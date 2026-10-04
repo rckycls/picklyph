@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="330" viewBox="0 0 900 330" role="img" aria-labelledby="title description">
+  <title id="title">PicklyPH app color palette</title>
+  <desc id="description">Court blue, court green, ball lime, deep navy, and white, inspired by the user's pickleball photograph.</desc>
+  <rect width="900" height="330" rx="24" fill="#F6F8FB"/>
+  <g font-family="Segoe UI, Arial, sans-serif" fill="#14264D">
+    <text x="32" y="48" font-size="26" font-weight="700">PicklyPH</text>
+    <text x="32" y="76" font-size="15" fill="#526078">Colors from the court. Ready for the app.</text>
+    <g transform="translate(32 100)">
+      <rect width="156" height="110" rx="14" fill="#466E9E"/>
+      <text y="140" font-size="16" font-weight="600">Court blue</text>
+      <text y="164" font-size="14" fill="#526078">#466E9E</text>
+    </g>
+    <g transform="translate(202 100)">
+      <rect width="156" height="110" rx="14" fill="#4EA473"/>
+      <text y="140" font-size="16" font-weight="600">Court green</text>
+      <text y="164" font-size="14" fill="#526078">#4EA473</text>
+    </g>
+    <g transform="translate(372 100)">
+      <rect width="156" height="110" rx="14" fill="#E5FC35"/>
+      <text y="140" font-size="16" font-weight="600">Ball lime</text>
+      <text y="164" font-size="14" fill="#526078">#E5FC35</text>
+    </g>
+    <g transform="translate(542 100)">
+      <rect width="156" height="110" rx="14" fill="#14264D"/>
+      <text y="140" font-size="16" font-weight="600">Deep navy</text>
+      <text y="164" font-size="14" fill="#526078">#14264D</text>
+    </g>
+    <g transform="translate(712 100)">
+      <rect width="156" height="110" rx="14" fill="#FFFFFF" stroke="#D8E1EC"/>
+      <text y="140" font-size="16" font-weight="600">White</text>
+      <text y="164" font-size="14" fill="#526078">#FFFFFF</text>
+    </g>
+    <text x="32" y="306" font-size="14" fill="#526078">Blue for primary actions · Lime for highlights · Navy for readable text</text>
+  </g>
+</svg>

@@ -1,0 +1,195 @@
+# PicklyPH: vibe-plus plan
+
+> An iOS pickleball court finder and venue manager for players and verified owners across the Philippines.
+
+**Tool/plan:** Codex desktop, ChatGPT Plus; retain the user's configured model. **Capacity:** initial estimate 8 points/window; schedule 7 plus reserved wrap-up. **Availability:** a few sessions/week (assume 3). **Target:** no deadline. **Experience:** experienced with development setup. **Created:** 2026-10-05, Asia/Manila.
+
+## Decisions (locked unless evidence requires a change)
+
+- Mobile: Expo, React Native, TypeScript, Expo Router, React Native Reanimated, Gesture Handler, `@gorhom/bottom-sheet`, and TanStack Query. Pin an Expo-compatible dependency set during T01; do not overwrite the existing theme when scaffolding.
+- Maps: `react-native-maps` using Google Maps on iOS, with app-owned venue data and markers. Owners search an address or drag a pin, then submit the venue for review. Google supplies the basemap; do not build tiles or scrape Google's venue data.
+- Backend: Supabase PostgreSQL with PostGIS, Auth, Storage, Edge Functions, Cron, and row-level security. Booking mutations run through authorized server-side transactions, not direct client writes.
+- Upstash: server-side Redis via `@upstash/redis` and `@upstash/ratelimit` for business API request limits. Use separate staging/production databases and secrets; never expose Redis tokens to mobile or browser code. Implement the reusable guard during T13 and apply it to later player/owner commands. Supabase Auth retains its own authentication limits. See [Supabase integration](https://supabase.com/docs/guides/functions/examples/rate-limiting) and [Upstash rate-limit behavior](https://upstash.com/docs/redis/sdks/ratelimit-ts/features).
+- Service boundaries: Supabase is authoritative for allocation locks, booking holds, payment idempotency, event outbox and expiry jobs; do not move these to Redis or add QStash in v1. Configure separate limits by verified user/action and trusted request-source IP for guest searches; return 429 with retry information. On Redis failure/timeout, public discovery may continue with bounded DB queries, but creation of new holds/checkouts fails with retryable 503 before inventory/payment changes. Cancellation and authenticated provider webhooks must remain processable. Do not silently accept the SDK's fail-open timeout for protected creation commands. Restrict direct mutation/RPC privileges so guarded commands cannot be bypassed.
+- Admin: Next.js/TypeScript on Vercel; Supabase for backend hosting, Expo EAS for cloud iOS builds and TestFlight. The mobile app stays at repo root; `apps/admin/` is the admin workspace, `packages/domain/` holds shared contracts, `supabase/` holds migrations/functions/tests, `src/features/` holds mobile features, and `src/theme/` holds styling. Use npm workspaces with one root lockfile; exclude admin code from mobile TypeScript compilation.
+- Identity: guests can browse; Apple sign-in or email verification codes to book. Owners use the same account, with venue-scoped verified ownership. Admins and moderators use the web console; privileged roles cannot be self-assigned.
+- Branding: use `src/theme/colors.ts` and `docs/brand-colors.md`. Blue `#466E9E`, green `#4EA473`, lime `#E5FC35`, navy `#14264D`, white `#FFFFFF`; preserve readable foreground pairs. White sheets/cards, blue primary actions, lime highlights.
+- Locale: English, PHP, integer centavos, Asia/Manila schedule display, UTC storage. Defaults: 30-minute rental increments, one-hour minimum rental, 60-day booking horizon; open-play group limit defaults to 4, adjustable by the owner within session capacity.
+- Directory: admins seed approved listings. Unclaimed venues show contact/directions only. Owners can claim listings or submit missing venues; reviewed ownership and a configured schedule are prerequisites for booking. One owner may manage multiple venues and multiple courts per venue.
+- Reservations: private rentals allocate one court; open-play sessions allocate specified courts and sell participant spots. Groups supply participant names, pay as one booking, and cancel as one booking in v1. Owners record outside bookings, maintenance, and walk-ins in the same inventory system.
+- Owner policies: instant or approval-based confirmation per venue; online, arrival, or both payment options. Initial venue defaults are instant and pay-on-arrival; online remains disabled until merchant activation.
+- Holds: approval requests reserve court inventory/session spots for up to 2 hours, capped at start time. On acceptance, arrival bookings confirm; online bookings have a 15-minute payment hold capped at start time. Instant online bookings use that same 15-minute hold. Release declined, cancelled, and expired allocations transactionally; availability queries must not rely solely on a cron job running on time.
+- Booking correctness: shared court allocations use nonoverlapping half-open UTC intervals; sessions lock their participant inventory so group reservations cannot exceed capacity. Pending requests and checkout holds consume inventory. Retry-safe commands and database constraints prevent duplicates and conflicts. Snapshot totals and policies; reject schedule edits that displace active allocations. Checkouts cannot change price after booking creation.
+- Payments: PayMongo hosted checkout with provider-configured settlement to verified venue accounts and zero platform commission. Owners absorb processing costs; show the full booking price before confirmation. Server-only secrets, signed/deduplicated webhooks, and reconciliation; redirects are not payment confirmation. Late payment after inventory release triggers a refund, never booking revival.
+- Cancellation: players can cancel before play; full refund at least 24 hours before start, no automatic refund later. Venue cancellation refunds in full. No reschedule API in v1: cancel then rebook. Keep booking and payment/refund statuses separate; do not label requested refunds as completed.
+- Operations: owner calendar, approvals, private and session walk-ins, check-in, completed/no-show states, arrival-payment recording; public reports, listing moderation, ownership verification, suspension, and privileged audit logs. Suspension stops new bookings; cancelling existing bookings is an explicit audited action with full refunds for venue cancellations.
+- Notifications: booking request, acceptance/decline, payment, cancellation, expiry, and one-hour-before-play reminders via an outbox and Expo push. Push is supplementary; the booking screen remains authoritative.
+- Public read API: approved venue search by map bounds/city/name, details, filters and availability. Authenticated command API: reserve/accept/decline/cancel/check-in/record-arrival-payment, session management, owner submissions/claims, and moderation; authorization and idempotency required. Shared contracts cover profiles, venues, courts, schedules, allocations, sessions, bookings, participants, payments/refunds, reports, and audits.
+
+## Scope and assumptions
+
+**MVP:** nationwide discovery; owner pins and verified claims; court rentals and group open play; booking operations; integrated online/arrival payments; web moderation; notifications; privacy/account deletion; TestFlight pilot.
+**Later:** Android release, public player website, ratings, chat, memberships, tournaments, subscriptions/commission, staff roles, advanced financial reporting; Upstash caching of public directory metadata only if measured latency/load justifies it. Always query current booking availability in PostgreSQL; never treat cached data as reservable inventory. Do not silently move online payment out of the MVP if onboarding is delayed.
+**Assumptions:** working name PicklyPH; 3 sessions/week is a scheduling default, not a confirmed usage allowance. Weekly limits, model cost, provider approval, and account setup may change pacing. Sixteen windows is an initial estimate, not a delivery promise. Recalibrate after each window; split any task larger than L.
+**Initial baseline:** palette tokens, usage guide, SVG palette preview only; no package manifest, app scaffold, backend, or git commits at planning time. T01 now provides the Expo SDK 57 app foundation; see HANDOFF.md for current state. Planning also consumes allowance; use fresh task chats.
+**Sizes:** S=1, M=2, L=4. Human tasks do not consume AI task points. W1/W2 have full cards; expand later cards just before their window using the current handoff.
+
+## Overview
+
+| Window | Demo/milestone | AI tasks | Points | Human cooldown / gate |
+| --- | --- | --- | --- | --- |
+| W1 | Branded iOS app shell | T01–T03 | 7 | H01–H03: build, maps, backend, payments accounts |
+| W2 | Google Maps with sample court pins | T04–T06 | 7 | H03–H04: merchant eligibility and seed venue permissions |
+| W3 | Player sign-in and protected owner access | T07–T09 | 7 | H05: Apple/email sign-in on an iPhone |
+| W4 | Admins publish directory listings | T10–T12 | 7 | H04: collect real approved listing details |
+| W5 | Rate-limited court search and owner pin submission | T13–T16 | 7 | H02: Redis ready; H06: owner claim/moderation trial |
+| W6 | Verified owner edits venue and policies | T17–T20 | 7 | H06: verify venue hours, rates, courts |
+| W7 | Shared schedule and conflict prevention | T21–T23 | 7 | H07: calendar/walk-in workflow review |
+| W8 | Private rental with arrival payment | T24–T26 | 7 | H07: two-player booking race test |
+| W9 | Owners create open play; groups reserve spots | T27–T29 | 7 | H08: agree capacities and group limits with pilot owners |
+| W10 | Approval/expiry lifecycle and owner operations | T30–T33 | 7 | H08: no-show, cancellation, and approval trials |
+| W11 | Online checkout with venue settlement | T34–T36 | 7 | H03: activated provider test relationships must be ready |
+| W12 | Reliable payment events and recovery | T37–T39 | 7 | H09: interrupted checkout and late payment tests |
+| W13 | Cancellation and refunds | T40–T42 | 7 | H09: confirm gross refunds and venue fee handling |
+| W14 | Booking alerts and reminders | T43–T45 | 7 | H10: iPhone push permission/background checks |
+| W15 | Moderation, privacy, and pilot acceptance | T46–T49 | 7 | H11: review privacy copy and real pilot directory |
+| W16 | TestFlight pilot and launch monitoring | T50–T52 | 7 | H12: owner/player device trials; store submission when ready |
+
+## Shared task and wrap-up rules
+
+Read `vibe-plus/HANDOFF.md` first, then only the current card and its listed context. Each kickoff permits current-card setup/config files and dependency updates necessary for its goal, plus PLAN/HANDOFF status updates; avoid unrelated changes. Full cards below define boundaries. Do not create separate Codex chats, spawn agents, or change models automatically.
+Each task ends with its meaningful done-check, a task checkbox update, a short handoff update, and an explicit-path commit named `Txx: <title>`. Handle filesystem approval normally; do not bypass it. At the end of every window reserve wrap-up: log planned/done points and limit outcome, recalibrate, pack remaining windows, expand the next window's cards, and commit the updated handoff. Stop a debugging loop after two failed fixes and record evidence/new approach. Do not start L work near a limit.
+
+### W1: branded app shell (7 / 8)
+
+- [x] **T01 · Scaffold the mobile workspace** `L` 🤖 `big`
+  - **Goal:** a minimal Expo Router iOS app and reproducible npm workspace, preserving the existing palette.
+  - **Files:** root `package.json`, lockfile, `app.config.ts`, `tsconfig.json`, lint config, `.gitignore`, `src/app/_layout.tsx`, `src/app/index.tsx`, `packages/domain/` scaffold; preserve `src/theme/colors.ts` and `docs/`.
+  - **Context:** this plan's Decisions and W1; `src/theme/colors.ts`, `docs/brand-colors.md`; current Expo scaffold documentation. No external accounts needed for the starter screen.
+  - **Done when:** clean install succeeds, `npm run typecheck` and `npm run lint` pass, `npx expo-doctor` has no unresolved dependency issues, and Metro bundles iOS successfully. Verify a themed welcome screen on an available iPhone; report device testing separately if unavailable.
+  - **Validated 2026-10-05:** `npm ci`, typecheck (mobile/domain), lint, `expo install --check`, Expo Doctor (21/21), and `npm run bundle:ios` passed on Windows/Node 24.19.0/npm 11.17.0. Physical iPhone rendering remains unverified. Expo SDK 57/React Native 0.86.3 pinned; upstream npm audit advisories recorded in HANDOFF.md.
+  - **Kickoff prompt:** `Read vibe-plus/HANDOFF.md, then T01 in vibe-plus/PLAN.md. Scaffold the Expo mobile workspace within the card's file boundary; preserve our existing theme and docs. Add the listed check scripts, run the done-checks, record device evidence separately, update PLAN/HANDOFF, then commit when done as "T01: scaffold mobile workspace". Do not build later features.`
+- [ ] **T02 · Reusable branded controls and navigation** `M` 🤖 `small-ok`
+  - **Goal:** accessible button, card, field, and status primitives with Discover, Bookings, and Account destinations.
+  - **Files:** `src/components/ui/`, `src/app/(tabs)/`, `src/app/_layout.tsx`; T01 wiring as needed.
+  - **Context:** T01 handoff, existing app layouts, `src/theme/colors.ts`, `docs/brand-colors.md`.
+  - **Done when:** typecheck/lint and iOS bundle pass; tab switching and labeled controls work on-device with the specified foreground/background pairs. No fake live bookings or backend claims.
+  - **Kickoff prompt:** `Read vibe-plus/HANDOFF.md and card T02. Build the branded primitives and three navigation destinations using our semantic colors; read/touch only the card's files. Run its checks, update PLAN/HANDOFF, then commit when done as "T02: add branded app controls".`
+- [ ] **T03 · Environment setup and developer guide** `S` 🤖 `small-ok`
+  - **Goal:** document exact local setup and separate public configuration from server-only secrets, including Upstash REST URL/token server configuration.
+  - **Files:** `.env.example`, `README.md`; `.gitignore` if necessary.
+  - **Context:** T01/T02 handoff and actual package scripts/config; H01–H03 below.
+  - **Done when:** examples contain placeholders only, real `.env` files are ignored, README commands match scripts, and secret keys are never specified as Expo public variables.
+  - **Kickoff prompt:** `Read vibe-plus/HANDOFF.md and T03. Write .env.example and README.md for the actual workspace, including Windows-to-iOS EAS setup and secret boundaries. Check commands against scripts and git-ignore behavior, update PLAN/HANDOFF, then commit when done as "T03: document environment setup".`
+
+### W2: native map and backend foundation (7 / 8)
+
+- [ ] **T04 · Google Maps on iOS with sample pins** `L` 🤖 `big`
+  - **Goal:** interactive in-app Google Map, three clearly labeled demo venues, a selected-court sheet, and location-denied fallback.
+  - **Files:** `src/app/(tabs)/index.tsx`, `src/features/discovery/`, `src/lib/location.ts`, `app.config.ts`, `eas.json`, dependencies and env examples as needed.
+  - **Context:** T02/T03 handoff, app shell/UI components, theme; H01 must be complete; official react-native-maps installation docs.
+  - **Done when:** typecheck/lint/iOS bundle pass and a physical iPhone development build actually displays Google Maps; tap/select markers, recenter, pan, and deny location successfully. Default to a Philippines-wide view without permission. Demo data must be labeled and kept out of production seed data.
+  - **Kickoff prompt:** `Read vibe-plus/HANDOFF.md and T04. Implement the native Google Maps discovery screen with demo court markers, selection sheet, and denied-location fallback, within the listed files. Use H01 credentials with app restrictions; no keys in commits. Run the card's checks and verify the native Google map on an iPhone, update PLAN/HANDOFF, then commit when done as "T04: add iOS court map". If H01 is missing, record that gate and do independent tasks rather than claiming completion.`
+- [ ] **T05 · Public directory schema and shared contracts** `M` 🤖 `big`
+  - **Goal:** venue/court tables with coordinates, publication/claim status, safe public reads, and reusable domain types.
+  - **Files:** `supabase/config.toml`, `supabase/migrations/`, `supabase/tests/directory.sql`, `packages/domain/src/`, `src/lib/supabase.ts`; dependency/env wiring as needed.
+  - **Context:** Decisions; H02 project config; domain scaffold; official Supabase PostGIS/RLS docs. Only model directory data now, not booking/payment internals.
+  - **Done when:** migrations apply to a disposable local or staging database; spatial lookup returns expected fixtures; anonymous callers read only approved public fields and cannot mutate listings or read claim evidence; generated/domain types compile.
+  - **Kickoff prompt:** `Read vibe-plus/HANDOFF.md and T05. Create the public venue/court schema, PostGIS indexes, safe read policies, and shared contracts within the card's files. Use H02 and disposable test data. Run migration, spatial, access-policy, and type checks; update PLAN/HANDOFF, then commit when done as "T05: add directory data foundation".`
+- [ ] **T06 · Validate PayMongo marketplace prerequisites** `S` 🤖 `big`
+  - **Goal:** establish the provider-supported checkout/split/settlement/refund API path and test/live merchant requirements before payment implementation.
+  - **Files:** `docs/payment-integration.md`, `.env.example` only if needed.
+  - **Context:** Decisions, H03 answers, official PayMongo hosted-checkout, split-payment, webhook, and refund documentation. Do not mix API versions without verified compatibility.
+  - **Done when:** notes name the supported API flow, activation requirements, signature checks, checkout expiry, late-payment handling, venue fee responsibility, and gross-refund funding. Any provider questions are explicitly assigned to H03; no payment code or live charges.
+  - **Kickoff prompt:** `Read vibe-plus/HANDOFF.md and T06. Check current official PayMongo documentation and record the supported marketplace checkout/settlement/refund flow and merchant gates in docs/payment-integration.md. Distinguish verified facts from provider questions. Keep the full online-payment scope, update PLAN/HANDOFF, then commit when done as "T06: verify payment integration prerequisites".`
+
+## Later windows: expand cards just before implementation
+
+### W3: identity (7 points)
+- [ ] T07 · L · 🤖 · Apple/email sign-in and session lifecycle · done when sign-in/out, restoration, and protected routes work on iPhone.
+- [ ] T08 · M · 🤖 · Profiles, privileged roles, venue ownership and RLS · done when player/owner/admin/moderator allow/deny tests pass and roles cannot be self-assigned.
+- [ ] T09 · S · 🤖 · Currency, time, booking horizon and duration helpers · done when PHP-centavo and UTC/Manila boundary cases pass.
+### W4: admin directory (7 points)
+- [ ] T10 · L · 🤖 · Next.js admin workspace and role-gated access · done when admin builds and role-denied users cannot access privileged operations.
+- [ ] T11 · M · 🤖 · Directory listing creation/edit/publish and import · done when approved records appear in public queries and drafts stay private.
+- [ ] T12 · S · 🤖 · Privileged action audit records · done when actor, target, action, and timestamp persist through server-side changes.
+### W5: discovery and owner pin submission (7 points)
+- [ ] T13 · M · 🤖 · Bounded geographic/city/name search API and shared Upstash rate-limit guard · done when spatial/filter/pagination, 429/retry, secret-isolation, and outage-policy checks pass; leave a reusable guard for subsequent command handlers.
+- [ ] T14 · M · 🤖 · Live map/list, filters, details and directions · done when both views select the same venue and unclaimed listings show contact instead of booking.
+- [ ] T15 · M · 🤖 · Owner pin submission and claim evidence · done when address search/drag pin creates a reviewable submission with private evidence and duplicate warnings.
+- [ ] T16 · S · 🤖 · Discovery loading/error/empty/location states · done when offline, denied permission, and empty search remain usable without false availability.
+### W6: verified venue management (7 points)
+- [ ] T17 · M · 🤖 · Ownership review/approval and duplicate resolution · done when only authorized admins approve ownership and duplicate evidence stays private.
+- [ ] T18 · M · 🤖 · Venue/court/photo editing with storage permissions · done when verified owners update only their own venues and uploads have enforced constraints.
+- [ ] T19 · M · 🤖 · Opening hours, rate rules and schedule exceptions schema · done when same-day/overnight schedules and closure exceptions resolve correctly.
+- [ ] T20 · S · 🤖 · Owner mode switch and venue policy form · done when verified owners switch context and configure confirmation/payment policies safely.
+### W7: shared court inventory (7 points)
+- [ ] T21 · L · 🤖 · Transactional allocations and expiration primitives · done when simultaneous conflicting allocations fail safely and adjacent intervals succeed.
+- [ ] T22 · M · 🤖 · Owner calendar, court hours, closures and blocks · done when blocks use shared allocations and conflicting edits cannot displace bookings.
+- [ ] T23 · S · 🤖 · Server rental validation and price snapshots · done when invalid durations, out-of-hours starts, horizon violations, and changed-rate cases pass.
+### W8: private rental (7 points)
+- [ ] T24 · L · 🤖 · Private-booking requests/acceptance/expiry API · done when instant/approval arrival bookings obey holds, retries, authorization, and Upstash limits; Redis outages cannot create unguarded holds and direct RPC calls cannot bypass guards.
+- [ ] T25 · M · 🤖 · Private-rental selection and booking/history screens · done when an authenticated player sees total/policy, reserves, and sees authoritative status.
+- [ ] T26 · S · 🤖 · Private booking race/retry regression cases · done when repeated commands create one reservation and concurrent requests cannot double-book.
+### W9: group open play (7 points)
+- [ ] T27 · L · 🤖 · Owner session scheduling and court allocation · done when sessions reserve their assigned courts and owners cannot overlap private rentals.
+- [ ] T28 · M · 🤖 · Atomic participant/group booking API · done when participant names/limits are enforced and concurrent groups cannot oversell capacity.
+- [ ] T29 · S · 🤖 · Owner-entered session walk-ins · done when a walk-in consumes the same spot inventory and cannot exceed capacity.
+### W10: booking operations (7 points)
+- [ ] T30 · M · 🤖 · Player session discovery and group reservation UI · done when spot count, names, price, policy and confirmation match server records.
+- [ ] T31 · M · 🤖 · Owner approvals, outside bookings, check-in and arrival payments · done when manual bookings share inventory and statuses/payment records are correctly separated.
+- [ ] T32 · M · 🤖 · Scheduled hold expiry and lifecycle transitions · done when expired requests release inventory even with delayed cron, and declines/cancellations are retry-safe.
+- [ ] T33 · S · 🤖 · Arrival-booking cancellation/no-show regression cases · done when start-time and exact 24-hour boundaries match locked policy.
+### W11: checkout (7 points; H03 is a gate)
+- [ ] T34 · L · 🤖 · PayMongo checkout/venue settlement adapter · done when sandbox checkout references the correct venue, amount and booking, with provider expiry, server-only secrets, and the shared Upstash creation guard.
+- [ ] T35 · M · 🤖 · Allowed payment choice and hosted checkout launch · done when venue-enabled methods alone are offered and approval precedes online checkout.
+- [ ] T36 · S · 🤖 · Payment account activation and total-price display · done when unactivated venues cannot enable online payment and totals have no hidden platform fees.
+### W12: payment reliability (7 points)
+- [ ] T37 · L · 🤖 · Signed webhook handling and payment reconciliation · done when duplicate/out-of-order events, mismatched amounts, late payment and expired inventory are handled safely.
+- [ ] T38 · M · 🤖 · Checkout return, cancellation and payment retry UI · done when redirects alone never confirm payment and retries cannot double-charge.
+- [ ] T39 · S · 🤖 · Payment exception queue for admins · done when stuck/late payments are visible and manual reconciliation is audited.
+### W13: refunds (7 points)
+- [ ] T40 · L · 🤖 · Cancellation/refund worker and provider outcomes · done when player cutoff, venue cancellation, late payment and refund-failure cases are idempotent and release inventory correctly.
+- [ ] T41 · M · 🤖 · Player/owner payment and refund status screens · done when paid, arrival-unpaid, refund-pending, failed and refunded states stay accurate.
+- [ ] T42 · S · 🤖 · Gross-refund and 24-hour boundary regressions · done when the original policy/price snapshot governs and refund confirmations follow provider truth.
+### W14: notifications (7 points)
+- [ ] T43 · L · 🤖 · Push registration, event outbox and delivery worker · done when request/accept/decline/payment/cancel/expiry events deliver once logically with safe retries and invalid-token cleanup.
+- [ ] T44 · M · 🤖 · One-hour reminders and booking deep links · done when cancelled bookings do not remind, newly confirmed bookings inside one hour remind once, and links respect account access.
+- [ ] T45 · S · 🤖 · Notification preferences and permission UX · done when denied permission leaves booking flows usable and sign-out removes account/device association.
+### W15: trust and pilot acceptance (7 points)
+- [ ] T46 · M · 🤖 · Public reports, moderation and audited suspension · done when moderators cannot grant ownership/refund access and suspensions prevent new bookings.
+- [ ] T47 · M · 🤖 · Privacy/account deletion workflow · done when deletion removes personal profile data, handles future bookings under policy and preserves only necessary transaction references for reconciliation.
+- [ ] T48 · M · 🤖 · Integrated player/owner/admin acceptance scenarios · done when guest discovery, owner pin/review, court/group booking and cancellation pass together, including access isolation.
+- [ ] T49 · S · 🤖 · Real pilot directory import and demo-data removal · done when production contains only approved venue data and clearly distinguishes claimed/unclaimed listings.
+### W16: TestFlight pilot (7 points)
+- [ ] T50 · L · 🤖 · Staging/production migration and TestFlight delivery · done when an installable iPhone build uses restricted production keys and staging is isolated.
+- [ ] T51 · M · 🤖 · Error, payment/refund, Redis and scheduled-job monitoring · done when simulated failures alert operators, Upstash environment isolation/outage policies hold, and venue/payment rollout gates are enforced.
+- [ ] T52 · S · 🤖 · Release/recovery runbook and pilot handoff · done when setup, rollback, incident handling and remaining store-submission work are documented.
+
+## Human cooldown tasks (complete before dependent AI work)
+
+- [ ] H01 · S · 🧑 · After W1, before T04: Expo/EAS and Apple Developer access, a physical iPhone registered for builds, Google Cloud Maps SDK for iOS plus Places/address search configuration. Restrict native/server keys separately; supply values via ignored env/hosting secrets. Allow 30–60 min active work plus external enrollment delays.
+- [ ] H02 · S · 🧑 · After W1, before T05: Supabase staging/production projects and local Docker or disposable staging SQL access; before T13, add separate Upstash Redis staging/production databases, located near the configured server region. Supply Supabase public URL/key via local env and server-only Supabase/Upstash secrets via hosting configuration; allow 30–50 min.
+- [ ] H03 · M · 🧑 · Start after W1; respond during T06; complete before T34: PayMongo business onboarding, provider confirmation of marketplace relationships/checkout compatibility, venue settlement and refund funding, and pilot owner merchant onboarding. Account activation may take days; no secret keys in chat or commits. Estimate 30–60 min active work, excluding approval waits.
+- [ ] H04 · M · 🧑 · After W2–W4, before T49: collect permissioned venue names, contacts, photos, pin coordinates, court counts, hours and rates; start with a small verified set across PH regions. Nationwide support does not imply a complete directory on day one.
+- [ ] H05 · S · 🧑 · After W3: test Apple/email sign-in, token restoration, sign-out, and guest browse on a physical iPhone; return concise failure steps.
+- [ ] H06 · S · 🧑 · After W5–W6: trial ownership evidence/review and confirm listing accuracy with pilot owners.
+- [ ] H07 · S · 🧑 · After W7–W8: compare owner calendar against outside bookings and test simultaneous bookings with two accounts.
+- [ ] H08 · S · 🧑 · After W9–W10: trial group capacities, walk-ins, approvals, check-in and no-shows with pilot owners.
+- [ ] H09 · M · 🧑 · After W11–W13, before live online payment: trial wallet/card paths, interrupted checkout, gross refunds, provider fees and venue settlement in the enabled sandbox/live verification process.
+- [ ] H10 · S · 🧑 · After W14: test push notifications/background delivery/permission denial on iPhone.
+- [ ] H11 · M · 🧑 · After W15: review privacy/contact/account-deletion copy and approve real directory entries for the pilot.
+- [ ] H12 · M · 🧑 · After W16: player/owner TestFlight acceptance, store assets/support URLs, and Apple review submission when the pilot passes.
+
+## Tips and calibration
+
+Use a fresh chat per task and paste its kickoff. Keep context to the card and handoff; share only relevant error excerpts. Run cheap manual setup during cooldowns; never paste keys. Use the model-cost labels as suggestions, not automatic model changes. Reserve wrap-up before a reset and record partial work precisely.
+At check-in, an unfinished task earns half its points. Estimate real capacity as done if the limit hit, or done+2 if all planned work finished with room left; average the last three observed windows, round down, then schedule capacity minus one. Re-size one anomalous task instead of treating its overrun as universal. Respect observed weekly caps and provider gates; avoid promising fixed reset times.
+
+## Log
+
+| Date (Manila) | Window | Planned | Done | Limit hit | Notes |
+| --- | --- | --- | --- | --- | --- |
+| 2026-10-05 | Planning | — | — | Not reported | Initial plan created; no app implementation tasks completed. |
+| 2026-10-05 | Stack refinement | — | — | Not reported | User requested Supabase/Upstash; added Redis API guards and setup to existing tasks. Capacity estimate remains provisional. |
+| 2026-10-05 | W1 checkpoint | 7 | 4 | Not reported | T01 foundation checks pass; device check remains manual. T02/T03 pending; window not complete, no capacity recalibration yet. |

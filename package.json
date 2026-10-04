@@ -1,0 +1,44 @@
+{
+  "name": "picklyph",
+  "version": "0.1.0",
+  "private": true,
+  "main": "expo-router/entry",
+  "workspaces": ["packages/*", "apps/*"],
+  "engines": {
+    "node": ">=24.3.0",
+    "npm": ">=11"
+  },
+  "scripts": {
+    "start": "expo start",
+    "start:ios": "expo start --ios",
+    "typecheck": "tsc --noEmit && npm run typecheck --workspace @picklyph/domain",
+    "lint": "eslint . --max-warnings 0",
+    "check:dependencies": "expo install --check",
+    "bundle:ios": "expo export --platform ios --output-dir dist/ios"
+  },
+  "dependencies": {
+    "@expo/log-box": "57.0.4",
+    "@expo/metro-runtime": "57.0.16",
+    "@picklyph/domain": "0.1.0",
+    "expo": "57.0.26",
+    "expo-constants": "57.0.20",
+    "expo-linking": "57.0.11",
+    "expo-router": "57.0.24",
+    "expo-status-bar": "57.0.1",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-native": "0.86.3",
+    "react-native-gesture-handler": "2.32.0",
+    "react-native-reanimated": "4.5.1",
+    "react-native-safe-area-context": "5.7.0",
+    "react-native-screens": "4.26.0",
+    "react-native-web": "0.21.2",
+    "react-native-worklets": "0.10.1"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.4",
+    "eslint": "9.39.5",
+    "eslint-config-expo": "57.0.2",
+    "typescript": "6.0.3"
+  }
+}
