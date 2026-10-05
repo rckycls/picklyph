@@ -1,41 +1,38 @@
 # HANDOFF: read this first
 
-**Updated:** 2026-10-05, Asia/Manila. **Window:** W1 of an estimated 16. **Capacity:** 8 points; plan 7 plus reserved wrap-up. **Tool/plan:** Codex desktop, ChatGPT Plus. **Availability:** a few sessions/week; 3 assumed. **Experience:** experienced. **Deadline:** none.
+**Updated:** 2026-10-05, Asia/Manila. **Window:** W1 of an estimated 16. **Capacity:** 8 points; plan 7 plus wrap-up. **Tool/plan:** Codex desktop, ChatGPT Plus. **Availability:** a few sessions/week; 3 assumed. **Experience:** experienced. **Deadline:** none.
 
 ## Where we are
-- T01 finished; T02 implementation committed as `T02: add branded app controls`, with device acceptance pending. PLAN.md keeps T02 unchecked until that check passes.
-- App: Expo SDK 57.0.26 / React 19.2.3 / React Native 0.86.3. Discover is the initial tab, with Bookings and Account under `src/app/(tabs)/`; no map/backend yet. Root welcome route replaced with Discover; court artwork reused.
-- UI: `src/components/ui/` contains Button, Card, Field, StatusBadge, Screen, CourtArtwork, and TabIcon. Buttons support focus/pressed/disabled/loading; fields support labels/hints/errors/focus/disabled. Safe-area scrolling and font-scale-aware tab sizing included. Search/sign-in explicitly unavailable; buttons navigate between tabs.
-- Workspace: mobile app at root, `@picklyph/domain` under `packages/domain/`, reserved `apps/*` for admin. One root npm lockfile; Node >=24.3/npm >=11.
-- Existing palette/docs preserved: `src/theme/colors.ts`, `docs/brand-colors.md`, `docs/color-palette.svg`.
-- Theme: blue #466E9E, green #4EA473, lime #E5FC35, navy #14264D, white #FFFFFF. Text pairs checked at 4.5:1 or better.
-- Git: `main` tracks `origin/main` at https://github.com/rckycls/picklyph.git. T01/README, T02, and the Expo configuration sync are committed on `main`; the user authorized publishing this checkpoint.
-- T02 checks passed: mobile/domain typecheck, lint, iOS bundle (1114 modules), and 11 text contrast pairs (minimum 4.95:1). No dependency changes. T01 clean install, dependency check and Expo Doctor 21/21 previously passed.
-- Device evidence: no physical iPhone test. Browser permission review rejected localhost access as declined; no interaction/screenshot check claimed. Use matching SDK 57 Expo Go on iPhone; `start:ios` requires macOS.
+- Last finished: T03, committed as `T03: document environment setup`. T01 finished; T02 code/checks complete, but its checkbox stays open pending iPhone acceptance.
+- App: Expo SDK 57.0.26 / React 19.2.3 / React Native 0.86.3. Discover opens first, with Bookings/Account under `src/app/(tabs)/`. UI only; no service calls, native map, authentication, or reservations yet.
+- UI: `src/components/ui/` has Button, Card, Field, StatusBadge, Screen, CourtArtwork, TabIcon; focus/pressed/disabled/loading/error states, safe-area scrolling and font-scale-aware tabs. Search/sign-in explicitly unavailable; buttons navigate.
+- Workspace: root mobile, `packages/domain/`, reserved `apps/*` for admin; root npm lockfile, Node >=24.3/npm >=11. Theme/docs preserved: blue #466E9E, green #4EA473, lime #E5FC35, navy #14264D, white #FFFFFF.
+- T03: README covers actual scripts, optional local env setup, Expo Go and future Windows-to-iPhone EAS setup. Root `.env.example` activates only public Supabase URL/publishable key and the native Maps key; server references stay commented. No real credentials or app/dependency changes.
+- T03 checks passed: placeholder-only values, 3 active mobile/build variables, all package scripts/README file links valid, 8 private env paths ignored, template allowed, no tracked private env files. Existing ignore rules suffice.
+- Prior checks: mobile/domain typecheck, lint, iOS bundle (1114 modules), 11 text contrasts >=4.95:1; T01 clean install/dependency check/Expo Doctor 21/21. Native acceptance remains separate.
+- Git: `main` tracks `origin/main` at https://github.com/rckycls/picklyph.git. T01/T02/Expo sync pushed; T03 committed locally.
+- No iPhone evidence yet. Browser review denied localhost preview; no UI interaction/screenshot check claimed. Temporary preview server stopped.
 
 ## Next up
-1. T02 acceptance: run `npm start` on the computer and open it in Expo Go on an iPhone. Switch all three tabs, follow navigation buttons, check large text/scrolling, and use VoiceOver to confirm labels and disabled search/sign-in announcements. Tick T02 only when that passes.
-2. T03 · Environment setup/README can proceed independently while awaiting the device check.
-- Keep the mobile app at root; reserve apps/admin and packages/domain. Use Expo-compatible versions and the saved semantic theme.
-- W1: 4/7 accepted task points; 2 more implemented with device acceptance pending, 1 unstarted. No capacity recalibration until window check-in. User authorized T02 and committing/pushing current changes; T03 remains unstarted.
+1. T02 acceptance: run `npm start` on the computer, open matching SDK 57 Expo Go on iPhone, switch tabs/follow buttons, test large text/scrolling and VoiceOver labels/disabled states. Tick T02 only after that passes.
+2. H01 before T04: Expo/Apple accounts, iPhone, chosen bundle identifier, restricted iOS Maps key. T04 then adds native dependencies, EAS/config plugin wiring and the actual Google map.
+3. H02 before T05: Supabase staging/production and Docker or disposable staging SQL access. H03 begins provider/venue onboarding for T06 and later payments. W2 full cards already exist.
+- W1: 5/7 accepted points, all 7 implemented; T02's 2 await device acceptance. No window-end/usage-limit signal; capacity unchanged. User authorized T03; T04 has not started.
 
 ## Gotchas
-- Expo typed-route cache briefly contained stale/misclassified paths during file moves. Restarting `expo start` regenerated correct routes; do not cast paths or disable strict types to mask cache errors. Temporary preview server stopped after checks.
-- iOS-first from Windows: actual native Google Maps testing requires EAS build setup and a physical iPhone; no claim of device verification from a Metro bundle alone.
-- Google provides the basemap. PicklyPH owns its directory; owners drop venue pins and submit for review. Do not build custom map infrastructure.
-- Stack update: Supabase remains authoritative for all booking/payment data, holds, locks, and scheduled jobs. Add server-only Upstash Redis API rate limits in T13; no Redis inventory locks or QStash. Public directory caching is deferred until justified. Redis outages block new holds/checkouts, while cancellation and provider webhooks remain processable.
-- Online payment and venue settlement require PayMongo activation/relationships; T06 checks API compatibility and refund funding. Keep online payments in MVP, but gate live enablement on provider readiness.
-- Later windows are intentionally one-liners. Expand only the upcoming window into full cards at check-in/resume using real file paths learned so far.
-- Capacity and session count are estimates; do not infer actual account limits or reset times from them.
-- npm's optional peer resolution selected unsupported animation versions initially; explicit SDK-57 pins fixed it. The interrupted first install left missing files; clean `npm ci` restored them. Do not mask dependency failures with `any` declarations or `--legacy-peer-deps`.
-- Upstream audit follow-up: 30 advisories (20 high/10 moderate), including unpatched braces <=3.0.3 and node-forge <=1.4.0, plus Router decoding/uuid chains. No force fix or incompatible Expo downgrade applied. Reassess supported upstream fixes before pilot; this checkpoint is for development.
+- Root env values are unused by the current shell. T04 wires `GOOGLE_MAPS_IOS_API_KEY`; T05 wires `EXPO_PUBLIC_SUPABASE_URL`/`EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`. Native Maps keys ship in the binary: restrict bundle/API usage.
+- Server secrets never enter root mobile env, Expo public variables, app `extra`, or native config. Hosted functions inject `SUPABASE_URL`/`SUPABASE_SECRET_KEYS`; the `SUPABASE_` prefix is reserved. Optional other-host examples use `PICKLYPH_SUPABASE_URL`/`PICKLYPH_SUPABASE_SECRET_KEY`. Upstash REST URL/token live in backend secrets.
+- Windows supports Metro/cloud EAS submission; local iOS Simulator requires macOS. Actual native Google Maps acceptance needs the app's own physical iPhone development build; no `eas.json`, dev client, Maps plugin or bundle identifier is configured yet.
+- Google supplies the basemap; PicklyPH owns reviewed venue data/pins. Supabase owns inventory/holds/payments/jobs; T13 adds server-only Upstash API guards, no Redis locks/QStash. Redis outages block new holds/checkouts, while cancellation/webhooks remain processable.
+- Online payment live activation depends on PayMongo/provider readiness; T06 verifies marketplace APIs/refund funding. Keep full MVP payment scope.
+- Restart Metro after route moves if generated typed routes become stale; do not cast paths/disable strict typing. T01 dependency failures were resolved by SDK-57 pins and clean `npm ci`; do not use `any` shims or `--legacy-peer-deps`.
+- Existing audit follow-up: 30 upstream advisories (20 high/10 moderate), including unpatched braces/node-forge and Router/uuid chains. No force fix/downgrade; reassess supported fixes before pilot.
+- Expand later cards only just before their window. Estimates do not imply actual account limits/reset times.
 
 ## Waiting on the human
-- T02 iPhone acceptance above; T01 device rendering also remains unverified.
-- H01–H03 during first cooldown: iPhone/Apple/Expo/Google setup, Supabase projects, payment provider/merchant onboarding; H02 also covers Upstash Redis databases/secrets before T13. See PLAN.md for exact prerequisites.
-- Optional AGENTS.md startup rule has not been added; the skill requires offering it first.
+- T02 iPhone acceptance; T01 device rendering also unverified. H01–H03 account/device/provider setup (PLAN.md), with Upstash databases before T13.
+- Optional AGENTS.md startup rule remains unadded; offer before adding.
 
 ## Uncommitted or half-done
-- T02 source/planning and the pre-existing Expo-generated `.gitignore`/`expo-env.d.ts` changes are committed; no half-done code or pending source changes. Dependencies/build output stay ignored.
-- Next implementation: T03 in a fresh task chat. Keep admin excluded from mobile TypeScript/lint; it gets separate checks in T10.
-- At window end, log results, tick tasks, recalibrate, refresh this handoff, expand next-window cards, and commit. Keep this file under about 40 lines.
+- T03 docs/template/planning committed; no half-done code or pending source changes. Generated dependency/build/env files ignored.
+- At window end, log results, tick verified tasks, recalibrate, refresh handoff, expand upcoming cards, and commit.
