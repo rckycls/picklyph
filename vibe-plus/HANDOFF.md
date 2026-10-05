@@ -1,38 +1,37 @@
 # HANDOFF: read this first
 
-**Updated:** 2026-10-05, Asia/Manila. **Window:** W1 of an estimated 16. **Capacity:** 8 points; plan 7 plus wrap-up. **Tool/plan:** Codex desktop, ChatGPT Plus. **Availability:** a few sessions/week; 3 assumed. **Experience:** experienced. **Deadline:** none.
+**Updated:** 2026-10-05, Asia/Manila. **Window grouping:** W2 of an estimated 16; actual usage/reset timing unconfirmed. **Capacity:** estimated 8 points; plan 7 plus wrap-up. **Tool/plan:** Codex desktop, ChatGPT Plus; retain configured model. **Availability:** a few sessions/week, 3 assumed. **Experience:** experienced. **Deadline:** none.
 
 ## Where we are
-- Last finished: T03, committed as `T03: document environment setup`. T01 finished; T02 code/checks complete, but its checkbox stays open pending iPhone acceptance.
-- App: Expo SDK 57.0.26 / React 19.2.3 / React Native 0.86.3. Discover opens first, with Bookings/Account under `src/app/(tabs)/`. UI only; no service calls, native map, authentication, or reservations yet.
-- UI: `src/components/ui/` has Button, Card, Field, StatusBadge, Screen, CourtArtwork, TabIcon; focus/pressed/disabled/loading/error states, safe-area scrolling and font-scale-aware tabs. Search/sign-in explicitly unavailable; buttons navigate.
-- Workspace: root mobile, `packages/domain/`, reserved `apps/*` for admin; root npm lockfile, Node >=24.3/npm >=11. Theme/docs preserved: blue #466E9E, green #4EA473, lime #E5FC35, navy #14264D, white #FFFFFF.
-- T03: README covers actual scripts, optional local env setup, Expo Go and future Windows-to-iPhone EAS setup. Root `.env.example` activates only public Supabase URL/publishable key and the native Maps key; server references stay commented. No real credentials or app/dependency changes.
-- T03 checks passed: placeholder-only values, 3 active mobile/build variables, all package scripts/README file links valid, 8 private env paths ignored, template allowed, no tracked private env files. Existing ignore rules suffice.
-- Prior checks: mobile/domain typecheck, lint, iOS bundle (1114 modules), 11 text contrasts >=4.95:1; T01 clean install/dependency check/Expo Doctor 21/21. Native acceptance remains separate.
-- Git: `main` tracks `origin/main` at https://github.com/rckycls/picklyph.git. T01/T02/Expo sync pushed; T03 committed locally.
-- No iPhone evidence yet. Browser review denied localhost preview; no UI interaction/screenshot check claimed. Temporary preview server stopped.
+- Last finished: T03 (`61d3a82`). T01 finished; T02 code/checks complete, still awaiting iPhone interaction/accessibility acceptance. T04 source implementation and automated checks complete; native acceptance pending, checkbox open.
+- Mobile: Expo 57.0.26 / React 19.2.3 / React Native 0.86.3, TypeScript, Expo Router. Discover opens first; Bookings/Account remain honest placeholders. Backend/auth/reservations are not connected.
+- T04: native Google map with Philippines-wide default, three labeled demo locations, marker/list selection and a white detail sheet, optional foreground location, national reset, denial/services/timeout states and Settings recheck. Map pans freely; Google attribution stays within the map area. No location prompt on opening, persistence, or background tracking.
+- Fixtures are development-only, illustrative, unverified and not bookable; no production database seeds. Expo Go, browser and missing native configuration display a setup fallback. Real Google Maps requires this app's own iPhone development build.
+- Native dependencies pinned: react-native-maps 1.27.2, expo-location 57.0.20, expo-dev-client 57.0.19. `app.config.ts` has Maps/location plugins; `eas.json` has a physical-device internal development-client profile using the development environment.
+- EAS created/linked: [@rckycls/picklyph](https://expo.dev/accounts/rckycls/projects/picklyph), UUID `c856cbf6-f323-41b7-9e1a-76ef6f5f2146`, owner `rckycls`. Verified with project:info. User confirmed accounts/device ready and bundle ID `com.rckycls.picklyph`; device registration/provisioning/signing are not verified.
+- User explicitly answered **Key isn't saved yet**. `.env.local` exists but has no usable `GOOGLE_MAPS_IOS_API_KEY`. No real key values were printed, committed or uploaded. No cloud iOS build submitted.
+- T04 checks passed: mobile/domain typecheck, lint, iOS bundle (1161 modules), 16 discovery/config tests, Expo Doctor 21/21 and dependency compatibility. Synthetic-key config introspection verifies native key placement, foreground-only permission and bundle ID; this does not verify real Google tiles or an iPhone binary.
+- README scripts/file links and env placeholder/ignore checks pass. `.env.example` retains 3 active mobile/build placeholders and commented server references, plus optional build metadata. Native iOS EAS builds reject missing/placeholder Maps keys; ordinary source checks work without credentials.
+- Workspace: root mobile, `packages/domain/`, reserved `apps/*` admin, root npm lockfile, Node >=24.3/npm >=11. Theme preserved: blue #466E9E, green #4EA473, lime #E5FC35, navy #14264D, white #FFFFFF.
+- Git: `main` tracks https://github.com/rckycls/picklyph.git. T01/T02/Expo sync pushed; T03 and the T04 partial checkpoint are local commits. No push requested for these tasks.
+- No iPhone acceptance evidence yet. Prior localhost browser preview access was denied; no workaround or UI screenshot check claimed.
 
 ## Next up
-1. T02 acceptance: run `npm start` on the computer, open matching SDK 57 Expo Go on iPhone, switch tabs/follow buttons, test large text/scrolling and VoiceOver labels/disabled states. Tick T02 only after that passes.
-2. H01 before T04: Expo/Apple accounts, iPhone, chosen bundle identifier, restricted iOS Maps key. T04 then adds native dependencies, EAS/config plugin wiring and the actual Google map.
-3. H02 before T05: Supabase staging/production and Docker or disposable staging SQL access. H03 begins provider/venue onboarding for T06 and later payments. W2 full cards already exist.
-- W1: 5/7 accepted points, all 7 implemented; T02's 2 await device acceptance. No window-end/usage-limit signal; capacity unchanged. User authorized T03; T04 has not started.
+1. Finish H01/T04: add the restricted Maps SDK for iOS key to ignored `.env.local` under `GOOGLE_MAPS_IOS_API_KEY` and to the EAS development environment with sensitive visibility. Restrict it to `com.rckycls.picklyph`; never paste the key in chat. README contains the exact workflow.
+2. Verify/register the physical iPhone and Apple signing, submit `npx eas-cli@latest build --platform ios --profile development`, install the build, then `npm start -- --dev-client`. Verify actual Google tiles, all markers/list selections, sheet close, pan, recenter/national reset, permission denial, disabled services and Settings recovery. Only then tick T04.
+3. On that iPhone, complete T02 tab/button, large-text/scroll and VoiceOver checks, including Account's disabled sign-in state. Discover's old disabled search field has been replaced by the map screen. T01 device rendering is also unverified.
+4. Start T05 only when authorized: H02 needs Supabase staging/production and Docker or disposable staging SQL access. T06 needs H03 provider answers; no backend work started during T04.
+- W1: 5/7 accepted points, all code/docs implemented; T02's 2 await acceptance. W2: T04 partial checkpoint earns 2 points, no task accepted yet. No usage-limit/window-end signal; no recalibration.
 
 ## Gotchas
-- Root env values are unused by the current shell. T04 wires `GOOGLE_MAPS_IOS_API_KEY`; T05 wires `EXPO_PUBLIC_SUPABASE_URL`/`EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`. Native Maps keys ship in the binary: restrict bundle/API usage.
-- Server secrets never enter root mobile env, Expo public variables, app `extra`, or native config. Hosted functions inject `SUPABASE_URL`/`SUPABASE_SECRET_KEYS`; the `SUPABASE_` prefix is reserved. Optional other-host examples use `PICKLYPH_SUPABASE_URL`/`PICKLYPH_SUPABASE_SECRET_KEY`. Upstash REST URL/token live in backend secrets.
-- Windows supports Metro/cloud EAS submission; local iOS Simulator requires macOS. Actual native Google Maps acceptance needs the app's own physical iPhone development build; no `eas.json`, dev client, Maps plugin or bundle identifier is configured yet.
-- Google supplies the basemap; PicklyPH owns reviewed venue data/pins. Supabase owns inventory/holds/payments/jobs; T13 adds server-only Upstash API guards, no Redis locks/QStash. Redis outages block new holds/checkouts, while cancellation/webhooks remain processable.
-- Online payment live activation depends on PayMongo/provider readiness; T06 verifies marketplace APIs/refund funding. Keep full MVP payment scope.
-- Restart Metro after route moves if generated typed routes become stale; do not cast paths/disable strict typing. T01 dependency failures were resolved by SDK-57 pins and clean `npm ci`; do not use `any` shims or `--legacy-peer-deps`.
-- Existing audit follow-up: 30 upstream advisories (20 high/10 moderate), including unpatched braces/node-forge and Router/uuid chains. No force fix/downgrade; reassess supported fixes before pilot.
-- Expand later cards only just before their window. Estimates do not imply actual account limits/reset times.
+- Native Maps keys ship in the binary: restrict API/application use. Local `.env.local` is ignored and does not replace cloud EAS environment configuration. Changes to native plugins/keys require a rebuild.
+- Supabase public URL/publishable key remain unused until T05. Server credentials never enter root mobile env, Expo public variables, app extra or native configuration. Hosted functions inject `SUPABASE_URL`/`SUPABASE_SECRET_KEYS`; custom `SUPABASE_` names are reserved. Other-host examples use `PICKLYPH_SUPABASE_URL`/`PICKLYPH_SUPABASE_SECRET_KEY`.
+- Google supplies the basemap; PicklyPH owns reviewed venue data/pins. Supabase owns inventory/holds/payments/jobs. T13 adds server-only Upstash request guards, no Redis locks/QStash; Redis outages block new holds/checkouts while cancellation/webhooks remain processable.
+- Windows supports Metro/EAS cloud builds; local iOS Simulator requires macOS. Bundle/config tests cannot replace actual Google Maps device acceptance.
+- Online payment activation depends on PayMongo/provider readiness; T06 verifies marketplace APIs/refund funding. Retain full MVP payment scope.
+- Current npm audit: 31 affected upstream packages (21 high/10 moderate); Maps inherits the React Native chain. Suggested Maps downgrade to 1.20.1 falls outside the SDK-compatible pin. No force fix/downgrade; reassess supported fixes before pilot.
+- Restart Metro after route moves if generated routes are stale. Do not cast route paths, disable strict typing, add any shims or use legacy-peer-deps. Capacity estimates are not actual account limits/reset times.
 
-## Waiting on the human
-- T02 iPhone acceptance; T01 device rendering also unverified. H01–H03 account/device/provider setup (PLAN.md), with Upstash databases before T13.
-- Optional AGENTS.md startup rule remains unadded; offer before adding.
-
-## Uncommitted or half-done
-- T03 docs/template/planning committed; no half-done code or pending source changes. Generated dependency/build/env files ignored.
-- At window end, log results, tick verified tasks, recalibrate, refresh handoff, expand upcoming cards, and commit.
+## Waiting on the human / checkpoint
+- Restricted iOS Maps key, EAS environment/device/signing setup and T04/T02 iPhone acceptance. H02/H03 provider/backend setup; Upstash databases before T13. Optional AGENTS startup rule remains unadded.
+- T04 ends as a truthful partial commit; source checks pass, native gate remains. Generated dependency/build/private env files are ignored. At an actual window end, log results, recalibrate, refresh handoff, expand upcoming cards and commit.

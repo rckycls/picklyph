@@ -7,9 +7,11 @@ owners will pin and manage venues through the same account.
 ## Current state
 
 The Expo app opens on Discover, with Bookings and Account tabs and shared branded
-controls. Search and sign-in are labeled as coming soon. The native map,
-directory, authentication, reservations, payments, and owner tools are planned;
-the app currently requires no credentials and makes no service calls.
+controls. Discovery now has a Google Maps screen, three labeled development-only
+sample locations, a selected-venue sheet, and optional foreground location.
+Native map acceptance is pending the Maps key and an iPhone development build;
+Expo Go shows a setup fallback instead. The live directory, search, sign-in,
+reservations, payments, and owner tools are still planned.
 
 T01/T02 source checks and iOS bundling passed. Physical iPhone tab switching,
 large-text layout, and VoiceOver acceptance are still pending. Bundling alone
@@ -33,14 +35,16 @@ npm start
 ```
 
 If you already have the checkout, use that directory and preserve any existing
-`.env` values. Copying the template is optional for the current shell. When the
-integrations are added, replace its mobile/build placeholders with staging
-values. The commented server section is a reference, not mobile configuration.
+`.env` values. The fallback/tab UI works without credentials. To build the native
+map, replace the Maps placeholder in an ignored `.env.local` and configure it in
+the EAS development environment. Supabase values are unused until T05. The
+commented server section is a reference, not mobile configuration.
 
 Open matching **Expo SDK 57** Expo Go on an iPhone, put the phone and computer on
 the same Wi-Fi network, and scan Metro's QR code with the iPhone camera. Check
 all three tabs and their navigation buttons, large text/scrolling, and VoiceOver
-labels and disabled search/sign-in announcements. Press `Ctrl+C` to stop Metro.
+labels and disabled sign-in announcements. Expo Go does not verify this app's
+Google Maps build configuration. Press `Ctrl+C` to stop Metro.
 If the iOS App Store version of Expo Go no longer supports SDK 57, use a matching
 development build; do not change pinned dependencies just to suppress a mismatch.
 
@@ -56,6 +60,7 @@ If PowerShell blocks the npm scripts, use `npm.cmd`/`npx.cmd` for these commands
 | `npm run start:ios` | Start Metro and open a local iOS Simulator on macOS. |
 | `npm run typecheck` | Check mobile TypeScript and the shared domain workspace. |
 | `npm run lint` | Lint the mobile/domain/config source; fail on warnings. |
+| `npm run test:discovery` | Run location permission/failure, demo release-gate, and build-configuration checks with Node's test runner. |
 | `npm run check:dependencies` | Check the installed versions against the Expo SDK. |
 | `npm run bundle:ios` | Export an iOS Hermes bundle to ignored `dist/ios`; does not create an installable `.ipa`. |
 | `npx expo-doctor` | Check Expo project health; not a package script. |
@@ -76,6 +81,8 @@ Only the placeholder `.env.example` is allowed back into version control.
 | `EXPO_PUBLIC_SUPABASE_URL` | Mobile `.env`; EAS environment for cloud builds. | Directory client, T05. |
 | `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Same staging project as the URL; mobile `.env`/EAS. | Directory client, T05. |
 | `GOOGLE_MAPS_IOS_API_KEY` | Local native-build `.env` and EAS development environment. | Maps config plugin, T04. |
+| `IOS_BUNDLE_IDENTIFIER` (optional) | Local/EAS build configuration; defaults to `com.rckycls.picklyph`. | Must match the Maps key restriction and Apple signing. |
+| `EAS_PROJECT_ID` (optional) | Local/EAS build configuration; default project already linked in app config. | Use when intentionally changing the EAS project. |
 | `SUPABASE_URL`, `SUPABASE_SECRET_KEYS` | Automatically injected in Supabase-hosted functions; do not set/override them. | Privileged server handlers; never the mobile app. |
 | `PICKLYPH_SUPABASE_URL`, `PICKLYPH_SUPABASE_SECRET_KEY` | Optional reference names for other backend hosts; backend secrets or a separate ignored backend env file. | Server integrations outside hosted functions. |
 | `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | Backend hosting secrets or a separate ignored backend env file. | Server API rate limits, T13. |
@@ -116,30 +123,31 @@ in T06 before checkout implementation.
 
 ## Windows to iPhone development builds (T04)
 
-This is the upcoming setup workflow, not a build already configured by T03.
-The repo has no `expo-dev-client`, `eas.json`, iOS bundle identifier, EAS project
-link, or Maps plugin yet. H01 supplies the accounts/device/key; T04 adds the
-native dependencies and configuration. Google Maps acceptance must use the
-app's own iPhone development build with its configured key.
+Native Maps/location dependencies, `expo-dev-client`, the config plugins, and
+`eas.json` are now configured. The bundle identifier is `com.rckycls.picklyph`.
+The EAS project is [@rckycls/picklyph](https://expo.dev/accounts/rckycls/projects/picklyph),
+ID `c856cbf6-f323-41b7-9e1a-76ef6f5f2146`. No iPhone build or native acceptance has
+been completed yet. The real restricted Maps key, EAS development environment,
+device registration, and Apple signing must be ready before that check.
 
 1. Prepare an Expo account, active Apple Developer Program membership, and a
-   physical iPhone. Choose the app's unique iOS bundle identifier for T04.
+   physical iPhone. The account/device readiness and bundle ID were confirmed
+   for T04; verify the device is registered in EAS before building.
    Enable Maps SDK for iOS in a billing-enabled Google Cloud project and create
    the restricted iOS Maps key for that identifier. Use Developer Mode on the
    iPhone when installing a development build.
-2. During T04, set that identifier in `app.config.ts`, install `expo-dev-client`
-   and the map/location dependencies using Expo-compatible versions, and wire
-   `GOOGLE_MAPS_IOS_API_KEY` to the Maps plugin's `iosGoogleMapsApiKey` option.
-   Native changes require a new build. [Expo SDK 57 Maps setup](https://docs.expo.dev/versions/v57.0.0/sdk/map-view/)
-3. Link/configure the project during T04:
+2. Put `GOOGLE_MAPS_IOS_API_KEY` in ignored `.env.local`. The Maps plugin reads it
+   through `iosGoogleMapsApiKey`. iOS cloud builds reject missing/placeholder
+   keys. Native changes require a new build.
+   [Expo SDK 57 Maps setup](https://docs.expo.dev/versions/v57.0.0/sdk/map-view/)
+3. Sign in and check the existing project link:
 
    ```powershell
    npx eas-cli@latest login
-   npx eas-cli@latest init
-   npx eas-cli@latest build:configure --platform ios
+   npx eas-cli@latest project:info
    ```
 
-   Its `eas.json` development profile will use `developmentClient: true`,
+   Its `eas.json` development profile uses `developmentClient: true`,
    `distribution: "internal"`, and `environment: "development"`.
 4. Set the mobile public values and native Maps key in the EAS **development**
    environment. Use plaintext visibility for public values and sensitive
@@ -161,6 +169,15 @@ app's own iPhone development build with its configured key.
    is separate from the App Store Expo Go app and from later TestFlight delivery.
    [Expo iPhone cloud-build workflow](https://docs.expo.dev/tutorial/eas/ios-development-build-for-devices/)
 
+On the installed development build, pan the map, select all three demo markers
+and list entries, close the sheet, use location to recenter, and return to the
+Philippines-wide view. Deny location and confirm browsing still works; test
+disabled Location Services and returning from Settings after granting/revoking
+access. Google attribution stays inside the unobstructed map area. These checks
+require the device; Node tests and config introspection cannot substitute for them.
+Demo locations are illustrative and not bookable; release mode exposes no demo
+venues, and these fixtures are never backend seed data.
+
 ## Workspace and next steps
 
 | Path | Responsibility |
@@ -179,7 +196,8 @@ prepare separate staging/production Upstash Redis databases near the backend
 region. Begin PayMongo/venue onboarding alongside these tasks; T06 verifies
 the supported payment flow and live activation requirements.
 
-T01 recorded 30 upstream npm advisories (20 high/10 moderate). Reassess supported
-upstream fixes before pilot; do not apply a force fix that downgrades Expo or
-breaks native compatibility. This guide documents development setup, not a
-production release acceptance.
+T04 dependency audit reports 31 upstream advisories (21 high/10 moderate), including
+the new Maps package's inherited React Native advisory chain. The suggested Maps
+downgrade is outside the SDK 57 pin. Reassess supported upstream fixes before pilot;
+do not apply a force fix that breaks native compatibility. This guide documents
+development setup, not a production release acceptance.
