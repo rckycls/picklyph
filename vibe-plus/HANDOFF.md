@@ -9,7 +9,7 @@
 - Workspace: mobile app at root, `@picklyph/domain` under `packages/domain/`, reserved `apps/*` for admin. One root npm lockfile; Node >=24.3/npm >=11.
 - Existing palette/docs preserved: `src/theme/colors.ts`, `docs/brand-colors.md`, `docs/color-palette.svg`.
 - Theme: blue #466E9E, green #4EA473, lime #E5FC35, navy #14264D, white #FFFFFF. Text pairs checked at 4.5:1 or better.
-- Git: `main` tracks `origin/main` at https://github.com/rckycls/picklyph.git. T01/README pushed earlier; T02 committed locally. Preserve unrelated Expo-generated edits.
+- Git: `main` tracks `origin/main` at https://github.com/rckycls/picklyph.git. T01/README, T02, and the Expo configuration sync are committed on `main`; the user authorized publishing this checkpoint.
 - T02 checks passed: mobile/domain typecheck, lint, iOS bundle (1114 modules), and 11 text contrast pairs (minimum 4.95:1). No dependency changes. T01 clean install, dependency check and Expo Doctor 21/21 previously passed.
 - Device evidence: no physical iPhone test. Browser permission review rejected localhost access as declined; no interaction/screenshot check claimed. Use matching SDK 57 Expo Go on iPhone; `start:ios` requires macOS.
 
@@ -17,7 +17,7 @@
 1. T02 acceptance: run `npm start` on the computer and open it in Expo Go on an iPhone. Switch all three tabs, follow navigation buttons, check large text/scrolling, and use VoiceOver to confirm labels and disabled search/sign-in announcements. Tick T02 only when that passes.
 2. T03 · Environment setup/README can proceed independently while awaiting the device check.
 - Keep the mobile app at root; reserve apps/admin and packages/domain. Use Expo-compatible versions and the saved semantic theme.
-- W1: 4/7 accepted task points; 2 more implemented with device acceptance pending, 1 unstarted. No capacity recalibration until window check-in. User authorized T02 only this turn.
+- W1: 4/7 accepted task points; 2 more implemented with device acceptance pending, 1 unstarted. No capacity recalibration until window check-in. User authorized T02 and committing/pushing current changes; T03 remains unstarted.
 
 ## Gotchas
 - Expo typed-route cache briefly contained stale/misclassified paths during file moves. Restarting `expo start` regenerated correct routes; do not cast paths or disable strict types to mask cache errors. Temporary preview server stopped after checks.
@@ -36,6 +36,6 @@
 - Optional AGENTS.md startup rule has not been added; the skill requires offering it first.
 
 ## Uncommitted or half-done
-- T02 source/planning committed; no half-done code. `.gitignore` and tracked `expo-env.d.ts` had Expo-generated modifications before T02 and remain uncommitted. Dependencies/build output stay ignored.
+- T02 source/planning and the pre-existing Expo-generated `.gitignore`/`expo-env.d.ts` changes are committed; no half-done code or pending source changes. Dependencies/build output stay ignored.
 - Next implementation: T03 in a fresh task chat. Keep admin excluded from mobile TypeScript/lint; it gets separate checks in T10.
 - At window end, log results, tick tasks, recalibrate, refresh this handoff, expand next-window cards, and commit. Keep this file under about 40 lines.
