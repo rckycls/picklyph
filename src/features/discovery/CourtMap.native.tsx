@@ -72,7 +72,10 @@ export default function CourtMap({ venues, selectedId, focusRegion, showUserLoca
             title={venue.name}
             description="Sample location only. Not a verified court."
             accessibilityLabel={`${venue.name}. Sample location, not bookable.`}
-            pinColor={venue.id === selectedId ? colors.mapSelectedPin : colors.mapCourtPin}
+            image={venue.id === selectedId
+              ? require('../../../assets/brand/court-pin-selected.png')
+              : require('../../../assets/brand/court-pin.png')}
+            anchor={{ x: 0.5, y: 1 }}
             onPress={() => onSelect(venue)}
           />
         ))}

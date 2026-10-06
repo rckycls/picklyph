@@ -3,6 +3,7 @@ import { Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/ui/Button';
+import { BrandLockup } from '@/components/ui/BrandLockup';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import CourtMap from '@/features/discovery/CourtMap';
 import { getDemoVenues, PHILIPPINES_REGION, type DemoVenue } from '@/features/discovery/demoVenues';
@@ -11,6 +12,7 @@ import { useDeviceLocation } from '@/features/discovery/useDeviceLocation';
 import { VenueSheet } from '@/features/discovery/VenueSheet';
 import type { LocationResult } from '@/lib/location';
 import { colors } from '@/theme/colors';
+import { fonts } from '@/theme/typography';
 
 const venues = getDemoVenues(__DEV__);
 
@@ -45,7 +47,7 @@ export default function DiscoverScreen() {
     <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
       <View style={styles.header}>
         <View style={styles.brandRow}>
-          <Text accessibilityRole="header" style={styles.title}>PicklyPH</Text>
+          <BrandLockup tagline />
           <StatusBadge label={__DEV__ ? 'Demo map' : 'Philippines'} tone={__DEV__ ? 'pending' : 'neutral'} />
         </View>
         <View style={styles.actions}>
@@ -97,12 +99,11 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   header: { padding: 16, gap: 12, backgroundColor: colors.surface },
   brandRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
-  title: { color: colors.text, fontSize: 23, fontWeight: '800', letterSpacing: -0.8 },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   action: { flex: 1, flexBasis: 140, paddingHorizontal: 10 },
-  note: { color: colors.textSecondary, fontSize: 13, lineHeight: 20 },
+  note: { fontFamily: fonts.medium, color: colors.textSecondary, fontSize: 13, lineHeight: 20 },
   map: { flex: 1, minHeight: 0, overflow: 'hidden' },
   directory: { backgroundColor: colors.surface, paddingVertical: 16, gap: 12, borderTopWidth: 1, borderTopColor: colors.border },
-  directoryTitle: { color: colors.text, fontSize: 13, lineHeight: 20, fontWeight: '600', paddingHorizontal: 16 },
+  directoryTitle: { fontFamily: fonts.semibold, color: colors.text, fontSize: 13, lineHeight: 20, paddingHorizontal: 16 },
   locations: { paddingHorizontal: 16, gap: 10 },
 });

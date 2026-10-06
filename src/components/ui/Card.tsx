@@ -18,5 +18,5 @@ const styles = StyleSheet.create({
     padding: 22,
     gap: 16,
   },
-  highlight: { backgroundColor: colors.selectedBackground },
+  highlight: { backgroundColor: colors.successBackground, borderColor: colors.secondary },
 });

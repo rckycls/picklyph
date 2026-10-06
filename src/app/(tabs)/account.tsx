@@ -16,7 +16,7 @@ export default function AccountScreen() {
     <Screen
       eyebrow="PLAYERS & COURT OWNERS"
       title="Welcome to the court."
-      description="Find your next game or give players a place to play. PicklyPH brings both sides together."
+      description="Find your next game or give players a place to play. Pickly brings both sides together."
     >
       {auth.session && auth.status === 'ready' ? <Card>
         <StatusBadge label="Signed in" tone="success" />

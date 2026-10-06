@@ -1,6 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 
 import { colors } from '@/theme/colors';
+import { fonts } from '@/theme/typography';
 
 type StatusTone = 'neutral' | 'success' | 'pending' | 'error';
 
@@ -24,5 +25,5 @@ export function StatusBadge({ label, tone = 'neutral' }: { label: string; tone?:
 
 const styles = StyleSheet.create({
   badge: { alignSelf: 'flex-start', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 6 },
-  label: { fontSize: 12, lineHeight: 18, fontWeight: '700' },
+  label: { fontFamily: fonts.semibold, fontSize: 12, lineHeight: 18 },
 });

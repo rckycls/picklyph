@@ -18,7 +18,8 @@ const config: ExpoConfig = {
   orientation: 'portrait',
   userInterfaceStyle: 'light',
   platforms: ['ios', 'android'],
-  backgroundColor: '#F6F8FB',
+  backgroundColor: '#F4F6FA',
+  icon: './assets/brand/app-icon.png',
   plugins: [
     'expo-router',
     'expo-dev-client',

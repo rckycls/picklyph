@@ -230,7 +230,9 @@ tokens. Automated bundle/config tests alone do not satisfy this checklist.
 At implementation time, hosted Auth health responded successfully, Email was
 enabled and Apple was disabled. User subsequently showed the enabled Apple form
 with the correct native Client ID and reports working iPhone sign-in/sign-out.
-User explicitly confirms Apple works. Email delivery reaches the tested inbox
-but still uses the default signup link template; hosted template correction and
-email sign-in acceptance are pending. Remaining H05 checks await confirmation.
+User explicitly confirms Apple works and subsequently reports the email-code
+flow **works now** after SMTP/template setup guidance. Hosted email sign-in is
+accepted from that report; the exact SMTP provider/settings are not independently
+verified. Remaining H05 restoration, refresh, code-recovery and route checks
+await confirmation.
 T07 stays open until its device acceptance checks pass.

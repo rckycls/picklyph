@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 
 import { colors } from '@/theme/colors';
+import { fonts } from '@/theme/typography';
 
 type ButtonVariant = 'primary' | 'accent' | 'secondary';
 
@@ -77,7 +78,7 @@ export function Button({
 const styles = StyleSheet.create({
   button: {
     minHeight: 48,
-    borderRadius: 16,
+    borderRadius: 18,
     borderWidth: 2,
     borderColor: 'transparent',
     paddingHorizontal: 20,
@@ -87,7 +88,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 10,
   },
-  label: { fontSize: 15, lineHeight: 22, fontWeight: '700', textAlign: 'center', flexShrink: 1 },
+  label: { fontFamily: fonts.semibold, fontSize: 15, lineHeight: 22, textAlign: 'center', flexShrink: 1 },
   focused: { borderColor: colors.text },
   pressed: { transform: [{ scale: 0.98 }] },
   disabled: { borderStyle: 'dashed', borderColor: colors.textSecondary },

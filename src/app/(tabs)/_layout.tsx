@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { TabIcon } from '@/components/ui/TabIcon';
 import { colors } from '@/theme/colors';
+import { fonts } from '@/theme/typography';
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
@@ -18,7 +19,7 @@ export default function TabLayout() {
         sceneStyle: { backgroundColor: colors.background },
         tabBarActiveTintColor: colors.selectedText,
         tabBarInactiveTintColor: colors.textSecondary,
-        tabBarActiveBackgroundColor: colors.selectedBackground,
+        tabBarActiveBackgroundColor: colors.accent,
         tabBarHideOnKeyboard: true,
         tabBarLabelPosition: 'below-icon',
         tabBarLabelStyle: styles.label,
@@ -57,5 +58,5 @@ export default function TabLayout() {
 const styles = StyleSheet.create({
   bar: { backgroundColor: colors.surface, borderTopColor: colors.border, borderTopWidth: 1, paddingTop: 6 },
   item: { marginHorizontal: 6, borderRadius: 14, paddingVertical: 5, minHeight: 54 },
-  label: { fontSize: 12, fontWeight: '600', marginTop: 3 },
+  label: { fontFamily: fonts.semibold, fontSize: 12, marginTop: 3 },
 });

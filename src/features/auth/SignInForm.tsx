@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/Card';
 import { Field } from '@/components/ui/Field';
 import { screenText } from '@/components/ui/Screen';
 import { colors } from '@/theme/colors';
+import { fonts } from '@/theme/typography';
 
 import { normalizeEmail, validCode, validEmail } from './actions';
 import { AppleSignInButton } from './AppleSignInButton';
@@ -85,4 +86,4 @@ export function SignInForm() {
     <Text style={screenText.body}>You can keep browsing courts without signing in.</Text>
   </Card>;
 }
-const styles = StyleSheet.create({ error: { color: colors.error, fontSize: 15, lineHeight: 24 } });
+const styles = StyleSheet.create({ error: { fontFamily: fonts.medium, color: colors.error, fontSize: 15, lineHeight: 24 } });

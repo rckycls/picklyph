@@ -3,6 +3,9 @@ import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } fr
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { colors } from '@/theme/colors';
+import { fonts } from '@/theme/typography';
+
+import { BrandLockup } from './BrandLockup';
 
 export function Screen({
   eyebrow,
@@ -21,8 +24,7 @@ export function Screen({
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
           <View style={styles.content}>
             <View style={styles.brand}>
-              <View style={styles.dot} accessible={false} />
-              <Text style={styles.brandName}>PicklyPH</Text>
+              <BrandLockup tagline />
               <Text style={styles.country}>PH</Text>
             </View>
             <View style={styles.heading}>
@@ -39,9 +41,9 @@ export function Screen({
 }
 
 export const screenText = StyleSheet.create({
-  title: { color: colors.text, fontSize: 21, lineHeight: 28, fontWeight: '700', letterSpacing: -0.4 },
-  body: { color: colors.textSecondary, fontSize: 15, lineHeight: 24 },
-  label: { color: colors.text, fontSize: 14, lineHeight: 21, fontWeight: '700' },
+  title: { fontFamily: fonts.extrabold, color: colors.text, fontSize: 21, lineHeight: 28, letterSpacing: -0.4 },
+  body: { fontFamily: fonts.medium, color: colors.textSecondary, fontSize: 15, lineHeight: 24 },
+  label: { fontFamily: fonts.semibold, color: colors.text, fontSize: 14, lineHeight: 21 },
 });
 
 const styles = StyleSheet.create({
@@ -49,12 +51,10 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   scroll: { flexGrow: 1, alignItems: 'center' },
   content: { width: '100%', maxWidth: 560, padding: 24, gap: 24 },
-  brand: { flexDirection: 'row', alignItems: 'center', gap: 9 },
-  dot: { width: 11, height: 11, borderRadius: 6, backgroundColor: colors.secondary },
-  brandName: { color: colors.text, fontSize: 22, fontWeight: '800', letterSpacing: -0.8 },
-  country: { marginLeft: 'auto', color: colors.textSecondary, fontSize: 12, fontWeight: '700', letterSpacing: 2 },
+  brand: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  country: { fontFamily: fonts.semibold, color: colors.brandGreen, backgroundColor: colors.successBackground, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6, fontSize: 12, letterSpacing: 1.5 },
   heading: { gap: 10 },
-  eyebrow: { color: colors.link, fontSize: 11, lineHeight: 17, fontWeight: '700', letterSpacing: 1.5 },
-  title: { color: colors.text, fontSize: 34, lineHeight: 40, fontWeight: '800', letterSpacing: -1.2 },
-  description: { color: colors.textSecondary, fontSize: 16, lineHeight: 25 },
+  eyebrow: { fontFamily: fonts.semibold, color: colors.brandGreen, fontSize: 11, lineHeight: 17, letterSpacing: 1.5 },
+  title: { fontFamily: fonts.extrabold, color: colors.text, fontSize: 34, lineHeight: 40, letterSpacing: -1.2 },
+  description: { fontFamily: fonts.medium, color: colors.textSecondary, fontSize: 16, lineHeight: 25 },
 });

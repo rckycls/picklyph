@@ -1,4 +1,4 @@
-import { StyleSheet, View, type ColorValue } from 'react-native';
+import { Image, StyleSheet, View, type ColorValue } from 'react-native';
 
 type IconName = 'discover' | 'bookings' | 'account';
 
@@ -7,10 +7,7 @@ export function TabIcon({ name, color }: { name: IconName; color: ColorValue }) 
   return (
     <View style={styles.box} accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
       {name === 'discover' && (
-        <View style={[styles.map, { borderColor: color }]}>
-          <View style={[styles.fold, { borderColor: color }]} />
-          <View style={[styles.fold, styles.lastFold, { borderColor: color }]} />
-        </View>
+        <Image source={require('../../../assets/brand/mark-small.png')} style={[styles.pin, { tintColor: color }]} resizeMode="contain" accessible={false} />
       )}
       {name === 'bookings' && (
         <View style={[styles.calendar, { borderColor: color }]}>
@@ -30,9 +27,7 @@ export function TabIcon({ name, color }: { name: IconName; color: ColorValue }) 
 
 const styles = StyleSheet.create({
   box: { width: 26, height: 26, alignItems: 'center', justifyContent: 'center' },
-  map: { width: 24, height: 20, borderWidth: 2, borderRadius: 3, transform: [{ rotate: '-5deg' }] },
-  fold: { position: 'absolute', left: 6, top: 0, bottom: 0, borderLeftWidth: 2 },
-  lastFold: { left: 13 },
+  pin: { width: 18, height: 26 },
   calendar: { width: 22, height: 22, borderWidth: 2, borderRadius: 5 },
   calendarLine: { position: 'absolute', top: 5, left: 0, right: 0, height: 2 },
   date: { position: 'absolute', width: 4, height: 4, top: 11, left: 5, borderRadius: 1 },
