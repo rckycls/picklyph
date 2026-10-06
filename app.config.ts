@@ -46,6 +46,7 @@ const config: ExpoConfig = {
     bundleIdentifier: process.env.IOS_BUNDLE_IDENTIFIER?.trim() || 'com.rckycls.picklyph',
     supportsTablet: true,
     usesAppleSignIn: true,
+    infoPlist: { ITSAppUsesNonExemptEncryption: false },
   },
 };
 

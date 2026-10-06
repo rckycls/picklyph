@@ -121,6 +121,14 @@ npx expo start --dev-client
 
 If EAS requests Apple login/capability/profile setup, complete it interactively
 in your terminal. No Apple passwords, certificates or tokens belong in chat.
+The first T07 non-interactive build reused a profile without Apple's entitlement
+and failed. An interactive build restored the existing Apple session, enabled
+Sign in with Apple, and regenerated the existing ad hoc profile while reusing
+the distribution certificate. Source now records the user's previously accepted
+exempt-encryption answer as `ITSAppUsesNonExemptEncryption: false`.
+For this profile error, synchronize capabilities and regenerate the profile;
+clearing the build cache does not add missing entitlements.
+See [EAS capability synchronization](https://docs.expo.dev/build-reference/ios-capabilities/).
 
 ## H05: iPhone acceptance
 
