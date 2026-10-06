@@ -24,7 +24,13 @@
     "test:auth": "node --test src/features/auth/__tests__/*.test.cjs",
     "test:auth:local": "node supabase/tests/auth-local.cjs",
     "test:authorization:local": "node supabase/tests/authorization-local.cjs",
-    "test:domain": "npm test --workspace @picklyph/domain"
+    "test:domain": "npm test --workspace @picklyph/domain",
+    "admin:dev": "npm run dev --workspace @picklyph/admin",
+    "admin:build": "npm run build --workspace @picklyph/admin",
+    "admin:typecheck": "npm run typecheck --workspace @picklyph/admin",
+    "admin:lint": "npm run lint --workspace @picklyph/admin",
+    "test:admin": "npm test --workspace @picklyph/admin",
+    "test:admin:local": "node apps/admin/tests/local.cjs"
   },
   "dependencies": {
     "@expo-google-fonts/bricolage-grotesque": "0.4.1",

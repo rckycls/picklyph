@@ -23,6 +23,9 @@ on local Supabase; hosted migrations are not deployed.
 See [account authorization](docs/authorization.md).
 T09 adds exact PHP centavo conversion/display, UTC/Manila time helpers and
 validated rental duration/horizon boundaries. See [shared booking rules](docs/booking-rules.md).
+T10 adds a separate Next.js administrator/moderator console with email-code
+authentication, server-managed sessions and current database role checks.
+See [admin setup](docs/admin-setup.md). Directory editing is T11.
 The map still uses demo data; live directory screens, search, reservations,
 payments and owner tools are still planned.
 
@@ -82,6 +85,11 @@ If PowerShell blocks the npm scripts, use `npm.cmd`/`npx.cmd` for these commands
 | `npm run test:auth:local` | Exercise new/returning email OTP, cold restoration, refresh and sign-out against local Docker Auth/Mailpit; removes its own fixtures. |
 | `npm run test:authorization:local` | Check local SQL/API profile privacy, protected roles and venue ownership; removes its own fixtures. |
 | `npm run test:domain` | Check exact PHP amounts, UTC/Manila conversions and rental duration/horizon boundaries, including host-timezone independence. |
+| `npm run admin:dev` | Run the separate Next.js console; configure `apps/admin/.env.local` first. |
+| `npm run admin:build` | Build the admin workspace for production. |
+| `npm run admin:typecheck` / `npm run admin:lint` | Check admin source separately from the mobile app. |
+| `npm run test:admin` | Check server identity/current-role trust, revocation, CSRF/input and configuration boundaries. |
+| `npm run test:admin:local` | Test production console/email/session/page/API access against local Supabase/Mailpit; requires a built admin and removes its own fixtures. |
 | `npm run check:dependencies` | Check the installed versions against the Expo SDK. |
 | `npm run bundle:ios` | Export an iOS Hermes bundle to ignored `dist/ios`; does not create an installable `.ipa`. |
 | `npx expo-doctor` | Check Expo project health; not a package script. |
@@ -282,7 +290,7 @@ and verified target selection; a mobile publishable key cannot apply migrations.
 | `src/components/ui/` | Shared accessible controls and screen presentation. |
 | `src/theme/`, `assets/brand/`, `docs/` | Concept C colors, typography, paddle-pin assets and setup notes. |
 | `packages/domain/` | Shared TypeScript domain package. |
-| `apps/admin/` (planned) | Next.js admin/moderator workspace with its own checks. |
+| `apps/admin/` | Next.js admin/moderator console with its own server auth, env and checks. |
 | `supabase/` | Directory/authorization migrations, local configuration and SQL/API tests; Edge Functions later. |
 | `vibe-plus/` | Task plan and current handoff. |
 
@@ -292,8 +300,8 @@ prepare separate staging/production Upstash Redis databases near the backend
 region. Begin PayMongo/venue onboarding alongside these tasks; T06 verifies
 the supported payment flow and live activation requirements.
 
-The current dependency audit reports 31 upstream advisories (21 high/10 moderate), including
-the new Maps package's inherited React Native advisory chain. The suggested Maps
+The current dependency audit reports 34 upstream advisories (24 high/10 moderate), including
+the Maps package's inherited React Native chain and the admin lint dependency chain. The suggested Maps
 downgrade is outside the SDK 57 pin. Reassess supported upstream fixes before pilot;
 do not apply a force fix that breaks native compatibility. This guide documents
 development setup, not a production release acceptance.
