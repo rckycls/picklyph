@@ -60,6 +60,17 @@ does not use emailed deep links or make redirects proof of authentication.
 See [Supabase email OTP](https://supabase.com/docs/guides/auth/auth-email-passwordless)
 and [SMTP requirements](https://supabase.com/docs/guides/auth/auth-smtp).
 
+### If the email contains a link instead of a code
+
+`signInWithOtp` sends links when hosted templates still use `{{ .ConfirmationURL }}`.
+An email headed "Confirm your email address" is the **Confirm signup** template;
+editing only **Magic link** does not fix new/unconfirmed accounts. Replace the
+body of both hosted templates with the token-only HTML linked above and save
+each. Local `config.toml`/HTML changes do not publish hosted template settings.
+Request a fresh email from PicklyPH and enter its code in the app. Old links
+may be expired or consumed; their localhost:3000 redirect is not this code flow.
+Keep email confirmation enabled. No app rebuild/reinstall is needed.
+
 ## Session behavior
 
 - Native sessions use Expo SecureStore with device-only, unlocked Keychain
@@ -160,6 +171,7 @@ tokens. Automated bundle/config tests alone do not satisfy this checklist.
 At implementation time, hosted Auth health responded successfully, Email was
 enabled and Apple was disabled. User subsequently showed the enabled Apple form
 with the correct native Client ID and reports working iPhone sign-in/sign-out.
-Provider coverage and remaining H05 checks await confirmation. Hosted provider
-and template settings have not been independently verified. T07 stays open
-until its device acceptance checks pass.
+User explicitly confirms Apple works. Email delivery reaches the tested inbox
+but still uses the default signup link template; hosted template correction and
+email sign-in acceptance are pending. Remaining H05 checks await confirmation.
+T07 stays open until its device acceptance checks pass.
