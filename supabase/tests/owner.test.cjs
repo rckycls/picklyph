@@ -4,7 +4,7 @@ const path = require('node:path');
 const { test } = require('node:test');
 const { storageStub } = require('./platform.cjs');
 
-test('transactional directory audit, immutable client boundary, admin reads and rollback on PostgreSQL/PostGIS', async () => {
+test('owner submissions: private evidence, audited claims/pins, duplicates, retries and client isolation on PostgreSQL/PostGIS', async () => {
   const { PGlite } = await import('@electric-sql/pglite');
   const { postgis } = await import('@electric-sql/pglite-postgis');
   const { pg_trgm } = await import('@electric-sql/pglite/contrib/pg_trgm');
@@ -16,14 +16,16 @@ test('transactional directory audit, immutable client boundary, admin reads and 
       create function auth.uid() returns uuid language sql stable as $$
         select (nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub')::uuid; $$;
       ${storageStub}`);
-    const root = path.resolve(path.dirname(module.filename), '..');
-    for (const file of fs.readdirSync(path.join(root, 'migrations')).filter(f => f.endsWith('.sql')).sort()) {
+    const root = path.resolve(__dirname, '..');
+    for (const file of fs.readdirSync(path.join(root, 'migrations')).filter((f) => f.endsWith('.sql')).sort()) {
       await db.exec(fs.readFileSync(path.join(root, 'migrations', file), 'utf8'));
     }
-    await db.exec(fs.readFileSync(path.join(root, 'tests/audit.sql'), 'utf8'));
-    for (const table of ['public.venues', 'public.courts', 'public.profiles', 'private.directory_import_refs', 'private.directory_audit_events']) {
-      assert.equal((await db.query(`select count(*)::integer as n from ${table}`)).rows[0].n, 0, 'all fixtures roll back');
+    await db.exec(fs.readFileSync(path.join(root, 'tests/owner.sql'), 'utf8'));
+    for (const table of ['public.venues', 'public.profiles', 'private.venue_claims', 'private.venue_submissions',
+      'private.ownership_audit_events', 'storage.objects']) {
+      assert.equal((await db.query(`select count(*)::integer as n from ${table}`)).rows[0].n, 0, `${table} fixtures roll back`);
     }
-  } catch (e) { throw new Error(`Audit SQL ${e.code ?? ''}: ${e.message}${e.where ? ` (${e.where})` : ''}`); }
+    assert.equal((await db.query(`select count(*)::integer as n from storage.buckets where id = 'owner-evidence' and not public`)).rows[0].n, 1);
+  } catch (e) { throw new Error(`Owner SQL ${e.code ?? ''}: ${e.message}${e.where ? ` (${e.where})` : ''}`); }
   finally { await db.close(); }
 });

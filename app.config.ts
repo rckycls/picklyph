@@ -26,6 +26,12 @@ const config: ExpoConfig = {
     'expo-apple-authentication',
     ['expo-secure-store', { faceIDPermission: false }],
     ['react-native-maps', mapsConfigured ? { iosGoogleMapsApiKey: iosMapsKey } : {}],
+    // Owners pick one proof photo through the system picker; no camera or microphone use.
+    ['expo-image-picker', {
+      photosPermission: 'PicklyPH uses only the photo you choose as private proof that you own or manage a venue.',
+      cameraPermission: false,
+      microphonePermission: false,
+    }],
     ['expo-location', {
       locationWhenInUsePermission: 'Allow PicklyPH to use your location to center the court map near you.',
       locationAlwaysPermission: false,

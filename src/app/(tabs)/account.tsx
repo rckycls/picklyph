@@ -8,6 +8,7 @@ import { Screen, screenText } from '@/components/ui/Screen';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { SignInForm } from '@/features/auth/SignInForm';
 import { useAuth } from '@/features/auth/AuthProvider';
+import { OwnerCard } from '@/features/owner/OwnerCard';
 
 export default function AccountScreen() {
   const auth = useAuth();
@@ -29,13 +30,7 @@ export default function AccountScreen() {
         }} />
         <Button label="Go to Discover" variant="secondary" onPress={() => router.navigate('/(tabs)')} />
       </Card> : <SignInForm />}
-      <Card tone="highlight">
-        <Text accessibilityRole="header" style={screenText.title}>Have a court to share?</Text>
-        <Text style={screenText.body}>
-          Owners will use the same account to submit a court location and, after verification, manage their venue and bookings.
-        </Text>
-        <StatusBadge label="Owner tools coming soon" tone="pending" />
-      </Card>
+      <OwnerCard signedIn={Boolean(auth.session) && auth.status === 'ready'} />
     </Screen>
   );
 }

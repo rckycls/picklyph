@@ -1,12 +1,14 @@
 /** Server-only. Principals MUST come from verified Auth or a trusted ingress. */
 export type RatePrincipal = { kind: 'user' | 'guest' | 'provider'; id: string };
-export type RateAction = 'discovery' | 'owner-submit' | 'hold-create' | 'checkout-create' | 'cancel' | 'provider-webhook';
+export type RateAction = 'discovery' | 'owner-lookup' | 'owner-submit' | 'hold-create' | 'checkout-create' | 'cancel' | 'provider-webhook';
 export type LimitReply = { success: boolean; limit: number; remaining: number; reset: number; reason?: string; pending?: Promise<unknown> };
 export type RateDecision = { allowed: boolean; status: 200 | 429 | 503; state: 'enforced' | 'degraded' | 'bypassed'; headers: Record<string, string> };
 export type RateBackend = (action: RateAction, principal: RatePrincipal, identifier: string) => Promise<LimitReply>;
 
 export const RATE_POLICIES = {
   discovery: { user: 60, guest: 30, outage: 'continue' },
+  // Address search is a paid provider call; nearby checks share the bucket.
+  'owner-lookup': { user: 30, guest: 0, outage: 'reject' },
   'owner-submit': { user: 10, guest: 0, outage: 'reject' },
   'hold-create': { user: 10, guest: 0, outage: 'reject' },
   'checkout-create': { user: 5, guest: 0, outage: 'reject' },

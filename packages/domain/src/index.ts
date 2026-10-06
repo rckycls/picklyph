@@ -11,6 +11,8 @@ export type { DirectoryAuditAction, DirectoryAuditEvent, DirectoryAuditPage } fr
 export { DirectoryInputError, MAX_DIRECTORY_COURTS, MAX_DIRECTORY_IMPORT, directoryUuid, readVenueInput, readCourtInputs, readDirectorySave, readDirectoryPublication, readDirectoryImport } from './curation';
 export type { VenueInput, CourtInput, DirectoryListing, DirectoryPage, DirectorySave, DirectoryImportEntry, DirectoryImportResult } from './curation';
 export type { AccountAccess, PrivilegedRole, Profile } from './authorization';
+export { DUPLICATE_RADIUS_METERS, MAX_EVIDENCE_BYTES, MAX_OWNER_NOTE, MAX_PENDING_OWNER_SUBMISSIONS, MAX_SUBMISSION_COURTS, OwnerInputError, SUBMISSION_BOUNDS, inSubmissionBounds, isUuid, readOwnerLookup, readOwnerNote, readOwnerSubmission, readOwnerVenueInput, sniffEvidence } from './owner';
+export type { AddressCandidate, EvidenceType, OwnerClaimRequest, OwnerDuplicate, OwnerLookup, OwnerSubmission, OwnerSubmissionRequest, OwnerSubmissionStatus, OwnerSubmitResult, OwnerVenueInput, OwnerVenueRequest } from './owner';
 export { PHP_CURRENCY, CENTAVOS_PER_PESO, isPhpCentavos, assertPhpCentavos, pesosToCentavos, formatPhpCentavos } from './money';
 export { MANILA_TIME_ZONE, RENTAL_INCREMENT_MINUTES, MINIMUM_RENTAL_MINUTES, BOOKING_HORIZON_DAYS, toUtcIso, toManilaDateTime, fromManilaDateTime, formatManilaDateTime, validateRentalWindow } from './booking';
 export type { Instant, ManilaDateTime, RentalValidation } from './booking';

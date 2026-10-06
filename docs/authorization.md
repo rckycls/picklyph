@@ -12,7 +12,7 @@ signup metadata, an email-domain heuristic or cached JWT role claims.
 | `public.profiles` | A signed-in user reads their own row and edits only `display_name`. Other profiles are private. |
 | `private.account_roles` | Protected admin/moderator assignments; clients cannot read or mutate this table. |
 | `private.venue_owners` | Verified user-to-venue links; clients cannot read or mutate this table. |
-| `private.venue_claims` | Existing private claim evidence remains backend-only. |
+| `private.venue_claims` | Private claim evidence; T15 writes it only through the audited `owner_submit_claim` command. |
 | `public.my_account_access()` | Signed-in caller's current privileged roles and approved, verified owned venue IDs. No target-user argument. |
 
 The auth-user insert trigger creates a profile with a null display name and
@@ -55,9 +55,10 @@ suspension affect the next database authorization check. Admins can manage any
 existing venue; moderators can review ownership but get no automatic owner
 management scope. Moderators/admins still use server operations for evidence.
 
-T15 will perform evidence review and ownership-assignment orchestration; this
-migration does not approve evidence, upload files, publish directory records,
-edit court inventory or implement bookings. T10 adds the admin interface; T11
+T15 adds private evidence uploads and audited claim/missing-venue submissions
+([owner submissions](owner-submissions.md)); evidence review and ownership
+assignment are T17. This migration does not approve evidence, upload files,
+publish directory records, edit court inventory or implement bookings. T10 adds the admin interface; T11
 adds actor-checked directory curation without changing ownership/claim status.
 See [directory curation](directory-curation.md) for those transaction boundaries.
 

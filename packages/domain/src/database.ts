@@ -3,8 +3,9 @@ import type { AccountAccess, PrivilegedRole, Profile } from './authorization.ts'
 import type { VenueInput, CourtInput, DirectoryPage, DirectoryListing, DirectoryImportEntry, DirectoryImportResult } from './curation.ts';
 import type { DirectoryAuditPage } from './audit.ts';
 import type { VenueSearch, VenueSearchPage } from './search.ts';
+import type { OwnerDuplicate, OwnerSubmission, OwnerSubmitResult, OwnerVenueInput } from './owner.ts';
 
-// Schema-maintained PostgREST contract for directory + T08 authorization migrations.
+// Schema-maintained PostgREST contract for the directory, authorization and owner-submission migrations.
 // Only the exposed public schema belongs in mobile code. PostGIS geometry is
 // opaque transport data; callers use latitude/longitude instead.
 type VenueRow = Venue & { location: unknown };
@@ -50,7 +51,20 @@ export interface Database {
       directory_admin_publish: { Args: { actor_user_id: string; target_venue_id: string; expected_updated_at: string; new_status: VenuePublicationStatus }; Returns: DirectoryListing };
       directory_admin_import: { Args: { actor_user_id: string; listings: DirectoryImportEntry[] }; Returns: DirectoryImportResult[] };
       directory_admin_audit_read: { Args: { actor_user_id: string; target_venue_id?: string | null; after_id?: string | null }; Returns: DirectoryAuditPage };
+      my_owner_submissions: { Args: Record<PropertyKey, never>; Returns: OwnerSubmission[] };
       // Server-only execute grants. Having a type does not grant mobile access.
+      owner_duplicate_candidates: {
+        Args: { actor_user_id: string; latitude: number; longitude: number; proposed_name: string | null };
+        Returns: OwnerDuplicate[];
+      };
+      owner_submit_claim: {
+        Args: { actor_user_id: string; submission_request_id: string; target_venue_id: string; evidence_ref: string; claim_note: string | null };
+        Returns: OwnerSubmitResult;
+      };
+      owner_submit_venue: {
+        Args: { actor_user_id: string; submission_request_id: string; venue_input: OwnerVenueInput; evidence_ref: string; submission_note: string | null; acknowledge_duplicates: boolean };
+        Returns: OwnerSubmitResult;
+      };
       set_account_role: {
         Args: { actor_user_id: string; target_user_id: string; assigned_role: PrivilegedRole; enabled: boolean };
         Returns: undefined;

@@ -1,10 +1,12 @@
 import type { VenueSearchItem } from '@picklyph/domain';
+import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Linking, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 
 import { Button } from '@/components/ui/Button';
 import { screenText } from '@/components/ui/Screen';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { useAuth } from '@/features/auth/AuthProvider';
 import { colors } from '@/theme/colors';
 import { fonts } from '@/theme/typography';
 
@@ -20,6 +22,8 @@ export function VenueSheet({ venue, onClose, onMissing }: { venue: VenueSearchIt
   const [detail, setDetail] = useState<DetailState>({ status: 'loading' });
   const [attempt, setAttempt] = useState(0);
   const [linkError, setLinkError] = useState(false);
+  const auth = useAuth();
+  const signedIn = auth.status === 'ready' && Boolean(auth.session);
 
   // The screen keys this sheet by venue ID, so each venue starts from a fresh loading state.
   useEffect(() => {
@@ -106,6 +110,14 @@ export function VenueSheet({ venue, onClose, onMissing }: { venue: VenueSearchIt
               />
             </View>
             {linkError && <Text accessibilityLiveRegion="polite" style={styles.error}>Couldn’t open Maps on this device.</Text>}
+            {current.claim_status !== 'verified' && (
+              <Button
+                label={signedIn ? 'Own this venue? Claim it' : 'Own this venue? Sign in to claim it'}
+                variant="secondary"
+                accessibilityHint="A pickly reviewer checks your proof before anything changes."
+                onPress={() => (signedIn ? router.push({ pathname: '/owner/claim/[id]', params: { id: current.id } }) : router.navigate('/account'))}
+              />
+            )}
           </>
         )}
         <Button label="Close details" variant="secondary" onPress={onClose} />

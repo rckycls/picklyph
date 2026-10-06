@@ -47,7 +47,8 @@ Use `buildUpstashGuard(env)` from `supabase/functions/_shared/upstash.ts`, initi
 | Action | Limit per minute | Redis error/timeout policy |
 | --- | --- | --- |
 | discovery | guest 30; verified user 60 | Continue bounded search |
-| owner-submit | verified user 10 | Reject 503 before changes |
+| owner-lookup | verified user 30 | Reject 503 (paid address search; T15) |
+| owner-submit | verified user 10 | Reject 503 before changes (T15 [owner submissions](owner-submissions.md)) |
 | hold-create | verified user 10 | Reject 503 before inventory changes |
 | checkout-create | verified user 5 | Reject 503 before payment changes |
 | cancel | verified user 30 | Continue on outage |

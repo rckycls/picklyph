@@ -44,3 +44,8 @@ content_path = "./supabase/templates/email-code.html"
 verify_jwt = false
 # Hosted (API) bundling does not discover the shared map on its own; local serve and deploy use the same pins.
 import_map = "./functions/deno.json"
+
+[functions.owner-submissions]
+# Signed-in owners only; every bearer token is verified in code with getUser.
+verify_jwt = false
+import_map = "./functions/deno.json"

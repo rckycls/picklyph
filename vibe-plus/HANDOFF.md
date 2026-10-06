@@ -1,6 +1,6 @@
 # HANDOFF: read this first
 
-**Updated:** 2026-10-07, Asia/Manila. **Plan:** Codex desktop / ChatGPT Plus; keep configured model. W3/W4 implementation complete (7 points each); W5 T13 complete (2/7 points); T14 implemented, device review pending. Hosted staging has T05/T08/T11–T13. Capacity remains 8; no actual usage-window end/limit signal. A few sessions/week, experienced user, no deadline.
+**Updated:** 2026-10-07, Asia/Manila. **Plan:** Codex desktop / ChatGPT Plus; keep configured model. W3/W4 implementation complete (7 points each); W5 T13 complete (2/7 points); T14 and T15 implemented, device review pending. Hosted staging has T05/T08/T11–T13. Capacity remains 8; no actual usage-window end/limit signal. A few sessions/week, experienced user, no deadline.
 
 ## Current state
 
@@ -41,6 +41,15 @@
 **For T16:** reuse `resultsSummary`, `failureMessage` and `retryAfterSeconds`.
 **Evidence:** `test:discovery` → 24 pass (10 new); `test:search:local` → T14 mobile client + T13 Edge PASS, fixtures removed; `test:auth` 16, `test:domain` 14, `test:directory` 15; `typecheck`, `lint`, `bundle:ios` (3.3 MB) → exit 0. No device review claimed.
 
+## T15 owner submissions handoff
+
+**Built:** Signed-in owners claim an approved listing or submit a missing venue (address search/location/tap-and-drag pin, nearby-listing check, details, one private proof photo). Records are review-only: no publication, public claim-status change, owner link or role. Migration `20261007120000` applied locally only.
+**Files/APIs:** `supabase/functions/owner-submissions/` (`handler.ts`, `deps.ts`, `geocode.ts`), `packages/domain/src/owner.ts`, `src/features/owner/`, `src/app/owner/` (`submit`, `claim/[id]`), Account `OwnerCard`, VenueSheet claim button. Service-only `owner_submit_claim`, `owner_submit_venue`, `owner_duplicate_candidates`; authenticated self-only `my_owner_submissions()`. Contract/errors in `docs/owner-submissions.md`.
+**Decisions:** missing venues stay in private `venue_submissions` (not draft listings), so spam never enters the directory; public claim status untouched until T17, so unreviewed claims can't relabel listings; evidence goes through the function (bytes sniffed, server path, deleted unless a record is created), never client storage policies; duplicate warnings reveal approved listings only, drafts/other claimants stay in the reviewer snapshot; `request_id` makes retries return the original record.
+**Gotchas:** new native module `expo-image-picker` 57.0.20 → device review needs a new EAS development build. Function reuses `DISCOVERY_SUPABASE_*`/Upstash secrets; add `GOOGLE_MAPS_SERVER_API_KEY` (Geocoding API only). Without Redis, owner lookups/submissions return 503 by design. `service_role` can no longer write `private.venue_claims` directly. Audit rows have no FK and photos keep their metadata (both T47). PGlite suites that load all migrations need the `supabase/tests/platform.cjs` storage stub. `expo install --check` now flags newer patch releases for expo/expo-constants/expo-linking/expo-router (published after T14; not upgraded).
+**For T17:** review queue = `private.venue_claims`/`venue_submissions` with `nearby_venue_ids`, `nearby_submission_ids`, `duplicates_acknowledged`; serve evidence via short-lived server-signed URLs; extend `ownership_audit_events` actions; approval must set claim status/owner links under `set_verified_venue_owner` rules.
+**Evidence:** `test:directory` 22 pass (7 new: owner SQL + handler/geocoder), `test:domain` 18 (4 new), `test:owner` 4, `test:discovery` 24, `test:auth` 16, `test:admin` 9; `test:owner:local` → Docker owner.sql + actual served function (401/forged 401, Redis-less 503 with no storage/DB change) + real Auth/Storage/RPC via the mobile client PASS, own fixtures/evidence/audit rows removed; `test:search:local` PASS; `typecheck`, `lint`, `functions:check`, `functions:lint`, `test:functions`, `admin:typecheck`, `admin:lint`, `bundle:ios` (3.4 MB, no server secrets) → exit 0. No device or hosted acceptance claimed.
+
 ## Mobile and branding
 
 - Expo57.0.26 / React19.2.3 / RN0.86.3 / Router57.0.24 / TS6.0.3 / Supabase-js2.117.2. Map opens first with live T13 directory results (demo pins removed in T14) and optional foreground location. Bookings guarded by restored auth; inventory, payments and owner UI are later tasks.
@@ -51,8 +60,8 @@
 
 ## Next
 
-1. **T15 when authorized** (owner submissions/private claims). T14 stays unchecked until its device review (docs/discovery-api.md#mobile-client-t14) passes once a published staging venue exists (staging function deployed). Decide whether public contact fields belong in a later directory task. H02: staging Redis/429/recovery verified; production Redis, hosted outage/isolation checks and per-IP ingress verification remain. Future privileged commands must add their own transactional auditing and authorization.
-2. First hosted admin bootstrap requires intended account selection; same staging project and schema/API are verified. Hosted T11–T13 migrations are applied; console directory tools still need the same-project server-only key and an intended admin assignment. Console browser/email acceptance remains. Claim/evidence orchestration is T15. T09 rules are ready for later commands; use server-derived clocks. T46 must review moderator audit permissions; T47 must define audit UUID retention/account deletion.
+1. **T16 next** (discovery recovery states). T15 needs operator steps before device review: apply `20261007120000` to staging, set `GOOGLE_MAPS_SERVER_API_KEY`, deploy `owner-submissions`, build a new EAS development client; then try address search, pin drag, duplicate warning, claim and submission status on an iPhone (docs/owner-submissions.md). T14 stays unchecked until its device review (docs/discovery-api.md#mobile-client-t14) passes once a published staging venue exists (staging function deployed). Decide whether public contact fields belong in a later directory task. H02: staging Redis/429/recovery verified; production Redis, hosted outage/isolation checks and per-IP ingress verification remain. Future privileged commands must add their own transactional auditing and authorization.
+2. First hosted admin bootstrap requires intended account selection; same staging project and schema/API are verified. Hosted T11–T13 migrations are applied; console directory tools still need the same-project server-only key and an intended admin assignment. Console browser/email acceptance remains. Claim/evidence submission is T15; review/approval is T17. T09 rules are ready for later commands; use server-derived clocks. T46 must review moderator audit permissions; T47 must define audit UUID retention/account deletion.
 3. T06 docs/payment-integration.md and H03 merchant/provider gates remain beforeT34; no provider messages, payment charges or payment code.
 
 ## Git and gotchas
