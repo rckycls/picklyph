@@ -1,14 +1,16 @@
-import type { Coordinates } from '@/lib/location';
+import type { VenueSearchItem } from '@picklyph/domain';
 
-import type { DemoVenue } from './demoVenues';
+import type { Coordinates } from '@/lib/location';
 
 export type MapRegion = Coordinates & { latitudeDelta: number; longitudeDelta: number };
 
 export type CourtMapProps = {
-  venues: readonly DemoVenue[];
+  venues: readonly VenueSearchItem[];
   selectedId?: string;
   focusRegion: MapRegion;
   showUserLocation: boolean;
-  onSelect: (venue: DemoVenue) => void;
+  onSelect: (venue: VenueSearchItem) => void;
+  /** Settled camera region after a gesture or animation. */
+  onRegionChange: (region: MapRegion) => void;
   onReadyChange: (ready: boolean) => void;
 };

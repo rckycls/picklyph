@@ -113,7 +113,7 @@ the disabled-API placeholder. A minimal configuration update exposed only
 venue/court reads and bounds RPC return 200 with empty results; guest profile and
 access-RPC requests return 401/42501, and private-schema requests return
 406/PGRST106. Mobile settings cannot deploy migrations. No new app binary is
-needed; the current phone map still uses demo data.
+needed; at that deployment the phone map still used demo data.
 
 Sources: [Supabase RLS](https://supabase.com/docs/guides/database/postgres/row-level-security),
 [Auth profiles and triggers](https://supabase.com/docs/guides/auth/managing-user-data),

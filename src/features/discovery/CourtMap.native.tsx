@@ -7,10 +7,11 @@ import { Button } from '@/components/ui/Button';
 import { screenText } from '@/components/ui/Screen';
 import { colors } from '@/theme/colors';
 
-import { PHILIPPINES_REGION } from './demoVenues';
+import { markerDescription } from './listing';
 import type { CourtMapProps } from './mapTypes';
+import { PHILIPPINES_REGION } from './region';
 
-export default function CourtMap({ venues, selectedId, focusRegion, showUserLocation, onSelect, onReadyChange }: CourtMapProps) {
+export default function CourtMap({ venues, selectedId, focusRegion, showUserLocation, onSelect, onRegionChange, onReadyChange }: CourtMapProps) {
   const map = useRef<MapView>(null);
   const [ready, setReady] = useState(false);
   const [slow, setSlow] = useState(false);
@@ -42,7 +43,7 @@ export default function CourtMap({ venues, selectedId, focusRegion, showUserLoca
       <View style={styles.placeholder}>
         <Text accessibilityRole="header" style={screenText.title}>Your court map is next.</Text>
         <Text style={screenText.body}>{__DEV__ ? setupMessage : 'The court map is unavailable on this device.'}</Text>
-        {venues.length > 0 && <Text style={screenText.body}>You can still explore the labeled sample locations below.</Text>}
+        <Text style={screenText.body}>Choose List to browse approved venues across the Philippines.</Text>
       </View>
     );
   }
@@ -55,8 +56,9 @@ export default function CourtMap({ venues, selectedId, focusRegion, showUserLoca
         provider={PROVIDER_GOOGLE}
         initialRegion={PHILIPPINES_REGION}
         style={StyleSheet.absoluteFill}
-        accessibilityLabel="Google court map. Sample locations are also available in the list below."
+        accessibilityLabel="Google court map. Venues in this area are also available in the list."
         onMapReady={() => { setReady(true); setSlow(false); }}
+        onRegionChangeComplete={(region) => { if (ready) onRegionChange(region); }}
         showsUserLocation={showUserLocation}
         showsMyLocationButton={false}
         showsCompass
@@ -68,14 +70,15 @@ export default function CourtMap({ venues, selectedId, focusRegion, showUserLoca
           <Marker
             key={venue.id}
             identifier={venue.id}
-            coordinate={venue.coordinates}
+            coordinate={{ latitude: venue.latitude, longitude: venue.longitude }}
             title={venue.name}
-            description="Sample location only. Not a verified court."
-            accessibilityLabel={`${venue.name}. Sample location, not bookable.`}
+            description={markerDescription(venue.claim_status)}
+            accessibilityLabel={`${venue.name}, ${venue.city}. ${markerDescription(venue.claim_status)}`}
             image={venue.id === selectedId
               ? require('../../../assets/brand/court-pin-selected.png')
               : require('../../../assets/brand/court-pin.png')}
             anchor={{ x: 0.5, y: 1 }}
+            zIndex={venue.id === selectedId ? 1 : 0}
             onPress={() => onSelect(venue)}
           />
         ))}

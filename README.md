@@ -7,8 +7,9 @@ owners will pin and manage venues through the same account.
 ## Current state
 
 The Expo app opens on Discover, with Bookings and Account tabs and shared branded
-controls. Discovery now has a Google Maps screen, three labeled development-only
-sample locations, a selected-venue sheet, and optional foreground location.
+controls. Discovery has a Google Maps screen, optional foreground location and,
+since T14, live approved directory results with a shared map/list selection,
+court filters, current venue details and Apple/Google Maps directions.
 The iPhone development build succeeds, and Google map rendering, marker/detail
 selection, panning, location recentering and permission-denied browsing pass
 on-device. T04 is complete. Expo Go shows a
@@ -30,8 +31,9 @@ See [admin setup](docs/admin-setup.md). T11 adds admin directory creation/editin
 publication/suspension and atomic, repeat-safe JSON imports. Its migration and
 production HTTP flow pass locally; hosted T11 migration/server-key setup remains.
 See [directory curation](docs/directory-curation.md).
-The map still uses demo data; live directory screens, search, reservations,
-payments and owner tools are still planned.
+T14 replaced the demo pins with the T13 search endpoint; live hosted results need
+the pending T11–T13 migrations, the `venue-search` deployment and published venues.
+Reservations, payments and owner tools are still planned.
 
 T01/T02 source checks and iOS bundling passed. Physical iPhone tab switching,
 large-text layout, and VoiceOver acceptance are still pending. Bundling alone
@@ -82,7 +84,7 @@ If PowerShell blocks the npm scripts, use `npm.cmd`/`npx.cmd` for these commands
 | `npm run start:ios` | Start Metro and open a local iOS Simulator on macOS. |
 | `npm run typecheck` | Check mobile TypeScript and the shared domain workspace. |
 | `npm run lint` | Lint the mobile/domain/config source; fail on warnings. |
-| `npm run test:discovery` | Run location permission/failure, demo release-gate, and build-configuration checks with Node's test runner. |
+| `npm run test:discovery` | Run location permission/failure, live search client/paging/listing, and build-configuration checks with Node's test runner. |
 | `npm run test:directory` | Apply the migration and test spatial/role isolation in disposable embedded PostgreSQL/PostGIS, plus public client configuration checks. No Docker, hosted credentials or network requests. |
 | `npm run test:directory:local` | Run the same rollback-only SQL suite against the local Docker Supabase database; requires the migrated local stack. |
 | `npm run test:auth` | Check email/Apple contracts, secure-storage recovery and restoration/foreground lifecycle races. |
@@ -205,14 +207,13 @@ The checklist below is retained for future native builds and regression checks.
    is separate from the App Store Expo Go app and from later TestFlight delivery.
    [Expo iPhone cloud-build workflow](https://docs.expo.dev/tutorial/eas/ios-development-build-for-devices/)
 
-On the installed development build, pan the map, select all three demo markers
-and list entries, close the sheet, use location to recenter, and return to the
-Philippines-wide view. Deny location and confirm browsing still works; test
+On the installed development build, pan the map, select markers and list entries,
+close the sheet, use location to recenter, and return to the
+Philippines-wide view (T14 live-directory review steps: [discovery API](docs/discovery-api.md#mobile-client-t14)). Deny location and confirm browsing still works; test
 disabled Location Services and returning from Settings after granting/revoking
 access. Google attribution stays inside the unobstructed map area. These checks
 require the device; Node tests and config introspection cannot substitute for them.
-Demo locations are illustrative and not bookable; release mode exposes no demo
-venues, and these fixtures are never backend seed data.
+Listings are directory records only; no venue is bookable yet.
 
 ## Supabase directory foundation (T05)
 

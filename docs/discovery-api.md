@@ -1,6 +1,6 @@
 # Bounded venue discovery (T13)
 
-`GET /functions/v1/venue-search` returns approved directory records. It reports no availability, prices, owner contact, or bookability. A verified claim is not a booking permission. T14 connects the mobile UI; development map pins are unchanged by T13.
+`GET /functions/v1/venue-search` returns approved directory records. It reports no availability, prices, owner contact, or bookability. A verified claim is not a booking permission. The T14 mobile client is described [below](#mobile-client-t14).
 
 ## Request and response
 
@@ -84,10 +84,20 @@ Applying hosted migrations and deploying this function are separate operator act
 
 Implementation references: [Supabase rate limiting](https://supabase.com/docs/guides/functions/examples/rate-limiting), [Supabase function configuration](https://supabase.com/docs/guides/functions/function-configuration), [Upstash timeout/cache behavior](https://upstash.com/docs/redis/sdks/ratelimit-ts/features), [Upstash result fields](https://upstash.com/docs/redis/sdks/ratelimit-ts/methods), [Cloudflare authoritative IP header](https://developers.cloudflare.com/fundamentals/reference/http-headers/).
 
+## Mobile client (T14)
+
+`src/features/discovery/searchClient.ts` builds each request from the settled map region (600ms debounce, outward 4-decimal rounding, spans capped at 29.99°) plus Indoor/Outdoor, Covered and surface filters, which apply to the same active court. Pages hold 25 venues; Load more follows `next_cursor` with the same query. A new area or filter aborts the previous request and stale responses are ignored. At most 200 venues stay loaded, after which the player zooms in. Panning keeps current markers until the new area loads; changing filters clears results and the selection.
+
+Guests send only `apikey`. Signed-in players send their own access token; a 401 retries once as a guest because discovery is public. Responses are strictly validated, so an unexpected shape shows the directory as unavailable rather than a guessed listing. 429/503 retry hints are shown; countdown, offline and empty-state polish is T16.
+
+Map and list share one selected venue. The detail sheet reads the current record from the public `venues`/`courts` tables under T05 RLS (approved venues, active courts only). A suspended or unpublished venue shows "No longer listed" and leaves the results. These existing public reads are not behind the Upstash guard. Every listing says it is not bookable in pickly and tells players to contact the venue directly; Apple/Google Maps directions use the current coordinates, and pickly never sends the player's location. The directory has **no public phone/website fields** yet, so no contact details are shown. Map bounds near a player's location do reach this endpoint as query parameters (never Redis).
+
+Device review is pending. It needs the hosted T11–T13 migrations, the `venue-search` deployment with its secrets, and at least one published staging venue. Then, signed out and signed in on the development build: pan/zoom and confirm results update; toggle each filter; use Load more; select a marker and confirm the list highlights it, and the reverse; open both directions links; suspend the venue in the console and reopen details to see "No longer listed"; check VoiceOver labels for chips, rows and markers, plus large text.
+
 ## Verification
 
 `npm run test:search` covers strict shared parsing, guest-source trust/canonicalization, guard policies/deadlines, environment/HMAC isolation, endpoint auth/errors and real embedded PostgreSQL/PostGIS spatial/filter/pagination/permissions. `npm run test:functions` uses the pinned real Upstash SDK against in-memory REST responses, including its actual 650ms fail-open timeout; this is not a live Upstash test.
 
-With the existing local Docker Supabase stack running and migrations applied: `npm run test:search:local`. It runs rollback-only SQL, then serves the actual function with ephemeral local keys and **no Redis configuration**. It verifies actual guest/player HTTP, forged JWT rejection, RPC denial, filters, suspension visibility, sanitized output and bounded Redis-outage fallback. It removes only its own generated user/venue/env file and stops its own CLI child. No hosted/mobile env is read. Do not run it concurrently with another local function-serve session.
+With the existing local Docker Supabase stack running and migrations applied: `npm run test:search:local`. It runs rollback-only SQL, then serves the actual function with ephemeral local keys and **no Redis configuration**. It also drives the shipped T14 mobile client and detail loader against that endpoint and local PostgREST. It verifies actual guest/player HTTP, forged JWT rejection, RPC denial, filters, suspension visibility, sanitized output and bounded Redis-outage fallback. It removes only its own generated user/venue/env file and stops its own CLI child. No hosted/mobile env is read. Do not run it concurrently with another local function-serve session.
 
 `npm run functions:check`, `npm run functions:lint` and `npm run test:functions` invoke pinned Deno 2.9.6 through npm exec; first use needs network/package cache. Upstash/SDK dependencies are pinned in `supabase/functions/deno.json` and `deno.lock`, outside the mobile/admin npm bundle. Shared type-only imports include `.ts` so Deno and workspace TypeScript resolve the same contracts without unstable resolution flags.

@@ -6,6 +6,9 @@ const path = require('node:path');
 const { randomUUID } = require('node:crypto');
 const { execFileSync, spawn } = require('node:child_process');
 const { createClient } = require('@supabase/supabase-js');
+// T14 mobile modules use type-only imports, so Node loads the shipped client code directly.
+const { searchVenues } = require('../../src/features/discovery/searchClient.ts');
+const { loadVenueDetail } = require('../../src/features/discovery/venueDetail.ts');
 
 async function main() {
   const dockerPath = process.env.LOCALAPPDATA ? path.join(process.env.LOCALAPPDATA, 'Programs/DockerDesktop/resources/bin/docker.exe') : '';
@@ -26,13 +29,17 @@ async function main() {
   const anonymous = createClient(api.href, config.ANON_KEY, options);
   const player = createClient(api.href, config.ANON_KEY, options);
   const check = (result,message) => { assert.ok(!result.error,message); return result.data; };
-  const venueId = randomUUID(); const city = `Search-${randomUUID()}`;
-  let created = false; let userId; let child;
+  const venueId = randomUUID(); const venueTwo = randomUUID(); const city = `Search-${randomUUID()}`;
+  let created = false; let createdTwo = false; let userId; let child;
   const temp = fs.mkdtempSync(path.join(os.tmpdir(),'pickly-search-'));
   try {
     check(await service.from('venues').insert({ id:venueId, name:'Local Edge search fixture', address_line:'Fixture address',city,province:'Fixture',latitude:14.6,longitude:121,publication_status:'approved' }), 'Fixture venue creation');
     created = true;
     check(await service.from('courts').insert({ venue_id:venueId,name:'Court',surface:'hard',is_indoor:true,is_covered:true }), 'Fixture court creation');
+    check(await service.from('courts').insert({ venue_id:venueId,name:'Closed court',surface:'other',status:'inactive' }), 'Inactive fixture court');
+    check(await service.from('venues').insert({ id:venueTwo, name:'Local unclaimed fixture', address_line:'Second address',city,province:'Fixture',latitude:14.6005,longitude:121.0005,publication_status:'approved' }), 'Second fixture venue');
+    createdTwo = true;
+    check(await service.from('courts').insert({ venue_id:venueTwo,name:'Outdoor court',surface:'synthetic',is_indoor:false,is_covered:false }), 'Second fixture court');
     const credentials = { email:`search-${randomUUID()}@example.test`, password:`Local-${randomUUID()}!` };
     userId = check(await service.auth.admin.createUser({...credentials,email_confirm:true}), 'Fixture user creation').user.id;
     const session = check(await player.auth.signInWithPassword(credentials), 'Fixture user login').session;
@@ -73,8 +80,26 @@ async function main() {
     const forged = `${session.access_token.split('.')[0]}.${Buffer.from(JSON.stringify({sub:userId,role:'authenticated',exp:9999999999})).toString('base64url')}.forged`;
     assert.equal((await invoke(query,forged)).status,401,'Forged user ID must fail actual getUser');
     assert.equal((await invoke(query,null,{'x-forwarded-for':'forged','cf-connecting-ip':'203.0.113.4'})).status,200,'Unknown ingress ignores spoofed headers and remains bounded');
+    // T14: the shipped mobile client against the actual endpoint, plus public-RLS detail reads.
+    const mobile = { endpoint:endpoint.href, apiKey:config.ANON_KEY, accessToken:async()=>null, fetch:(url,init)=>fetch(url,{...init,signal:init.signal??AbortSignal.timeout(5000)}) };
+    const area = { bounds:{south:14.59,west:120.99,north:14.61,east:121.01}, city, indoor:null, covered:null, surface:null };
+    const first = await searchVenues(mobile,area,{limit:1}); assert.ok(first.ok && first.page.venues.length===1 && first.page.next_cursor,'Mobile first page');
+    const second = await searchVenues(mobile,area,{after:first.page.next_cursor,limit:1}); assert.ok(second.ok && second.page.venues.length===1 && second.page.next_cursor===null,'Mobile cursor page');
+    assert.deepEqual(new Set([first.page.venues[0].id,second.page.venues[0].id]),new Set([venueId,venueTwo]),'Pages are disjoint and complete');
+    const outdoor = await searchVenues(mobile,{...area,indoor:false,surface:'synthetic'}); assert.ok(outdoor.ok);
+    assert.deepEqual(outdoor.page.venues.map((v)=>[v.id,v.claim_status,v.active_court_count]),[[venueTwo,'unclaimed',1]],'Mobile same-court filters');
+    for (const token of [session.access_token,forged]) {
+      const signed = await searchVenues({...mobile,accessToken:async()=>token},area); assert.ok(signed.ok && signed.page.venues.length===2,'Verified bearer or guest fallback after 401');
+    }
+    const detail = await loadVenueDetail(anonymous,venueId);
+    assert.deepEqual(detail.courts.map((c)=>[c.name,c.surface,c.is_indoor]),[['Court','hard',true]],'Detail lists active courts only');
+    assert.equal((await loadVenueDetail(anonymous,venueTwo)).claim_status,'unclaimed');
+    assert.ok(!JSON.stringify(detail).includes('evidence') && !('publication_status' in detail),'Detail projects public fields only');
     check(await service.from('venues').update({publication_status:'suspended'}).eq('id',venueId),'Suspend fixture');
     const suspended = await invoke(query); assert.equal(suspended.status,200); assert.equal((await suspended.json()).venues.length,0,'Publication changes apply next query');
+    const after = await searchVenues(mobile,area); assert.ok(after.ok); assert.deepEqual(after.page.venues.map((v)=>v.id),[venueTwo],'Mobile search drops suspended venue');
+    assert.equal(await loadVenueDetail(anonymous,venueId),null,'Suspended detail reads as no longer listed');
+    console.log('PASS: T14 mobile client pages/filters/bearer fallback and current public detail (active courts, suspension) against actual local endpoint.');
     console.log('PASS: actual local Edge Runtime guest/verified-player search, client RPC denial, filters, forged JWT, suspension, sanitized output and missing-Redis bounded fallback.');
   } finally {
     if (child && child.exitCode === null) {
@@ -84,6 +109,7 @@ async function main() {
     let clean = true;
     for (const step of [
       ...(created?[()=>service.from('venues').delete().eq('id',venueId).then((r)=>check(r,'Own venue cleanup'))]:[]),
+      ...(createdTwo?[()=>service.from('venues').delete().eq('id',venueTwo).then((r)=>check(r,'Own second venue cleanup'))]:[]),
       ...(userId?[()=>service.auth.admin.deleteUser(userId).then((r)=>check(r,'Own user cleanup'))]:[]),
       ()=>service.auth.stopAutoRefresh(),()=>anonymous.auth.stopAutoRefresh(),()=>player.auth.stopAutoRefresh(),
       ()=>{

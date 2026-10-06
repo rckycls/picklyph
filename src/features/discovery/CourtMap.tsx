@@ -11,6 +11,7 @@ export default function CourtMap(_props: CourtMapProps) {
     <View style={styles.placeholder}>
       <Text accessibilityRole="header" style={screenText.title}>Explore on your iPhone.</Text>
       <Text style={screenText.body}>The Google court map is available in the PicklyPH iPhone development build.</Text>
+      <Text style={screenText.body}>Choose List to browse approved venues across the Philippines.</Text>
     </View>
   );
 }
