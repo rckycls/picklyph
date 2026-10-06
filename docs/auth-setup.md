@@ -39,26 +39,52 @@ and [Expo Apple authentication](https://docs.expo.dev/versions/v57.0.0/sdk/apple
 
 1. Keep Email enabled and email confirmation required; permit new signups for
    the staging trial.
-2. In Authentication → Email Templates, copy
+2. Set up custom SMTP first. The user reports this hosted dashboard requires
+   **Set up custom SMTP to edit templates**. Supabase's default sender can
+   deliver its default emails to team addresses, but it does not unblock the
+   required template edits on this project. Use an existing provider or the
+   Resend example below; account/domain/provider selection is pending.
+3. In Authentication → Email → Templates (or Email Templates), copy
    [`supabase/templates/email-code.html`](../supabase/templates/email-code.html)
    into **both Confirm signup and Magic link**, with subject
    `Your PicklyPH sign-in code`. The body must include `{{ .Token }}`.
    New and returning users should both receive a code they enter in the app.
-3. Set Email OTP length to **6 digits**, expiry to **600 seconds**, and the
+4. Set Email OTP length to **6 digits**, expiry to **600 seconds**, and the
    minimum resend interval to **60 seconds**, matching local config. The input
    tolerates 6–10 digits if an existing hosted project has a longer code.
-4. For initial testing with Supabase's default sender, use an organization team
-   member's email. For other tester/player addresses, configure custom SMTP in
-   Supabase with a verified sending domain. Keep SMTP credentials in provider
-   configuration. Default delivery is restricted to team addresses and currently
-   capped at two messages/hour, so a 60-second UI cooldown does not override the
-   project's overall delivery limits.
+5. Keep SMTP credentials in Supabase's provider configuration. The default
+   sender is restricted to team addresses and currently capped at two
+   messages/hour. Custom SMTP also has provider/project delivery limits; the
+   app's 60-second cooldown does not override those limits.
 
 The app requests `signInWithOtp` with `shouldCreateUser: true` and verifies with
 `verifyOtp({ type: 'email' })`; it requires a returned session. This code flow
 does not use emailed deep links or make redirects proof of authentication.
 See [Supabase email OTP](https://supabase.com/docs/guides/auth/auth-email-passwordless)
 and [SMTP requirements](https://supabase.com/docs/guides/auth/auth-smtp).
+
+### Custom SMTP example: Resend
+
+An existing SMTP provider is also supported. For Resend, first create an account,
+add a domain you own, apply its supplied DNS records, wait for verification and
+create an API key in Resend. No domain/provider is selected or purchased by the
+app task; use an existing domain if available.
+
+In Supabase → Authentication → Email → SMTP Settings, enable custom SMTP:
+
+| Setting | Value |
+| --- | --- |
+| Sender name | PicklyPH |
+| Sender email | `auth@your-domain.com` (replace with your verified domain) |
+| Host | `smtp.resend.com` |
+| Port | `465` |
+| Username | `resend` |
+| Password | Your Resend API key, entered directly in Supabase |
+
+Save SMTP settings, then edit both templates and request a fresh code from the
+app. Never paste the API key into chat, commit it, or put it in Expo public env.
+No native rebuild is needed. Apple sign-in remains independent of SMTP.
+See [Resend's Supabase SMTP setup](https://resend.com/docs/send-with-supabase-smtp).
 
 ### If the email contains a link instead of a code
 
@@ -67,6 +93,7 @@ An email headed "Confirm your email address" is the **Confirm signup** template;
 editing only **Magic link** does not fix new/unconfirmed accounts. Replace the
 body of both hosted templates with the token-only HTML linked above and save
 each. Local `config.toml`/HTML changes do not publish hosted template settings.
+If editing is locked behind custom SMTP, complete SMTP setup above first.
 Request a fresh email from PicklyPH and enter its code in the app. Old links
 may be expired or consumed; their localhost:3000 redirect is not this code flow.
 Keep email confirmation enabled. No app rebuild/reinstall is needed.
