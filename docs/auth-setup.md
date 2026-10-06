@@ -42,11 +42,13 @@ and [Expo Apple authentication](https://docs.expo.dev/versions/v57.0.0/sdk/apple
 2. Set up custom SMTP first. The user reports this hosted dashboard requires
    **Set up custom SMTP to edit templates**. Supabase's default sender can
    deliver its default emails to team addresses, but it does not unblock the
-   required template edits on this project. Use an existing provider or the
-   Resend example below; account/domain/provider selection is pending.
+   required template edits on this project. User has no domain yet. For
+   temporary staging tests, the Gmail option below needs no purchased domain;
+   an existing provider or verified-domain Resend is also supported. Provider
+   selection and hosted configuration remain pending.
 3. In Authentication → Email → Templates (or Email Templates), copy
    [`supabase/templates/email-code.html`](../supabase/templates/email-code.html)
-   into **both Confirm signup and Magic link**, with subject
+   into **both Confirm sign up and Magic link or OTP**, with subject
    `Your PicklyPH sign-in code`. The body must include `{{ .Token }}`.
    New and returning users should both receive a code they enter in the app.
 4. Set Email OTP length to **6 digits**, expiry to **600 seconds**, and the
@@ -62,6 +64,36 @@ The app requests `signInWithOtp` with `shouldCreateUser: true` and verifies with
 does not use emailed deep links or make redirects proof of authentication.
 See [Supabase email OTP](https://supabase.com/docs/guides/auth/auth-email-passwordless)
 and [SMTP requirements](https://supabase.com/docs/guides/auth/auth-smtp).
+
+### Temporary staging SMTP: Gmail, without a custom domain
+
+Use a Gmail account you control, preferably one dedicated to project testing.
+Enable Google 2-Step Verification, then create an App Password named
+`PicklyPH staging` at [Google App Passwords](https://myaccount.google.com/apppasswords).
+This is conditional on the account supporting App Passwords; some managed,
+security-key-only or Advanced Protection accounts cannot create them. Do not
+disable account protections to make this option available.
+
+In Supabase → Authentication → Email → SMTP Settings (or **Set up SMTP**),
+enable custom SMTP:
+
+| Setting | Value |
+| --- | --- |
+| Sender name | PicklyPH |
+| Sender email | Your full Gmail address |
+| Host | `smtp.gmail.com` |
+| Port | `465` (SSL) |
+| Username | The same full Gmail address |
+| Password | The Google App Password, entered directly in Supabase |
+
+Use the App Password rather than the account's normal password. Keep it only
+in hosted SMTP configuration, never in chat, the repository or Expo env. Save,
+edit both templates, then request a fresh code from the app. Gmail and Supabase
+delivery limits still apply; this is a low-volume staging option, not the
+production mail-provider decision. No app rebuild is needed.
+See [Google App Password requirements](https://support.google.com/accounts/answer/185833),
+[Gmail third-party authentication](https://support.google.com/mail/answer/7126229)
+and [Google SMTP server settings](https://knowledge.workspace.google.com/admin/gmail/send-email-from-a-printer-scanner-or-app).
 
 ### Custom SMTP example: Resend
 
