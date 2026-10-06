@@ -42,3 +42,5 @@ content_path = "./supabase/templates/email-code.html"
 [functions.venue-search]
 # Guests are allowed; supplied bearer tokens are independently verified in code.
 verify_jwt = false
+# Hosted (API) bundling does not discover the shared map on its own; local serve and deploy use the same pins.
+import_map = "./functions/deno.json"
