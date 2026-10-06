@@ -9,8 +9,8 @@ records for successful directory commands; see [directory audit](directory-audit
 ## Setup
 
 T11 adds `supabase/migrations/20261007030000_directory_curation.sql`. It has been
-applied and tested on the local Docker database; hosted staging currently has
-T05/T08 only. Apply T11 and T12 to the verified staging project when deploying these tools:
+applied and tested on the local Docker database; T11–T13 were applied to hosted
+staging on 2026-10-07. For another environment, apply the chain to its verified project:
 
 ```powershell
 npx supabase db push --project-ref fkdusdurzdgbfwwigrqw --dry-run --skip-vault

@@ -29,10 +29,10 @@ T10 adds a separate Next.js administrator/moderator console with email-code
 authentication, server-managed sessions and current database role checks.
 See [admin setup](docs/admin-setup.md). T11 adds admin directory creation/editing,
 publication/suspension and atomic, repeat-safe JSON imports. Its migration and
-production HTTP flow pass locally; hosted T11 migration/server-key setup remains.
+production HTTP flow pass locally; T11–T13 are applied to hosted staging, and its server-key setup remains.
 See [directory curation](docs/directory-curation.md).
 T14 replaced the demo pins with the T13 search endpoint; live hosted results need
-the pending T11–T13 migrations, the `venue-search` deployment and published venues.
+the `venue-search` deployment and published venues (T11–T13 are applied on staging).
 Reservations, payments and owner tools are still planned.
 
 T01/T02 source checks and iOS bundling passed. Physical iPhone tab switching,
@@ -255,7 +255,7 @@ T05/T08 were applied to `fkdusdurzdgbfwwigrqw`, backfilling both existing Auth
 accounts' profiles. The earlier `503 / PGRST002` came from the disabled Data API;
 exposing only `public` resolved it. Public venue/court reads and bounds RPC return
 200; guest profile/access-RPC reads and private-schema access are denied.
-No hosted fixtures or account roles were added. Docker Desktop's Linux engine is installed and
+No hosted fixtures or account roles were added. T11–T13 were applied later that day after the same preflight/dry run; `venue-search` is not deployed yet. Docker Desktop's Linux engine is installed and
 the migration and rollback-only SQL suite pass on local PostgreSQL 17.11 / PostGIS
 3.3.7. Use the pinned CLI from this project:
 

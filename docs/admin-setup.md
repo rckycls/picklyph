@@ -38,7 +38,7 @@ SMTP, payment or server secrets into browser configuration.
 The selected Supabase project must have T05/T08 migrations and working Auth/REST;
 T11 directory tools also need the curation migration and server-only secret key.
 The local stack and hosted staging project `fkdusdurzdgbfwwigrqw` now have these
-schemas. Hosted T05/T08 deployment completed on 2026-10-07; mobile and admin env
+schemas. Hosted T05/T08 and then T11–T13 deployments completed on 2026-10-07; mobile and admin env
 URLs were checked against that same target. Public directory reads and the bounds
 RPC pass, and guest profile/access-RPC and private-schema requests are denied.
 The Data API exposes only `public`; enabling it resolved the earlier PGRST002.
@@ -124,7 +124,7 @@ HTTPS in production.
 These checks prove server behavior, not a browser screenshot or physical-device
 layout review. Use dev mode for local browser layout, keyboard focus, narrow
 viewport, wrong-code recovery and sign-out checks. No iPhone rebuild is required.
-Vercel deployment, intended admin bootstrap, T11 hosted migration/secret setup
+Vercel deployment, intended admin bootstrap, T11 hosted secret setup
 and hosted console email/browser acceptance remain operator steps. Hosted T05/T08
 migrations and Data API checks passed on 2026-10-07; no new iPhone build is needed.
 

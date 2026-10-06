@@ -2,7 +2,7 @@
 
 `supabase/migrations/20261007060000_directory_audit.sql` adds
 `private.directory_audit_events` and auditing for the existing T11 commands.
-Apply after T11. This task applies it locally; hosted staging remains on T05/T08.
+Apply after T11. Applied locally and, on 2026-10-07, to hosted staging.
 
 Each successful save or publication command appends one event in its database
 transaction. A venue save covers the venue and its submitted court changes.
