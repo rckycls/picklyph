@@ -5,6 +5,7 @@ export const market = {
 } as const;
 
 export type { Database } from './database';
+export type { DirectoryAuditAction, DirectoryAuditEvent, DirectoryAuditPage } from './audit';
 export { DirectoryInputError, MAX_DIRECTORY_COURTS, MAX_DIRECTORY_IMPORT, directoryUuid, readVenueInput, readCourtInputs, readDirectorySave, readDirectoryPublication, readDirectoryImport } from './curation';
 export type { VenueInput, CourtInput, DirectoryListing, DirectoryPage, DirectorySave, DirectoryImportEntry, DirectoryImportResult } from './curation';
 export type { AccountAccess, PrivilegedRole, Profile } from './authorization';

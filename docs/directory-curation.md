@@ -3,13 +3,14 @@
 Administrators open `/console/directory` to browse up to 100 venues per page,
 create drafts, edit venue/court details, publish, return to draft or suspend.
 Moderators can use the console foundation but cannot access directory curation.
-Ownership review, bookings and transactional audit records are later tasks.
+Ownership review and bookings are later tasks. T12 adds transactional audit
+records for successful directory commands; see [directory audit](directory-audit.md).
 
 ## Setup
 
 T11 adds `supabase/migrations/20261007030000_directory_curation.sql`. It has been
 applied and tested on the local Docker database; hosted staging currently has
-T05/T08 only. Apply T11 to the verified staging project when deploying these tools:
+T05/T08 only. Apply T11 and T12 to the verified staging project when deploying these tools:
 
 ```powershell
 npx supabase db push --project-ref fkdusdurzdgbfwwigrqw --dry-run --skip-vault

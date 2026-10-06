@@ -70,6 +70,9 @@ async function main() {
     stage = 'curation SQL allow/deny and rollback';
     sql(fs.readFileSync(path.join(root, 'supabase/tests/curation.sql'), 'utf8'));
     console.log('PASS: curation SQL allow/deny, invalid inputs, preservation, publication, bounded reads and atomic import rollback on Docker PostgreSQL.');
+    stage = 'audit SQL permissions and rollback';
+    sql(fs.readFileSync(path.join(root, 'supabase/tests/audit.sql'), 'utf8'));
+    console.log('PASS: Docker transactional audit actions, client immutability, admin-only reads, import/caller rollback and mandatory audit persistence.');
     stage = 'startup';
     // Refuse to attach to/terminate an existing server on the fixed test port.
     const net = require('node:net');
@@ -153,6 +156,7 @@ async function main() {
       const operation = await request('/api/console/check-access', jar, { actor_user_id: fixtures[0], roles: ['admin'] });
       stage = `${role} directory curation`;
       if (role !== 'admin') {
+        assert.equal((await service.rpc('directory_admin_audit_read', { actor_user_id: id })).error?.code, '42501', 'Player/moderator denied audit reads by current DB role.');
         for (const action of ['save', 'publish', 'import']) assert.equal((await request(`/api/console/directory/${action}`, jar, { actor_user_id: fixtures[0] })).status, 403, 'Player/moderator cannot use curation commands.');
         const directoryHtml = await (await request('/console/directory', jar)).text();
         assert.ok(!directoryHtml.includes('Better places to play.') && !directoryHtml.includes('Synthetic HTTP venue'), 'Directory data is administrator-only.');
@@ -197,7 +201,24 @@ async function main() {
         assert.deepEqual(outcomes.sort(), ['created','existing'], 'Concurrent retries create exactly one draft.');
         assert.equal((await request('/api/console/directory/import', jar, { listings: [{ reference, venue: { ...venue, name: 'Changed import' }, courts: [court] }] })).status, 409, 'Changed reference rejected.');
         assert.equal((await request('/api/console/directory/import', jar, { padding: 'x'.repeat(256 * 1024) })).status, 413, 'Oversized import body rejected.');
+        stage = 'verified HTTP directory command audit';
+        const audit = await service.rpc('directory_admin_audit_read', { actor_user_id: id, target_venue_id: draft.id });
+        assert.ok(!audit.error, 'Current admin can read audit via trusted RPC.');
+        assert.deepEqual(audit.data.items.map(event => event.action), ['directory.create','directory.update','directory.publish','directory.suspend'], 'Only successful HTTP commands produce events.');
+        for (const event of audit.data.items) {
+          assert.equal(event.actor_user_id, id, 'Recorded actor is the verified HTTP user.');
+          assert.equal(event.target_venue_id, draft.id);
+          assert.equal(typeof event.id, 'string');
+          assert.ok(Number.isFinite(Date.parse(event.occurred_at)));
+          assert.deepEqual(Object.keys(event).sort(), ['action','actor_user_id','id','occurred_at','target_venue_id'], 'Audit contains no input or secret snapshots.');
+        }
+        const importedId = [...venueFixtures].find(venueId => venueId !== draft.id);
+        const importedAudit = await service.rpc('directory_admin_audit_read', { actor_user_id: id, target_venue_id: importedId });
+        assert.ok(!importedAudit.error);
+        assert.deepEqual(importedAudit.data.items.map(event => event.action), ['directory.import'], 'Concurrent imports record one event, failed retry records none.');
+        assert.ok((await publicClient.rpc('directory_admin_audit_read', { actor_user_id: id })).error, 'Guest cannot impersonate admin to read audit.');
         await publicClient.auth.dispose();
+        console.log('PASS: real HTTP verified actor attribution, minimal audit records, stale/invalid/CSRF denial without audit and one concurrent import event.');
         console.log('PASS: production admin directory draft/edit/conflict/publish/suspend, guest/role/CSRF denial and concurrent import retry.');
       }
       if (role === 'player') {
@@ -211,6 +232,7 @@ async function main() {
         // Cold browser jar restores the session on subsequent independent HTTP requests.
         assert.equal((await request('/api/console/check-access', new Map(jar), {})).status, 200, 'Cookies restore the same role on a fresh request.');
         sql(`delete from private.account_roles where user_id='${id}'::uuid;`);
+        assert.equal((await service.rpc('directory_admin_audit_read', { actor_user_id: id })).error?.code, '42501', 'Revoked role immediately loses audit read access.');
         assert.equal((await request('/api/console/check-access', jar, {})).status, 403, 'Role revocation takes effect without refresh.');
         assert.equal((await request('/api/console/directory/save', jar, {})).status, 403, 'Revocation denies directory mutation.');
         assert.ok((await (await request('/console', jar)).text()).includes('Access required.'), 'Revoked user cannot render workspace.');
@@ -234,6 +256,11 @@ async function main() {
     }
     for (const id of fixtures) {
       try { if ((await service.auth.admin.deleteUser(id)).error) cleanupFailed = true; } catch { cleanupFailed = true; }
+    }
+    // Audit has no cascading FKs. Trusted local SQL removes only this run's
+    // synthetic actor history; infrastructure/client RPCs cannot delete it.
+    for (const id of fixtures) {
+      try { sql(`delete from private.directory_audit_events where actor_user_id='${id}'::uuid;`); } catch { cleanupFailed = true; }
     }
     if (messageIds.size) {
       try {
