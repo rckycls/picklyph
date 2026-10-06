@@ -233,6 +233,7 @@ with the correct native Client ID and reports working iPhone sign-in/sign-out.
 User explicitly confirms Apple works and subsequently reports the email-code
 flow **works now** after SMTP/template setup guidance. Hosted email sign-in is
 accepted from that report; the exact SMTP provider/settings are not independently
-verified. Remaining H05 restoration, refresh, code-recovery and route checks
-await confirmation.
-T07 stays open until its device acceptance checks pass.
+verified. On 2026-10-06 the user explicitly confirmed **the T07 checklist works
+and all passed**, including remaining restoration, foreground return/refresh,
+code-recovery and guest/protected-route checks. T07 is complete based on that
+device report and the automated/local evidence above.

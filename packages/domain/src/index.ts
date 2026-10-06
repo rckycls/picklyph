@@ -5,4 +5,5 @@ export const market = {
 } as const;
 
 export type { Database } from './database';
+export type { AccountAccess, PrivilegedRole, Profile } from './authorization';
 export type { Court, CourtStatus, CourtSurface, MapBounds, Venue, VenueClaimStatus, VenueMapPin, VenuePublicationStatus } from './directory';

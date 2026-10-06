@@ -15,8 +15,12 @@ on-device. T04 is complete. Expo Go shows a
 setup fallback instead. T05 adds venue/court migrations, protected public reads,
 private claim evidence, shared types and a lazy public Supabase client.
 T07 adds Apple/email-code sign-in, secure native sessions, sign-out and protected
-Bookings navigation. Provider setup and iPhone auth acceptance remain pending;
+Bookings navigation. The user confirms the full T07 iPhone checklist passes;
 see [auth setup and device checks](docs/auth-setup.md).
+T08 adds private role assignments, venue-scoped verified ownership, self-only
+profiles and actor-checked server authorization. SQL/API allow-deny tests pass
+on local Supabase; hosted migrations are not deployed.
+See [account authorization](docs/authorization.md).
 The map still uses demo data; live directory screens, search, reservations,
 payments and owner tools are still planned.
 
@@ -244,7 +248,8 @@ npm run test:directory:local
 
 Local SDK smoke checks also pass for public venue/court reads, spatial RPC,
 guest write denial, private-schema exclusion and Auth health. This verifies
-directory API wiring; signup/session and Storage workflows are future tasks.
+directory API wiring. Local auth and authorization integration now pass too;
+Storage workflows are later tasks.
 Studio is available at http://127.0.0.1:54323 while the stack is running.
 Use `npx supabase stop` to stop services while retaining local data.
 
@@ -271,10 +276,10 @@ and verified target selection; a mobile publishable key cannot apply migrations.
 | --- | --- |
 | `src/app/` | Expo Router mobile routes. |
 | `src/components/ui/` | Shared accessible controls and screen presentation. |
-| `src/theme/`, `docs/` | Photo-inspired semantic colors and brand notes. |
+| `src/theme/`, `assets/brand/`, `docs/` | Concept C colors, typography, paddle-pin assets and setup notes. |
 | `packages/domain/` | Shared TypeScript domain package. |
 | `apps/admin/` (planned) | Next.js admin/moderator workspace with its own checks. |
-| `supabase/` | Directory migration, local configuration and database tests; server functions later. |
+| `supabase/` | Directory/authorization migrations, local configuration and SQL/API tests; Edge Functions later. |
 | `vibe-plus/` | Task plan and current handoff. |
 
 T04's native map and T05's embedded and Docker database checks pass. Hosted
