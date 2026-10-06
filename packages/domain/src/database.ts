@@ -1,7 +1,8 @@
-import type { Court, CourtStatus, CourtSurface, MapBounds, Venue, VenueClaimStatus, VenueMapPin, VenuePublicationStatus } from './directory';
-import type { AccountAccess, PrivilegedRole, Profile } from './authorization';
-import type { VenueInput, CourtInput, DirectoryPage, DirectoryListing, DirectoryImportEntry, DirectoryImportResult } from './curation';
-import type { DirectoryAuditPage } from './audit';
+import type { Court, CourtStatus, CourtSurface, MapBounds, Venue, VenueClaimStatus, VenueMapPin, VenuePublicationStatus } from './directory.ts';
+import type { AccountAccess, PrivilegedRole, Profile } from './authorization.ts';
+import type { VenueInput, CourtInput, DirectoryPage, DirectoryListing, DirectoryImportEntry, DirectoryImportResult } from './curation.ts';
+import type { DirectoryAuditPage } from './audit.ts';
+import type { VenueSearch, VenueSearchPage } from './search.ts';
 
 // Schema-maintained PostgREST contract for directory + T08 authorization migrations.
 // Only the exposed public schema belongs in mobile code. PostGIS geometry is
@@ -42,6 +43,7 @@ export interface Database {
     Views: { [_ in never]: never };
     Functions: {
       venues_in_bounds: { Args: MapBounds; Returns: VenueMapPin[] };
+      directory_search: { Args: { search: VenueSearch }; Returns: VenueSearchPage };
       my_account_access: { Args: Record<PropertyKey, never>; Returns: AccountAccess[] };
       directory_admin_read: { Args: { actor_user_id: string; target_venue_id?: string | null; after_id?: string | null }; Returns: DirectoryPage };
       directory_admin_save: { Args: { actor_user_id: string; target_venue_id: string | null; expected_updated_at: string | null; venue_input: VenueInput; court_inputs: CourtInput[] }; Returns: DirectoryListing };

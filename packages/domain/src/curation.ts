@@ -1,4 +1,4 @@
-import type { Court, CourtSurface, CourtStatus, Venue, VenuePublicationStatus } from './directory';
+import type { Court, CourtSurface, CourtStatus, Venue, VenuePublicationStatus } from './directory.ts';
 
 export type VenueInput = Pick<Venue, 'name' | 'address_line' | 'city' | 'province' | 'latitude' | 'longitude'>;
 export type CourtInput = { id: string | null; name: string; surface: CourtSurface | null; is_indoor: boolean; is_covered: boolean; status: CourtStatus };

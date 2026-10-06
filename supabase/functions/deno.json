@@ -1,0 +1,10 @@
+{
+  "imports": {
+    "@upstash/redis": "npm:@upstash/redis@1.39.0",
+    "@upstash/ratelimit": "npm:@upstash/ratelimit@2.2.0",
+    "@supabase/supabase-js": "npm:@supabase/supabase-js@2.117.2"
+  },
+  "compilerOptions": { "strict": true, "noUncheckedIndexedAccess": true },
+  "nodeModulesDir": "none",
+  "fmt": { "singleQuote": true }
+}

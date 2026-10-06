@@ -38,3 +38,7 @@ content_path = "./supabase/templates/email-code.html"
 [auth.email.template.confirmation]
 subject = "Your PicklyPH sign-in code"
 content_path = "./supabase/templates/email-code.html"
+
+[functions.venue-search]
+# Guests are allowed; supplied bearer tokens are independently verified in code.
+verify_jwt = false

@@ -5,7 +5,8 @@ const { test } = require('node:test');
 test('admin curation, transaction rollback, import retries and directory isolation on real PostgreSQL/PostGIS', async () => {
   const { PGlite } = await import('@electric-sql/pglite');
   const { postgis } = await import('@electric-sql/pglite-postgis');
-  const db = new PGlite({ extensions: { postgis } });
+  const { pg_trgm } = await import('@electric-sql/pglite/contrib/pg_trgm');
+  const db = new PGlite({ extensions: { postgis, pg_trgm } });
   try {
     await db.exec(`create role anon; create role authenticated; create role service_role bypassrls;
       create schema auth; grant usage on schema auth to anon, authenticated, service_role;

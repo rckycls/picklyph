@@ -5,6 +5,8 @@ export const market = {
 } as const;
 
 export type { Database } from './database';
+export { MAX_SEARCH_PAGE, SearchInputError, readVenueSearch } from './search';
+export type { VenueSearch, VenueSearchItem, VenueSearchPage } from './search';
 export type { DirectoryAuditAction, DirectoryAuditEvent, DirectoryAuditPage } from './audit';
 export { DirectoryInputError, MAX_DIRECTORY_COURTS, MAX_DIRECTORY_IMPORT, directoryUuid, readVenueInput, readCourtInputs, readDirectorySave, readDirectoryPublication, readDirectoryImport } from './curation';
 export type { VenueInput, CourtInput, DirectoryListing, DirectoryPage, DirectorySave, DirectoryImportEntry, DirectoryImportResult } from './curation';
