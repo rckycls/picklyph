@@ -27,6 +27,7 @@ async function main() {
   const boundedFetch = (url, init = {}) => fetch(url, { ...init, signal: AbortSignal.timeout(15000) });
   const service = createClient(api.href, settings.SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false }, global: { fetch: boundedFetch } });
   const fixtures = [];
+  const venueFixtures = new Set();
   const messageIds = new Set();
   const origin = 'http://127.0.0.1:3100';
   let child;
@@ -66,6 +67,10 @@ async function main() {
   };
 
   try {
+    stage = 'curation SQL allow/deny and rollback';
+    sql(fs.readFileSync(path.join(root, 'supabase/tests/curation.sql'), 'utf8'));
+    console.log('PASS: curation SQL allow/deny, invalid inputs, preservation, publication, bounded reads and atomic import rollback on Docker PostgreSQL.');
+    stage = 'startup';
     // Refuse to attach to/terminate an existing server on the fixed test port.
     const net = require('node:net');
     const reservation = net.createServer();
@@ -74,7 +79,7 @@ async function main() {
     assert.ok(fs.existsSync(path.join(root, 'apps/admin/.next/BUILD_ID')), 'Build the admin before integration tests.');
     child = spawn(process.execPath, [require.resolve('next/dist/bin/next'), 'start', '--hostname', '127.0.0.1', '--port', '3100'], {
       cwd: path.join(root, 'apps/admin'), windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'],
-      env: { ...process.env, NODE_ENV: 'production', NEXT_TELEMETRY_DISABLED: '1', ADMIN_ORIGIN: origin, ADMIN_SUPABASE_URL: api.origin, ADMIN_SUPABASE_PUBLISHABLE_KEY: settings.ANON_KEY },
+      env: { ...process.env, NODE_ENV: 'production', NEXT_TELEMETRY_DISABLED: '1', ADMIN_ORIGIN: origin, ADMIN_SUPABASE_URL: api.origin, ADMIN_SUPABASE_PUBLISHABLE_KEY: settings.ANON_KEY, ADMIN_SUPABASE_SECRET_KEY: settings.SERVICE_ROLE_KEY },
     });
     // Drain output but never dump runtime logs/SDK objects containing credentials.
     child.stdout.on('data', () => {}); child.stderr.on('data', () => {});
@@ -93,6 +98,7 @@ async function main() {
     const guestPage = await request('/console');
     assert.ok([307, 303].includes(guestPage.status) && guestPage.headers.get('location') === '/login', 'Guest console redirects to sign-in.');
     assert.equal((await request('/api/console/check-access', new Map(), {})).status, 401, 'Guest operation denied.');
+    for (const action of ['save', 'publish', 'import']) assert.equal((await request(`/api/console/directory/${action}`, new Map(), {})).status, 401, 'Guest directory command denied.');
     assert.equal((await request('/api/auth/request', new Map(), { email: 'bad' })).status, 400, 'Invalid email denied.');
     assert.equal((await request('/api/auth/request', new Map(), { email: 'nobody@example.invalid' }, { Origin: 'https://attacker.invalid' })).status, 403, 'Cross-site request denied.');
 
@@ -145,6 +151,55 @@ async function main() {
       const consolePage = await request('/console', jar);
       const html = await consolePage.text();
       const operation = await request('/api/console/check-access', jar, { actor_user_id: fixtures[0], roles: ['admin'] });
+      stage = `${role} directory curation`;
+      if (role !== 'admin') {
+        for (const action of ['save', 'publish', 'import']) assert.equal((await request(`/api/console/directory/${action}`, jar, { actor_user_id: fixtures[0] })).status, 403, 'Player/moderator cannot use curation commands.');
+        const directoryHtml = await (await request('/console/directory', jar)).text();
+        assert.ok(!directoryHtml.includes('Better places to play.') && !directoryHtml.includes('Synthetic HTTP venue'), 'Directory data is administrator-only.');
+      } else {
+        const venue = { name: 'Synthetic HTTP venue', address_line: 'Local fixture only', city: 'Manila', province: 'Metro Manila', latitude: 14.6, longitude: 121 };
+        const court = { id: null, name: 'Court 1', surface: 'hard', is_indoor: false, is_covered: true, status: 'active' };
+        const input = { id: null, expected_updated_at: null, venue, courts: [court] };
+        assert.equal((await request('/api/console/directory/save', jar, input, { Origin: 'https://attacker.invalid' })).status, 403, 'Directory command rejects cross-site requests.');
+        assert.equal((await request('/api/console/directory/save', jar, { ...input, actor_user_id: fixtures[0] })).status, 400, 'Caller cannot supply actor or hidden authority fields.');
+        assert.equal((await request('/api/console/directory/save', jar, { ...input, venue: { ...venue, latitude: 91 } })).status, 400, 'Invalid coordinates fail before writes.');
+        const created = await request('/api/console/directory/save', jar, input);
+        assert.equal(created.status, 200, 'Admin creates draft via verified route.');
+        const { data: draft } = await created.json(); venueFixtures.add(draft.id);
+        assert.equal(draft.publication_status, 'draft'); assert.equal(draft.claim_status, 'unclaimed');
+        assert.ok(created.headers.get('cache-control')?.includes('no-store'), 'Draft response is private.');
+        const publicClient = createClient(api.href, settings.ANON_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
+        assert.equal((await publicClient.from('venues').select('id').eq('id', draft.id)).data.length, 0, 'Draft invisible over real API.');
+        const listingHtml = await (await request(`/console/directory/${draft.id}`, jar)).text();
+        assert.ok(listingHtml.includes(venue.name) && !listingHtml.includes(settings.SERVICE_ROLE_KEY), 'Editor receives directory data without secret.');
+        const existingCourt = { ...court, id: draft.courts[0].id, name: 'Renamed court' };
+        const editedResponse = await request('/api/console/directory/save', jar, { ...input, id: draft.id, expected_updated_at: draft.updated_at, venue: { ...venue, name: 'Edited HTTP venue' }, courts: [existingCourt] });
+        assert.equal(editedResponse.status, 200); const { data: edited } = await editedResponse.json();
+        assert.equal(edited.courts[0].id, draft.courts[0].id, 'Court ID retained.');
+        assert.equal((await request('/api/console/directory/save', jar, { ...input, id: draft.id, expected_updated_at: draft.updated_at })).status, 409, 'Stale editor cannot overwrite changes.');
+        const publication = await request('/api/console/directory/publish', jar, { id: edited.id, expected_updated_at: edited.updated_at, publication_status: 'approved' });
+        assert.equal(publication.status, 200); const { data: published } = await publication.json();
+        const visible = await publicClient.from('venues').select('id,claim_status').eq('id', draft.id);
+        assert.ok(!visible.error && visible.data.length === 1 && visible.data[0].claim_status === 'unclaimed', 'Publication visible without granting ownership.');
+        assert.equal((await publicClient.from('courts').select('id').eq('venue_id', draft.id)).data.length, 1);
+        const suspended = await request('/api/console/directory/publish', jar, { id: published.id, expected_updated_at: published.updated_at, publication_status: 'suspended' });
+        assert.equal(suspended.status, 200);
+        assert.equal((await publicClient.from('venues').select('id').eq('id', draft.id)).data.length, 0, 'Suspension hides venue.');
+        assert.equal((await publicClient.from('courts').select('id').eq('venue_id', draft.id)).data.length, 0, 'Suspension hides courts.');
+        const reference = `local-http:${randomUUID()}`;
+        const importBody = { listings: [{ reference, venue, courts: [court] }] };
+        const concurrent = await Promise.all([request('/api/console/directory/import', jar, importBody), request('/api/console/directory/import', new Map(jar), importBody)]);
+        const outcomes = [];
+        for (const response of concurrent) {
+          assert.equal(response.status, 200, 'Concurrent import retry succeeds.');
+          const { data } = await response.json(); venueFixtures.add(data[0].id); outcomes.push(data[0].outcome);
+        }
+        assert.deepEqual(outcomes.sort(), ['created','existing'], 'Concurrent retries create exactly one draft.');
+        assert.equal((await request('/api/console/directory/import', jar, { listings: [{ reference, venue: { ...venue, name: 'Changed import' }, courts: [court] }] })).status, 409, 'Changed reference rejected.');
+        assert.equal((await request('/api/console/directory/import', jar, { padding: 'x'.repeat(256 * 1024) })).status, 413, 'Oversized import body rejected.');
+        await publicClient.auth.dispose();
+        console.log('PASS: production admin directory draft/edit/conflict/publish/suspend, guest/role/CSRF denial and concurrent import retry.');
+      }
       if (role === 'player') {
         assert.ok(html.includes('Access required.') && !html.includes('Your workspace is ready.'), 'Player cannot render protected workspace.');
         assert.equal(operation.status, 403, 'Metadata and forged body cannot elevate a player.');
@@ -157,6 +212,7 @@ async function main() {
         assert.equal((await request('/api/console/check-access', new Map(jar), {})).status, 200, 'Cookies restore the same role on a fresh request.');
         sql(`delete from private.account_roles where user_id='${id}'::uuid;`);
         assert.equal((await request('/api/console/check-access', jar, {})).status, 403, 'Role revocation takes effect without refresh.');
+        assert.equal((await request('/api/console/directory/save', jar, {})).status, 403, 'Revocation denies directory mutation.');
         assert.ok((await (await request('/console', jar)).text()).includes('Access required.'), 'Revoked user cannot render workspace.');
       }
       stage = `${role} sign-out`;
@@ -172,6 +228,9 @@ async function main() {
     if (child && child.exitCode === null) {
       child.kill();
       await new Promise((resolve) => { child.once('exit', resolve); setTimeout(resolve, 3000); });
+    }
+    for (const id of venueFixtures) {
+      try { if ((await service.from('venues').delete().eq('id',id)).error) cleanupFailed = true; } catch { cleanupFailed = true; }
     }
     for (const id of fixtures) {
       try { if ((await service.auth.admin.deleteUser(id)).error) cleanupFailed = true; } catch { cleanupFailed = true; }

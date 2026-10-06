@@ -20,3 +20,15 @@ export function readAdminConfig(env: Record<string, string | undefined>) {
   } catch { throw new AdminConfigurationError(); }
   return { url, key, origin: new URL(origin).origin };
 }
+
+/** Infrastructure configuration; never consumed by client components. */
+export function readDirectoryConfig(env: Record<string, string | undefined>) {
+  const { url } = readAdminConfig(env);
+  const key = env.ADMIN_SUPABASE_SECRET_KEY;
+  if (!key || key.includes('REPLACE_')) throw new AdminConfigurationError();
+  try {
+    const role = key.startsWith('eyJ') ? JSON.parse(atob((key.split('.')[1] ?? '').replaceAll('-', '+').replaceAll('_', '/'))).role : null;
+    if (!(key.startsWith('sb_secret_') || role === 'service_role')) throw new AdminConfigurationError();
+  } catch { throw new AdminConfigurationError(); }
+  return { url, key };
+}

@@ -8,7 +8,7 @@ export function requireSameOrigin(request: Request, expectedOrigin: string) {
 }
 
 /** Bound the stream, rather than trusting Content-Length or buffering an unlimited body. */
-export async function readJsonBody(request: Request): Promise<Record<string, unknown>> {
+export async function readJsonBody(request: Request, maxBytes = 4096): Promise<Record<string, unknown>> {
   if (request.headers.get('content-type')?.split(';')[0]?.trim() !== 'application/json') throw new RequestError(415, 'Send JSON input.');
   const reader = request.body?.getReader();
   if (!reader) throw new RequestError(400, 'Missing input.');
@@ -19,7 +19,7 @@ export async function readJsonBody(request: Request): Promise<Record<string, unk
       const chunk = await reader.read();
       if (chunk.done) break;
       length += chunk.value.byteLength;
-      if (length > 4096) { await reader.cancel(); throw new RequestError(413, 'Input is too large.'); }
+      if (length > maxBytes) { await reader.cancel(); throw new RequestError(413, 'Input is too large.'); }
       chunks.push(chunk.value);
     }
     const bytes = new Uint8Array(length);

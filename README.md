@@ -26,7 +26,10 @@ T09 adds exact PHP centavo conversion/display, UTC/Manila time helpers and
 validated rental duration/horizon boundaries. See [shared booking rules](docs/booking-rules.md).
 T10 adds a separate Next.js administrator/moderator console with email-code
 authentication, server-managed sessions and current database role checks.
-See [admin setup](docs/admin-setup.md). Directory editing is T11.
+See [admin setup](docs/admin-setup.md). T11 adds admin directory creation/editing,
+publication/suspension and atomic, repeat-safe JSON imports. Its migration and
+production HTTP flow pass locally; hosted T11 migration/server-key setup remains.
+See [directory curation](docs/directory-curation.md).
 The map still uses demo data; live directory screens, search, reservations,
 payments and owner tools are still planned.
 

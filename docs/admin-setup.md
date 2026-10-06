@@ -1,4 +1,4 @@
-# Admin console (T10)
+# Admin console (T10–T11)
 
 `apps/admin` is a separate Next.js 16 workspace for administrators and moderators.
 It uses the Concept C palette, local Bricolage Grotesque fonts and the existing
@@ -6,9 +6,10 @@ paddle-pin mark. The root remains the Expo mobile app. Install from the root
 with `npm ci`; one root lockfile covers both workspaces.
 
 The console foundation has an email-code sign-in page, session-aware protected
-workspace, access-denied/unavailable states and sign-out. Directory editing is
-T11, auditing T12, and ownership review later. Feature cards are labeled as
-upcoming; no listing, ownership or account-role editor is implemented.
+workspace, access-denied/unavailable states and sign-out. T11 adds admin-only
+venue/court editing, draft/publish/suspend controls and validated JSON imports.
+See [directory curation](directory-curation.md) for setup, import format and
+transaction boundaries. Auditing is T12; ownership review and a role editor are later.
 
 ## Configure and run
 
@@ -26,6 +27,7 @@ independent of the root mobile env. Configure:
 | `ADMIN_ORIGIN` | Exact browser origin, e.g. `http://localhost:3000`; use the HTTPS console origin in hosting. Requests from other origins are rejected. |
 | `ADMIN_SUPABASE_URL` | Chosen staging project URL, or `http://127.0.0.1:54321` for local Docker. HTTPS is required for remote projects. |
 | `ADMIN_SUPABASE_PUBLISHABLE_KEY` | Same project's publishable key. Local CLI legacy `anon` keys are also accepted. Infrastructure/secret/service-role keys are rejected. |
+| `ADMIN_SUPABASE_SECRET_KEY` | T11 only: same project's server-only secret (`sb_secret_`) key, or local legacy `service_role` key. Never expose via `NEXT_PUBLIC_` or Expo config. |
 
 Open http://localhost:3000. Use the hostname in `ADMIN_ORIGIN` consistently;
 `127.0.0.1` and `localhost` are different origins. Local development uses HTTP
@@ -33,7 +35,8 @@ cookies; production uses Secure cookies and must be served over HTTPS. No
 service key or `NEXT_PUBLIC_` variables are needed for T10. Do not copy signing,
 SMTP, payment or server secrets into browser configuration.
 
-The selected Supabase project must have T05/T08 migrations and working Auth/REST.
+The selected Supabase project must have T05/T08 migrations and working Auth/REST;
+T11 directory tools also need the curation migration and server-only secret key.
 The local stack and hosted staging project `fkdusdurzdgbfwwigrqw` now have these
 schemas. Hosted T05/T08 deployment completed on 2026-10-07; mobile and admin env
 URLs were checked against that same target. Public directory reads and the bounds
@@ -67,8 +70,8 @@ SQL; T10 does not add a public bootstrap endpoint or a role editor.
 - The shared guard supports an operation-specific required role. Being admitted
   to the console does not grant moderators administrative directory/role/refund
   powers. Admins also meet moderator-level access checks, matching T08's review
-  permission hierarchy. Future mutation functions must check authorization in their database
-  transaction, preserving T08's verified actor boundary.
+  permission hierarchy. T11 directory functions check and lock the admin assignment
+  inside their transaction, preserving T08's verified actor boundary.
 - A request-specific `@supabase/ssr` client stores the session in HttpOnly,
   SameSite=Lax, host-only cookies. Production adds Secure. Browser code receives
   no access/refresh tokens and does not create a browser Supabase client. The
@@ -121,9 +124,9 @@ HTTPS in production.
 These checks prove server behavior, not a browser screenshot or physical-device
 layout review. Use dev mode for local browser layout, keyboard focus, narrow
 viewport, wrong-code recovery and sign-out checks. No iPhone rebuild is required.
-Vercel deployment, intended admin bootstrap and hosted console email/browser
-acceptance remain operator steps. Hosted migrations and Data API checks passed
-on 2026-10-07; no new iPhone build is needed.
+Vercel deployment, intended admin bootstrap, T11 hosted migration/secret setup
+and hosted console email/browser acceptance remain operator steps. Hosted T05/T08
+migrations and Data API checks passed on 2026-10-07; no new iPhone build is needed.
 
 The root audit currently lists 34 upstream advisories (24 high/10 moderate).
 Next's lint dependency chain adds affected package paths to the pre-existing

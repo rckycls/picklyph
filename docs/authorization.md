@@ -57,7 +57,9 @@ management scope. Moderators/admins still use server operations for evidence.
 
 T15 will perform evidence review and ownership-assignment orchestration; this
 migration does not approve evidence, upload files, publish directory records,
-edit court inventory or implement bookings. T10 adds the admin interface.
+edit court inventory or implement bookings. T10 adds the admin interface; T11
+adds actor-checked directory curation without changing ownership/claim status.
+See [directory curation](directory-curation.md) for those transaction boundaries.
 
 ## First administrator
 

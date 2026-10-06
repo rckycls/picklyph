@@ -1,0 +1,25 @@
+{
+  "listings": [
+    {
+      "reference": "fictional-example:001",
+      "venue": {
+        "name": "Fictional example — replace before importing",
+        "address_line": "Replace with a permissioned venue address",
+        "city": "Manila",
+        "province": "Metro Manila",
+        "latitude": 14.6,
+        "longitude": 121
+      },
+      "courts": [
+        {
+          "id": null,
+          "name": "Court 1",
+          "surface": "hard",
+          "is_indoor": false,
+          "is_covered": true,
+          "status": "active"
+        }
+      ]
+    }
+  ]
+}
