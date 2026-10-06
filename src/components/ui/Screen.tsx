@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { colors } from '@/theme/colors';
@@ -17,21 +17,23 @@ export function Screen({
 }) {
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
-      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-        <View style={styles.content}>
-          <View style={styles.brand}>
-            <View style={styles.dot} accessible={false} />
-            <Text style={styles.brandName}>PicklyPH</Text>
-            <Text style={styles.country}>PH</Text>
+      <KeyboardAvoidingView style={styles.keyboard} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+          <View style={styles.content}>
+            <View style={styles.brand}>
+              <View style={styles.dot} accessible={false} />
+              <Text style={styles.brandName}>PicklyPH</Text>
+              <Text style={styles.country}>PH</Text>
+            </View>
+            <View style={styles.heading}>
+              <Text style={styles.eyebrow}>{eyebrow}</Text>
+              <Text accessibilityRole="header" style={styles.title}>{title}</Text>
+              <Text style={styles.description}>{description}</Text>
+            </View>
+            {children}
           </View>
-          <View style={styles.heading}>
-            <Text style={styles.eyebrow}>{eyebrow}</Text>
-            <Text accessibilityRole="header" style={styles.title}>{title}</Text>
-            <Text style={styles.description}>{description}</Text>
-          </View>
-          {children}
-        </View>
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -43,6 +45,7 @@ export const screenText = StyleSheet.create({
 });
 
 const styles = StyleSheet.create({
+  keyboard: { flex: 1 },
   screen: { flex: 1, backgroundColor: colors.background },
   scroll: { flexGrow: 1, alignItems: 'center' },
   content: { width: '100%', maxWidth: 560, padding: 24, gap: 24 },

@@ -20,7 +20,9 @@
     "test:directory": "node --test supabase/tests/*.test.cjs",
     "test:directory:local": "docker exec -i supabase_db_picklyph psql -U postgres -d postgres -v ON_ERROR_STOP=1 -X -q < supabase/tests/directory.sql",
     "check:dependencies": "expo install --check",
-    "bundle:ios": "expo export --platform ios --output-dir dist/ios"
+    "bundle:ios": "expo export --platform ios --output-dir dist/ios",
+    "test:auth": "node --test src/features/auth/__tests__/*.test.cjs",
+    "test:auth:local": "node supabase/tests/auth-local.cjs"
   },
   "dependencies": {
     "@expo/log-box": "57.0.4",
@@ -28,11 +30,14 @@
     "@picklyph/domain": "0.1.0",
     "@supabase/supabase-js": "2.117.2",
     "expo": "57.0.26",
+    "expo-apple-authentication": "57.0.2",
     "expo-constants": "57.0.20",
+    "expo-crypto": "57.0.3",
     "expo-dev-client": "57.0.19",
     "expo-linking": "57.0.11",
     "expo-location": "57.0.20",
     "expo-router": "57.0.24",
+    "expo-secure-store": "57.0.4",
     "expo-status-bar": "57.0.1",
     "react": "19.2.3",
     "react-dom": "19.2.3",

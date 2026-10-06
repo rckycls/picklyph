@@ -117,9 +117,25 @@ Each task ends with its meaningful done-check, a task checkbox update, a short h
 ## Later windows: expand cards just before implementation
 
 ### W3: identity (7 points)
-- [ ] T07 · L · 🤖 · Apple/email sign-in and session lifecycle · done when sign-in/out, restoration, and protected routes work on iPhone.
-- [ ] T08 · M · 🤖 · Profiles, privileged roles, venue ownership and RLS · done when player/owner/admin/moderator allow/deny tests pass and roles cannot be self-assigned.
-- [ ] T09 · S · 🤖 · Currency, time, booking horizon and duration helpers · done when PHP-centavo and UTC/Manila boundary cases pass.
+- [ ] **T07 · Apple/email sign-in and session lifecycle** `L` 🤖 `big`
+  - **Goal:** native Apple and email-code authentication, persisted sessions, refresh on foreground, sign-out and guarded booking routes while guest discovery stays usable.
+  - **Files:** `src/features/auth/`, `src/lib/supabase.ts`, mobile layouts/account/bookings/sign-in routes, `app.config.ts`, Expo-compatible dependencies, `supabase/config.toml`/email templates, auth setup docs and focused tests.
+  - **Context:** HANDOFF, shared UI/theme, T05 client, official Supabase native Apple/OTP/session docs and Expo SDK 57 authentication/storage/router APIs. Provider setup and physical-device acceptance are H05 gates; no profiles/ownership authorization until T08.
+  - **Done when:** Apple/email sign-in, incorrect/expired code recovery, sign-out, cold-start restoration, foreground refresh and guest/protected-route behavior pass on iPhone; type/lint/bundle and meaningful storage/lifecycle/provider contract tests pass. Missing configuration must preserve guest discovery.
+  - **Checkpoint 2026-10-06 (partial):** Apple/email OTP UI and provider contracts, official native Apple button/hashed nonce, secure chunked session persistence, restoration/event race handling, foreground refresh, device-local sign-out and guarded Bookings routes implemented; guest Discover remains public. 16 focused auth tests, 4 directory/client tests, 16 discovery regressions, typecheck, lint, dependency compatibility, Expo Doctor (21/21), native entitlement/config introspection and iOS bundle pass. Real local Auth/Mailpit tests pass for new/returning email users, incorrect-code recovery, verification, cold restoration, refresh and sign-out; own fixtures are removed. SDK default lockless coordination retained. Hosted Auth health is 200 with Email enabled/Apple disabled; hosted templates/delivery still unconfirmed. New EAS development build `079a35d1-6e01-48b9-8f28-cef31b38c351` submitted and in progress. Provider setup and H05 device checks in docs/auth-setup.md remain before T07 can be checked off. No hosted provider/schema edits or device auth acceptance claimed.
+  - **Kickoff prompt:** `Read vibe-plus/HANDOFF.md and T07. Implement native Apple/email OTP authentication and the mobile session lifecycle within the card files. Preserve guest discovery and protect booking routes; use backend-verified auth, secure persistence and foreground refresh. Verify contracts, run checks and complete H05 device acceptance, update PLAN/HANDOFF and commit when done as "T07: add mobile authentication". Record provider/device gates honestly if unavailable.`
+- [ ] **T08 · Profiles, privileged roles and venue ownership** `M` 🤖 `big`
+  - **Goal:** server-owned authorization for player/verified venue owner/admin/moderator accounts.
+  - **Files:** `supabase/migrations/`, SQL tests, `packages/domain/src/`, profile/authorization helpers as needed.
+  - **Context:** T05 directory contracts, T07 auth handoff, locked identity/ownership decisions and official Supabase RLS guidance.
+  - **Done when:** real role tests prove users cannot self-assign privileges, owners act only on verified venues, private evidence stays restricted and privileged operations require server authorization; contracts compile.
+  - **Kickoff prompt:** `Read HANDOFF and T08. Add profiles, protected role assignments and venue-scoped ownership with SQL allow/deny tests. Do not trust client user metadata for roles. Update PLAN/HANDOFF and commit when done as "T08: add account authorization".`
+- [ ] **T09 · Currency, time and booking-rule helpers** `S` 🤖 `small-ok`
+  - **Goal:** shared PHP-centavo and UTC/Manila helpers for duration/horizon rules.
+  - **Files:** `packages/domain/src/` and focused domain tests; script wiring if needed.
+  - **Context:** locked locale, 30-minute increments, one-hour minimum and 60-day horizon; T06 refund-window constraints remain a separate activation policy.
+  - **Done when:** integer amount validation, timezone/day-boundary conversion, duration and booking-horizon boundary cases pass; no schedules/payment implementation introduced.
+  - **Kickoff prompt:** `Read HANDOFF and T09. Implement and test PHP integer-centavo, UTC/Manila display and rental/horizon boundary helpers in the domain package. Update PLAN/HANDOFF and commit when done as "T09: add booking rule helpers".`
 ### W4: admin directory (7 points)
 - [ ] T10 · L · 🤖 · Next.js admin workspace and role-gated access · done when admin builds and role-denied users cannot access privileged operations.
 - [ ] T11 · M · 🤖 · Directory listing creation/edit/publish and import · done when approved records appear in public queries and drafts stay private.
@@ -211,3 +227,4 @@ At check-in, an unfinished task earns half its points. Estimate real capacity as
 | 2026-10-06 | W2 checkpoint | 7 | 4 | Not reported | T04 accepted: EAS iPhone build finished, native Google map displays, and user confirms all required marker/location interactions pass. T05/T06 remain. No window-end or usage-limit signal; capacity unchanged. |
 | 2026-10-06 | W2 checkpoint | 7 | 6 | Not reported | T05 directory foundation passes disposable PostgreSQL/PostGIS, role/spatial and type/build checks. T04 commits pushed before T05. Full Docker/provider integration and staging API health remain setup follow-ups; no hosted changes. T06 remains; no window-end/limit signal or recalibration. |
 | 2026-10-06 | W2 checkpoint | 7 | 7 | Not reported | T06 official-source payment prerequisite review completed; account-specific questions assigned to H03, no provider requests or payment code. T05 Docker database/API checks pass and commits are pushed. W3 identity is next when authorized; no actual window-end/limit signal or capacity recalibration. |
+| 2026-10-06 | W3 checkpoint | 7 | 2 (partial) | Not reported | T07 source and local Auth integration pass; EAS iPhone build submitted. Hosted Apple/template setup and H05 device acceptance remain. T08/T09 not started; no actual window-end/limit signal or capacity recalibration. |

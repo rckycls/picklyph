@@ -22,6 +22,8 @@ const config: ExpoConfig = {
   plugins: [
     'expo-router',
     'expo-dev-client',
+    'expo-apple-authentication',
+    ['expo-secure-store', { faceIDPermission: false }],
     ['react-native-maps', mapsConfigured ? { iosGoogleMapsApiKey: iosMapsKey } : {}],
     ['expo-location', {
       locationWhenInUsePermission: 'Allow PicklyPH to use your location to center the court map near you.',
@@ -43,6 +45,7 @@ const config: ExpoConfig = {
   ios: {
     bundleIdentifier: process.env.IOS_BUNDLE_IDENTIFIER?.trim() || 'com.rckycls.picklyph',
     supportsTablet: true,
+    usesAppleSignIn: true,
   },
 };
 

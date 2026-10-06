@@ -14,8 +14,11 @@ selection, panning, location recentering and permission-denied browsing pass
 on-device. T04 is complete. Expo Go shows a
 setup fallback instead. T05 adds venue/court migrations, protected public reads,
 private claim evidence, shared types and a lazy public Supabase client.
-The map still uses demo data; live directory screens, search, sign-in,
-reservations, payments, and owner tools are still planned.
+T07 adds Apple/email-code sign-in, secure native sessions, sign-out and protected
+Bookings navigation. Provider setup and iPhone auth acceptance remain pending;
+see [auth setup and device checks](docs/auth-setup.md).
+The map still uses demo data; live directory screens, search, reservations,
+payments and owner tools are still planned.
 
 T01/T02 source checks and iOS bundling passed. Physical iPhone tab switching,
 large-text layout, and VoiceOver acceptance are still pending. Bundling alone
@@ -42,14 +45,15 @@ If you already have the checkout, use that directory and preserve any existing
 `.env` values. The fallback/tab UI works without credentials. To build the native
 map, replace the Maps placeholder in an ignored `.env.local` and configure it in
 the EAS development environment. Supabase values configure `getSupabase()` when
-the directory client is requested; the current map does not request it. The
+the auth provider starts; the current map does not request it. The
 commented server section is a reference, not mobile configuration.
 
 Open matching **Expo SDK 57** Expo Go on an iPhone, put the phone and computer on
 the same Wi-Fi network, and scan Metro's QR code with the iPhone camera. Check
 all three tabs and their navigation buttons, large text/scrolling, and VoiceOver
-labels and disabled sign-in announcements. Expo Go does not verify this app's
-Google Maps build configuration. Press `Ctrl+C` to stop Metro.
+labels. Use the new development build for Google Maps and Apple/secure-session
+acceptance; Expo Go does not verify this app's native configuration. Press
+`Ctrl+C` to stop Metro.
 If the iOS App Store version of Expo Go no longer supports SDK 57, use a matching
 development build; do not change pinned dependencies just to suppress a mismatch.
 
@@ -68,6 +72,8 @@ If PowerShell blocks the npm scripts, use `npm.cmd`/`npx.cmd` for these commands
 | `npm run test:discovery` | Run location permission/failure, demo release-gate, and build-configuration checks with Node's test runner. |
 | `npm run test:directory` | Apply the migration and test spatial/role isolation in disposable embedded PostgreSQL/PostGIS, plus public client configuration checks. No Docker, hosted credentials or network requests. |
 | `npm run test:directory:local` | Run the same rollback-only SQL suite against the local Docker Supabase database; requires the migrated local stack. |
+| `npm run test:auth` | Check email/Apple contracts, secure-storage recovery and restoration/foreground lifecycle races. |
+| `npm run test:auth:local` | Exercise new/returning email OTP, cold restoration, refresh and sign-out against local Docker Auth/Mailpit; removes its own fixtures. |
 | `npm run check:dependencies` | Check the installed versions against the Expo SDK. |
 | `npm run bundle:ios` | Export an iOS Hermes bundle to ignored `dist/ios`; does not create an installable `.ipa`. |
 | `npx expo-doctor` | Check Expo project health; not a package script. |
@@ -210,8 +216,9 @@ There are no schedules, inventory, booking/payment tables or production seeds.
 public contracts, including the typed Supabase `Database`; these are not generated
 from a hosted project. Compile-only checks verify RPC arguments, read result types
 and exclusion of private tables/schema. `getSupabase()` uses only a hosted staging
-URL and `sb_publishable_` key, initializes lazily, and leaves auth persistence and
-refresh disabled until T07. Missing configuration does not break the demo map.
+URL and `sb_publishable_` key, initializes lazily, and persists native sessions
+through SecureStore with foreground refresh. Missing configuration does not
+break the demo map. See [T07 authentication setup](docs/auth-setup.md).
 
 `npm run test:directory` creates an in-memory PostgreSQL 18.3/PostGIS 3.6 database
 using dev-only PGlite packages. It supplies minimal platform roles and `auth.users`,
