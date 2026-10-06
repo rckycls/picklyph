@@ -19,7 +19,8 @@ Bookings navigation. The user confirms the full T07 iPhone checklist passes;
 see [auth setup and device checks](docs/auth-setup.md).
 T08 adds private role assignments, venue-scoped verified ownership, self-only
 profiles and actor-checked server authorization. SQL/API allow-deny tests pass
-on local Supabase; hosted migrations are not deployed.
+on local Supabase. T05/T08 migrations are also deployed to the same hosted staging
+project as of 2026-10-07; its Data API and profile backfill checks pass.
 See [account authorization](docs/authorization.md).
 T09 adds exact PHP centavo conversion/display, UTC/Manila time helpers and
 validated rental duration/horizon boundaries. See [shared booking rules](docs/booking-rules.md).
@@ -245,10 +246,12 @@ database foundation, not Supabase's Auth/REST services or the Docker PostgreSQL 
 stack. [PGlite PostGIS extension](https://pglite.dev/extensions/)
 
 The user confirmed the mobile environment points to staging. Its public URL/key
-are also configured in EAS development; no values are committed. No hosted
-migrations or fixture data were applied. A staging SDK probe returned
-`503 / PGRST002` (schema cache unavailable); confirm dashboard/database/API health
-before connecting live screens. Docker Desktop's Linux engine is installed and
+are also configured in EAS development; no values are committed. On 2026-10-07,
+T05/T08 were applied to `fkdusdurzdgbfwwigrqw`, backfilling both existing Auth
+accounts' profiles. The earlier `503 / PGRST002` came from the disabled Data API;
+exposing only `public` resolved it. Public venue/court reads and bounds RPC return
+200; guest profile/access-RPC reads and private-schema access are denied.
+No hosted fixtures or account roles were added. Docker Desktop's Linux engine is installed and
 the migration and rollback-only SQL suite pass on local PostgreSQL 17.11 / PostGIS
 3.3.7. Use the pinned CLI from this project:
 
@@ -278,8 +281,8 @@ was restarting. Database, Auth, Storage and REST services remain available;
 Studio's aggregated logs are unavailable with this setting. Container logs are
 available in Docker Desktop. [Local analytics configuration](https://supabase.com/docs/guides/local-development/cli/config#analyticsenabled)
 
-Hosted staging deployment needs separate CLI project access
-and verified target selection; a mobile publishable key cannot apply migrations.
+Hosted staging is migrated. Future migrations still need separate CLI project
+access and verified target selection; a mobile publishable key cannot apply them.
 [Supabase CLI setup](https://supabase.com/docs/guides/local-development/cli/getting-started)
 
 ## Workspace and next steps
@@ -294,8 +297,8 @@ and verified target selection; a mobile publishable key cannot apply migrations.
 | `supabase/` | Directory/authorization migrations, local configuration and SQL/API tests; Edge Functions later. |
 | `vibe-plus/` | Task plan and current handoff. |
 
-T04's native map and T05's embedded and Docker database checks pass. Hosted
-staging deployment remains a separate setup step. Before T13,
+T04's native map and T05's embedded, Docker and hosted staging checks pass.
+First hosted administrator assignment remains an operator step. Before T13,
 prepare separate staging/production Upstash Redis databases near the backend
 region. Begin PayMongo/venue onboarding alongside these tasks; T06 verifies
 the supported payment flow and live activation requirements.

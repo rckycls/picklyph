@@ -96,9 +96,22 @@ remove those fixtures. Local CLI credentials stay in memory and loopback
 project/engine checks prevent hosted execution. Existing auth integration verifies signup,
 email codes, restore, refresh and sign-out after installing the trigger.
 
-Hosted deployment still requires verified project/CLI access. Mobile settings
-do not deploy migrations. No new app binary is needed for this database work;
-the current phone UI does not yet query these new tables/functions.
+Hosted staging deployment completed on 2026-10-07 in `fkdusdurzdgbfwwigrqw`, after
+confirming both apps target that project and checking for conflicting schemas.
+Migration history contains T05/T08 with no pending migrations. Both existing
+Auth accounts have profiles, with no missing rows; the signup trigger is enabled.
+All six app tables have RLS, authenticated users can edit `display_name` but not
+profile IDs, and clients lack private-schema usage. `my_account_access` is
+executable by authenticated users and denied to guests. No privileged roles or
+owner links were assigned, and no hosted fixtures were inserted.
+
+The Data API initially returned PGRST002 because its exposed schemas contained
+the disabled-API placeholder. A minimal configuration update exposed only
+`public`; Auth/SMTP and all other settings were left unchanged. Hosted public
+venue/court reads and bounds RPC return 200 with empty results; guest profile and
+access-RPC requests return 401/42501, and private-schema requests return
+406/PGRST106. Mobile settings cannot deploy migrations. No new app binary is
+needed; the current phone map still uses demo data.
 
 Sources: [Supabase RLS](https://supabase.com/docs/guides/database/postgres/row-level-security),
 [Auth profiles and triggers](https://supabase.com/docs/guides/auth/managing-user-data),

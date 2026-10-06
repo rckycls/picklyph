@@ -34,9 +34,12 @@ service key or `NEXT_PUBLIC_` variables are needed for T10. Do not copy signing,
 SMTP, payment or server secrets into browser configuration.
 
 The selected Supabase project must have T05/T08 migrations and working Auth/REST.
-The local stack already has these schemas; hosted deployment remains a separate
-operator step requiring verified access. Public mobile settings cannot deploy
-migrations. Local CLI status prints service secrets too: capture JSON in memory
+The local stack and hosted staging project `fkdusdurzdgbfwwigrqw` now have these
+schemas. Hosted T05/T08 deployment completed on 2026-10-07; mobile and admin env
+URLs were checked against that same target. Public directory reads and the bounds
+RPC pass, and guest profile/access-RPC and private-schema requests are denied.
+The Data API exposes only `public`; enabling it resolved the earlier PGRST002.
+Public mobile settings cannot deploy migrations. Local CLI status prints service secrets too: capture JSON in memory
 and copy only the URL/anon key, never paste full status output or keys into chat.
 
 ## Accounts and first administrator
@@ -118,8 +121,9 @@ HTTPS in production.
 These checks prove server behavior, not a browser screenshot or physical-device
 layout review. Use dev mode for local browser layout, keyboard focus, narrow
 viewport, wrong-code recovery and sign-out checks. No iPhone rebuild is required.
-Vercel deployment, hosted migrations, intended admin bootstrap and hosted email
-acceptance remain operator steps.
+Vercel deployment, intended admin bootstrap and hosted console email/browser
+acceptance remain operator steps. Hosted migrations and Data API checks passed
+on 2026-10-07; no new iPhone build is needed.
 
 The root audit currently lists 34 upstream advisories (24 high/10 moderate).
 Next's lint dependency chain adds affected package paths to the pre-existing
