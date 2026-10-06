@@ -60,7 +60,7 @@ export function failureMessage(failure: SearchFailure): string {
     case 'rate_limited':
       return `Too many searches right now. Try again in ${failure.retryAfterSeconds ?? 1} seconds.`;
     case 'rejected':
-      return 'This search couldn’t be completed. Move the map or clear filters and try again.';
+      return 'This search couldn’t be completed. Move the map, zoom in or clear filters.';
     case 'not_configured':
       return 'The court directory isn’t set up in this build.';
     case 'unavailable':

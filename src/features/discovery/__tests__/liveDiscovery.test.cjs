@@ -162,9 +162,9 @@ test('failures clear search results but keep loaded pages when only load-more fa
   const failure = { kind: 'network', retryAfterSeconds: null };
   let state = resultsReducer(initialResults, { type: 'search', requestId: 1, filterKey: 'a' });
   state = resultsReducer(state, { type: 'loaded', requestId: 1, venues: [venue(1)], nextCursor: id(1), append: false });
-  const more = resultsReducer(resultsReducer(state, { type: 'more', requestId: 2 }), { type: 'failed', requestId: 2, failure, append: true });
+  const more = resultsReducer(resultsReducer(state, { type: 'more', requestId: 2 }), { type: 'failed', requestId: 2, failure, append: true, at: 0 });
   assert.equal(more.status, 'ready'); assert.equal(more.venues.length, 1); assert.equal(more.nextCursor, id(1)); assert.equal(more.failure, failure);
-  const search = resultsReducer(resultsReducer(state, { type: 'search', requestId: 3, filterKey: 'a' }), { type: 'failed', requestId: 3, failure, append: false });
+  const search = resultsReducer(resultsReducer(state, { type: 'search', requestId: 3, filterKey: 'a' }), { type: 'failed', requestId: 3, failure, append: false, at: 0 });
   assert.equal(search.status, 'error'); assert.equal(search.venues.length, 0, 'No stale venues beside an error');
   assert.match(resultsSummary(search), /Couldn’t reach/);
   assert.equal(resultsReducer(state, { type: 'remove', id: id(1) }).venues.length, 0);

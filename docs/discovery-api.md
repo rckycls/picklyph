@@ -97,11 +97,27 @@ Still open for H02: production Redis/project, Redis region confirmation, hosted 
 
 `src/features/discovery/searchClient.ts` builds each request from the settled map region (600ms debounce, outward 4-decimal rounding, spans capped at 29.99°) plus Indoor/Outdoor, Covered and surface filters, which apply to the same active court. Pages hold 25 venues; Load more follows `next_cursor` with the same query. A new area or filter aborts the previous request and stale responses are ignored. At most 200 venues stay loaded, after which the player zooms in. Panning keeps current markers until the new area loads; changing filters clears results and the selection.
 
-Guests send only `apikey`. Signed-in players send their own access token; a 401 retries once as a guest because discovery is public. Responses are strictly validated, so an unexpected shape shows the directory as unavailable rather than a guessed listing. 429/503 retry hints are shown; countdown, offline and empty-state polish is T16.
+Guests send only `apikey`. Signed-in players send their own access token; a 401 retries once as a guest because discovery is public. Responses are strictly validated, so an unexpected shape shows the directory as unavailable rather than a guessed listing. Recovery states (T16) are described [below](#recovery-states-t16).
 
 Map and list share one selected venue. The detail sheet reads the current record from the public `venues`/`courts` tables under T05 RLS (approved venues, active courts only). A suspended or unpublished venue shows "No longer listed" and leaves the results. These existing public reads are not behind the Upstash guard. Every listing says it is not bookable in pickly and tells players to contact the venue directly; Apple/Google Maps directions use the current coordinates, and pickly never sends the player's location. The directory has **no public phone/website fields** yet, so no contact details are shown. Map bounds near a player's location do reach this endpoint as query parameters (never Redis).
 
 Device review is pending. Hosted T11–T13 migrations and the `venue-search` deployment are in place; it still needs at least one published staging venue. Then, signed out and signed in on the development build: pan/zoom and confirm results update; toggle each filter; use Load more; select a marker and confirm the list highlights it, and the reverse; open both directions links; suspend the venue in the console and reopen details to see "No longer listed"; check VoiceOver labels for chips, rows and markers, plus large text.
+
+### Recovery states (T16)
+
+A failed search clears that area's results; nothing from an earlier area is shown beside an error. A failed Load more keeps the venues already loaded. `resultsState` records the server's `Retry-After` as `retryAt`, and the pure `recovery.ts` decides what the UI may offer:
+
+| Condition | Shown | Recovery |
+| --- | --- | --- |
+| Loading | Spinner with “Searching approved venues…” (or “Updating…” while the previous area's markers remain) | — |
+| Offline/network | Connection message | **Try again**, plus one automatic search when the app returns to the foreground. There is no background polling. |
+| 429 / 503 with `Retry-After` | Server message and a disabled **Try again in Ns** countdown | One automatic search when the wait ends; after that the player retries. A Load more failure waits but never retries itself. |
+| 503 without a wait | Unavailable message | **Try again** immediately |
+| Rejected search (400) / not configured | Message only, no retry | **Clear filters** / **Show all of the Philippines** when either would change the query |
+| Empty results | “No approved venues match…” | **Clear filters** when filters are on; **Show all of the Philippines** unless already national |
+| Location denied, disabled or unavailable | Header note explains the state | Browsing continues; **Open settings** replaces **Use my location** after a permanent denial |
+
+Copy never claims availability or bookability. While a countdown runs, the retry button keeps a stable VoiceOver label (“Try again, available shortly”), so screen readers don't re-announce each tick. Pure logic is covered by `npm run test:discovery`. Device review is pending: in airplane mode, search, then reconnect and foreground the app; repeat searches past the guest limit and watch the countdown and the single automatic retry; filter to an empty result and use Clear filters and Show all of the Philippines; deny location (Don't Allow), then use Open settings; check VoiceOver and large text on each state.
 
 ## Verification
 

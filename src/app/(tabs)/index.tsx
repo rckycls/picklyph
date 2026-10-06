@@ -9,6 +9,7 @@ import { StatusBadge } from '@/components/ui/StatusBadge';
 import CourtMap from '@/features/discovery/CourtMap';
 import { FilterBar, type DiscoveryView } from '@/features/discovery/FilterBar';
 import type { MapRegion } from '@/features/discovery/mapTypes';
+import { filtersActive, locationMessage, wideningActions } from '@/features/discovery/recovery';
 import { PHILIPPINES_REGION, regionToBounds, sameBounds, venueRegion } from '@/features/discovery/region';
 import { NO_FILTERS, type DiscoveryFilters } from '@/features/discovery/searchClient';
 import { useDeviceLocation } from '@/features/discovery/useDeviceLocation';
@@ -33,7 +34,7 @@ export default function DiscoverScreen() {
   const [mapReady, setMapReady] = useState(false);
   const [settingsError, setSettingsError] = useState(false);
   const query = useMemo(() => ({ bounds, ...filters }), [bounds, filters]);
-  const { results, loadMore, retry, remove } = useVenueSearch(query);
+  const { results, recovery, loadMore, retry, remove } = useVenueSearch(query);
   const regionTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const applyLocation = useCallback((result: LocationResult) => {
@@ -79,13 +80,19 @@ export default function DiscoverScreen() {
     ? [...results.venues, selected]
     : results.venues;
 
-  const message = settingsError ? 'Couldn’t open Settings. You can keep browsing the Philippines.'
-    : location.status === 'denied' ? 'Location access is off. You can still explore the Philippines.'
-      : location.status === 'disabled' ? 'Location services are off. You can still browse the map.'
-        : location.status === 'unavailable' ? 'Couldn’t find your location. Try again or explore the Philippines.'
-          : location.status === 'requesting' ? 'Finding your location…'
-            : location.status === 'granted' ? 'Location enabled. Move the map to explore.'
-              : 'Explore approved venues. Location access is optional.';
+  const message = locationMessage(location, settingsError);
+  // Without a ready map, its camera cannot report the national area, so search it directly.
+  const showPhilippines = () => {
+    setSelected(null);
+    setFocusRegion({ ...PHILIPPINES_REGION });
+    if (!mapReady) setBounds(NATIONAL_BOUNDS);
+  };
+  const widen = wideningActions(results, { filtersActive: filtersActive(filters), national: sameBounds(bounds, NATIONAL_BOUNDS) });
+  const status = {
+    results, recovery, onLoadMore: loadMore, onRetry: retry,
+    onClearFilters: widen.clearFilters ? () => changeFilters(NO_FILTERS) : undefined,
+    onZoomOut: widen.zoomOut ? showPhilippines : undefined,
+  };
 
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
@@ -108,10 +115,7 @@ export default function DiscoverScreen() {
               else void request();
             }}
           />
-          <Button label="View Philippines" variant="secondary" style={styles.action} disabled={!mapReady} onPress={() => {
-            setSelected(null);
-            setFocusRegion({ ...PHILIPPINES_REGION });
-          }} />
+          <Button label="View Philippines" variant="secondary" style={styles.action} disabled={!mapReady} onPress={showPhilippines} />
         </View>
         <Text accessibilityLiveRegion="polite" style={styles.note}>{message}</Text>
       </View>
@@ -134,12 +138,12 @@ export default function DiscoverScreen() {
         </View>
         {view === 'list' && (
           <View style={styles.layer}>
-            <VenueList results={results} selectedId={selected?.id} onSelect={selectVenue} onLoadMore={loadMore} onRetry={retry} />
+            <VenueList {...status} selectedId={selected?.id} onSelect={selectVenue} />
           </View>
         )}
       </View>
       {selected ? <VenueSheet key={selected.id} venue={selected} onClose={() => setSelected(null)} onMissing={handleMissing} />
-        : view === 'map' && <ResultsBar results={results} onLoadMore={loadMore} onRetry={retry} onShowList={() => changeView('list')} />}
+        : view === 'map' && <ResultsBar {...status} onShowList={() => changeView('list')} />}
     </SafeAreaView>
   );
 }

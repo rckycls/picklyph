@@ -8,13 +8,23 @@ import { colors } from '@/theme/colors';
 import { fonts } from '@/theme/typography';
 
 import { courtCount, failureMessage, listingNotice, resultsSummary } from './listing';
+import { retryLabel, type Recovery } from './recovery';
 import type { ResultsState } from './resultsState';
 
-type ResultsProps = { results: ResultsState; onLoadMore: () => void; onRetry: () => void };
+type ResultsProps = {
+  results: ResultsState;
+  recovery: Recovery | null;
+  onLoadMore: () => void;
+  onRetry: () => void;
+  /** Present only when clearing filters or zooming out would change an empty or rejected search. */
+  onClearFilters?: () => void;
+  onZoomOut?: () => void;
+};
 
 /** Status, retry and paging controls shared by the map and list views. */
-function ResultsStatus({ results, onLoadMore, onRetry, extra, paging = true }: ResultsProps & { extra?: ReactNode; paging?: boolean }) {
+function ResultsStatus({ results, recovery, onLoadMore, onRetry, onClearFilters, onZoomOut, extra, paging = true }: ResultsProps & { extra?: ReactNode; paging?: boolean }) {
   const moreFailed = results.status === 'ready' && results.failure !== null;
+  const waiting = Boolean(recovery && recovery.waitSeconds > 0);
   return (
     <View style={styles.status}>
       <View style={styles.row} accessibilityLiveRegion="polite">
@@ -22,8 +32,20 @@ function ResultsStatus({ results, onLoadMore, onRetry, extra, paging = true }: R
         <Text style={[styles.summary, results.status === 'error' && styles.error]}>{resultsSummary(results)}</Text>
       </View>
       {moreFailed && results.failure && <Text accessibilityLiveRegion="polite" style={[styles.summary, styles.error]}>{failureMessage(results.failure)}</Text>}
+      {recovery?.automatic && waiting && <Text style={styles.summary}>pickly will search again when the wait ends.</Text>}
       <View style={styles.actions}>
-        {(results.status === 'error' || moreFailed) && <Button label="Try again" variant="accent" style={styles.action} onPress={onRetry} />}
+        {recovery?.retryable && (
+          <Button
+            label={retryLabel(recovery)}
+            accessibilityLabel={waiting ? 'Try again, available shortly' : 'Try again'}
+            variant="accent"
+            style={styles.action}
+            disabled={waiting}
+            onPress={onRetry}
+          />
+        )}
+        {onClearFilters && <Button label="Clear filters" variant="secondary" style={styles.action} onPress={onClearFilters} />}
+        {onZoomOut && <Button label="Show all of the Philippines" variant="secondary" style={styles.action} onPress={onZoomOut} />}
         {paging && <LoadMore results={results} onLoadMore={onLoadMore} />}
         {extra}
       </View>
@@ -65,7 +87,7 @@ function VenueRow({ venue, selected, onPress }: { venue: VenueSearchItem; select
   );
 }
 
-export function VenueList({ results, selectedId, onSelect, onLoadMore, onRetry }: ResultsProps & {
+export function VenueList({ selectedId, onSelect, ...status }: ResultsProps & {
   selectedId?: string;
   onSelect: (venue: VenueSearchItem) => void;
 }) {
@@ -73,11 +95,11 @@ export function VenueList({ results, selectedId, onSelect, onLoadMore, onRetry }
     <FlatList
       style={styles.list}
       contentContainerStyle={styles.content}
-      data={results.venues}
+      data={status.results.venues}
       keyExtractor={(venue) => venue.id}
       renderItem={({ item }) => <VenueRow venue={item} selected={item.id === selectedId} onPress={() => onSelect(item)} />}
-      ListHeaderComponent={<ResultsStatus results={results} onLoadMore={onLoadMore} onRetry={onRetry} paging={false} />}
-      ListFooterComponent={<LoadMore results={results} onLoadMore={onLoadMore} />}
+      ListHeaderComponent={<ResultsStatus {...status} paging={false} />}
+      ListFooterComponent={<LoadMore results={status.results} onLoadMore={status.onLoadMore} />}
       keyboardShouldPersistTaps="handled"
     />
   );

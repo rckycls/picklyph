@@ -1,6 +1,6 @@
 # HANDOFF: read this first
 
-**Updated:** 2026-10-07, Asia/Manila. **Plan:** Codex desktop / ChatGPT Plus; keep configured model. W3/W4 implementation complete (7 points each); W5 T13 complete (2/7 points); T14 and T15 implemented, device review pending. Hosted staging has T05/T08/T11–T13. Capacity remains 8; no actual usage-window end/limit signal. A few sessions/week, experienced user, no deadline.
+**Updated:** 2026-10-07, Asia/Manila. **Plan:** Codex desktop / ChatGPT Plus; keep configured model. W3/W4 implementation complete (7 points each); W5 T13 and T16 complete (3/7 points); T14 and T15 implemented, device review pending. Hosted staging has T05/T08/T11–T13. Capacity remains 8; no actual usage-window end/limit signal. A few sessions/week, experienced user, no deadline.
 
 ## Current state
 
@@ -50,6 +50,13 @@
 **For T17:** review queue = `private.venue_claims`/`venue_submissions` with `nearby_venue_ids`, `nearby_submission_ids`, `duplicates_acknowledged`; serve evidence via short-lived server-signed URLs; extend `ownership_audit_events` actions; approval must set claim status/owner links under `set_verified_venue_owner` rules.
 **Evidence:** `test:directory` 22 pass (7 new: owner SQL + handler/geocoder), `test:domain` 18 (4 new), `test:owner` 4, `test:discovery` 24, `test:auth` 16, `test:admin` 9; `test:owner:local` → Docker owner.sql + actual served function (401/forged 401, Redis-less 503 with no storage/DB change) + real Auth/Storage/RPC via the mobile client PASS, own fixtures/evidence/audit rows removed; `test:search:local` PASS; `typecheck`, `lint`, `functions:check`, `functions:lint`, `test:functions`, `admin:typecheck`, `admin:lint`, `bundle:ios` (3.4 MB, no server secrets) → exit 0. No device or hosted acceptance claimed.
 
+## T16 discovery recovery handoff
+
+**Built:** Live discovery stays usable when offline, rate limited, unavailable, empty or without location. `resultsState` stores `retryAt` from `Retry-After`; pure `recovery.ts` (`recoveryFor`, `retryLabel`, `wideningActions`, `filtersActive`, `locationMessage`) drives `ResultsStatus`; `useVenueSearch` returns `recovery`, ticks only during a wait, runs one automatic search after a server wait and retries an offline search when the app returns to the foreground.
+**Decisions:** retry only where it can help (not for 400/not-configured); Load more never retries itself; automatic retry once per failure streak to avoid draining the shared guest bucket; a failed search never shows an earlier area's venues.
+**Gotchas:** the `failed` reducer action now needs `at` (epoch ms). Without a ready map, Show all of the Philippines sets national bounds directly. No connectivity listener (no NetInfo dependency); offline recovery is manual or on foreground.
+**Evidence:** `test:discovery` 29 pass (5 new); `typecheck`, `lint`, `bundle:ios` → exit 0; `test:owner` 4, `test:auth` 16, `test:domain` 18. Device review pending (steps in docs/discovery-api.md#recovery-states-t16).
+
 ## Mobile and branding
 
 - Expo57.0.26 / React19.2.3 / RN0.86.3 / Router57.0.24 / TS6.0.3 / Supabase-js2.117.2. Map opens first with live T13 directory results (demo pins removed in T14) and optional foreground location. Bookings guarded by restored auth; inventory, payments and owner UI are later tasks.
@@ -60,7 +67,7 @@
 
 ## Next
 
-1. **T16 next** (discovery recovery states). T15 needs operator steps before device review: apply `20261007120000` to staging, set `GOOGLE_MAPS_SERVER_API_KEY`, deploy `owner-submissions`, build a new EAS development client; then try address search, pin drag, duplicate warning, claim and submission status on an iPhone (docs/owner-submissions.md). T14 stays unchecked until its device review (docs/discovery-api.md#mobile-client-t14) passes once a published staging venue exists (staging function deployed). Decide whether public contact fields belong in a later directory task. H02: staging Redis/429/recovery verified; production Redis, hosted outage/isolation checks and per-IP ingress verification remain. Future privileged commands must add their own transactional auditing and authorization.
+1. **W5 wrap-up next** (all W5 tasks implemented): log/recalibrate and expand W6 cards (T17 review/approval first). Device reviews for T14, T15 and T16 can share one new development build. T15 needs operator steps before device review: apply `20261007120000` to staging, set `GOOGLE_MAPS_SERVER_API_KEY`, deploy `owner-submissions`, build a new EAS development client; then try address search, pin drag, duplicate warning, claim and submission status on an iPhone (docs/owner-submissions.md). T14 stays unchecked until its device review (docs/discovery-api.md#mobile-client-t14) passes once a published staging venue exists (staging function deployed). Decide whether public contact fields belong in a later directory task. H02: staging Redis/429/recovery verified; production Redis, hosted outage/isolation checks and per-IP ingress verification remain. Future privileged commands must add their own transactional auditing and authorization.
 2. First hosted admin bootstrap requires intended account selection; same staging project and schema/API are verified. Hosted T11–T13 migrations are applied; console directory tools still need the same-project server-only key and an intended admin assignment. Console browser/email acceptance remains. Claim/evidence submission is T15; review/approval is T17. T09 rules are ready for later commands; use server-derived clocks. T46 must review moderator audit permissions; T47 must define audit UUID retention/account deletion.
 3. T06 docs/payment-integration.md and H03 merchant/provider gates remain beforeT34; no provider messages, payment charges or payment code.
 
