@@ -12,7 +12,9 @@ sample locations, a selected-venue sheet, and optional foreground location.
 The iPhone development build succeeds, and Google map rendering, marker/detail
 selection, panning, location recentering and permission-denied browsing pass
 on-device. T04 is complete. Expo Go shows a
-setup fallback instead. The live directory, search, sign-in,
+setup fallback instead. T05 adds venue/court migrations, protected public reads,
+private claim evidence, shared types and a lazy public Supabase client.
+The map still uses demo data; live directory screens, search, sign-in,
 reservations, payments, and owner tools are still planned.
 
 T01/T02 source checks and iOS bundling passed. Physical iPhone tab switching,
@@ -39,7 +41,8 @@ npm start
 If you already have the checkout, use that directory and preserve any existing
 `.env` values. The fallback/tab UI works without credentials. To build the native
 map, replace the Maps placeholder in an ignored `.env.local` and configure it in
-the EAS development environment. Supabase values are unused until T05. The
+the EAS development environment. Supabase values configure `getSupabase()` when
+the directory client is requested; the current map does not request it. The
 commented server section is a reference, not mobile configuration.
 
 Open matching **Expo SDK 57** Expo Go on an iPhone, put the phone and computer on
@@ -63,6 +66,8 @@ If PowerShell blocks the npm scripts, use `npm.cmd`/`npx.cmd` for these commands
 | `npm run typecheck` | Check mobile TypeScript and the shared domain workspace. |
 | `npm run lint` | Lint the mobile/domain/config source; fail on warnings. |
 | `npm run test:discovery` | Run location permission/failure, demo release-gate, and build-configuration checks with Node's test runner. |
+| `npm run test:directory` | Apply the migration and test spatial/role isolation in disposable embedded PostgreSQL/PostGIS, plus public client configuration checks. No Docker, hosted credentials or network requests. |
+| `npm run test:directory:local` | Run the same rollback-only SQL suite against the local Docker Supabase database; requires the migrated local stack. |
 | `npm run check:dependencies` | Check the installed versions against the Expo SDK. |
 | `npm run bundle:ios` | Export an iOS Hermes bundle to ignored `dist/ios`; does not create an installable `.ipa`. |
 | `npx expo-doctor` | Check Expo project health; not a package script. |
@@ -183,6 +188,59 @@ require the device; Node tests and config introspection cannot substitute for th
 Demo locations are illustrative and not bookable; release mode exposes no demo
 venues, and these fixtures are never backend seed data.
 
+## Supabase directory foundation (T05)
+
+The directory migration is
+[`20261006030000_directory.sql`](supabase/migrations/20261006030000_directory.sql).
+It keeps `public.venues` and `public.courts` limited to directory fields. Guests
+and signed-in clients can read approved venues and their active courts; neither
+can publish, claim or modify records. Claimant IDs and evidence paths live in
+`private.venue_claims`, with no client privileges or policies. PostGIS is installed
+in `extensions`, outside the exposed Data API schema.
+[Supabase PostGIS guidance](https://supabase.com/docs/guides/database/extensions/postgis),
+[grants and RLS](https://supabase.com/docs/guides/database/postgres/row-level-security)
+
+`venues_in_bounds` is an invoker-rights spatial primitive with validated bounds,
+stable ID ordering and a 200-row maximum. It returns safe pin fields and applies
+the caller's RLS. Full search/pagination/filter/rate-limit API work is T13/T14.
+Directory/claim status alone never implies ownership authorization or bookability.
+There are no schedules, inventory, booking/payment tables or production seeds.
+
+[`packages/domain/src/`](packages/domain/src/index.ts) contains schema-maintained
+public contracts, including the typed Supabase `Database`; these are not generated
+from a hosted project. Compile-only checks verify RPC arguments, read result types
+and exclusion of private tables/schema. `getSupabase()` uses only a hosted staging
+URL and `sb_publishable_` key, initializes lazily, and leaves auth persistence and
+refresh disabled until T07. Missing configuration does not break the demo map.
+
+`npm run test:directory` creates an in-memory PostgreSQL 18.3/PostGIS 3.6 database
+using dev-only PGlite packages. It supplies minimal platform roles and `auth.users`,
+then applies the real migration and runs
+[`directory.sql`](supabase/tests/directory.sql). The engine enforces SQL privileges,
+RLS and spatial behavior; fixtures and test helpers roll back. This checks the
+database foundation, not Supabase's Auth/REST services or the Docker PostgreSQL 17
+stack. [PGlite PostGIS extension](https://pglite.dev/extensions/)
+
+The user confirmed the mobile environment points to staging. Its public URL/key
+are also configured in EAS development; no values are committed. No hosted
+migrations or fixture data were applied. A staging SDK probe returned
+`503 / PGRST002` (schema cache unavailable); confirm dashboard/database/API health
+before connecting live screens. Once Docker Desktop is installed and its Linux
+container engine is running, use the pinned CLI from this project:
+
+```powershell
+npx supabase start
+npx supabase migration up --local
+npm run test:directory:local
+```
+
+The first startup downloads the local service images. `--local` keeps these
+commands on the project database; use the SQL suite only on disposable databases.
+The suite uses SQL assertions, not pgTAP, so use the command above rather than
+`supabase test db`. Hosted staging deployment needs separate CLI project access
+and verified target selection; a mobile publishable key cannot apply migrations.
+[Supabase CLI setup](https://supabase.com/docs/guides/local-development/cli/getting-started)
+
 ## Workspace and next steps
 
 | Path | Responsibility |
@@ -192,16 +250,16 @@ venues, and these fixtures are never backend seed data.
 | `src/theme/`, `docs/` | Photo-inspired semantic colors and brand notes. |
 | `packages/domain/` | Shared TypeScript domain package. |
 | `apps/admin/` (planned) | Next.js admin/moderator workspace with its own checks. |
-| `supabase/` (planned) | Migrations, server functions, and database tests. |
+| `supabase/` | Directory migration, local configuration and database tests; server functions later. |
 | `vibe-plus/` | Task plan and current handoff. |
 
-Before T04, complete H01 above. Before T05, prepare a Supabase staging project
-and Docker for local testing or a disposable staging database. Before T13,
+T04's native map and T05's disposable database checks pass. Docker full-stack
+testing and hosted staging deployment remain separate setup steps. Before T13,
 prepare separate staging/production Upstash Redis databases near the backend
 region. Begin PayMongo/venue onboarding alongside these tasks; T06 verifies
 the supported payment flow and live activation requirements.
 
-T04 dependency audit reports 31 upstream advisories (21 high/10 moderate), including
+The current dependency audit reports 31 upstream advisories (21 high/10 moderate), including
 the new Maps package's inherited React Native advisory chain. The suggested Maps
 downgrade is outside the SDK 57 pin. Reassess supported upstream fixes before pilot;
 do not apply a force fix that breaks native compatibility. This guide documents

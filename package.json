@@ -17,6 +17,8 @@
     "typecheck": "tsc --noEmit && npm run typecheck --workspace @picklyph/domain",
     "lint": "eslint . --max-warnings 0",
     "test:discovery": "node --test src/features/discovery/__tests__/*.test.cjs",
+    "test:directory": "node --test supabase/tests/*.test.cjs",
+    "test:directory:local": "supabase db query --local --file supabase/tests/directory.sql",
     "check:dependencies": "expo install --check",
     "bundle:ios": "expo export --platform ios --output-dir dist/ios"
   },
@@ -24,6 +26,7 @@
     "@expo/log-box": "57.0.4",
     "@expo/metro-runtime": "57.0.16",
     "@picklyph/domain": "0.1.0",
+    "@supabase/supabase-js": "2.117.2",
     "expo": "57.0.26",
     "expo-constants": "57.0.20",
     "expo-dev-client": "57.0.19",
@@ -39,13 +42,17 @@
     "react-native-reanimated": "4.5.1",
     "react-native-safe-area-context": "5.7.0",
     "react-native-screens": "4.26.0",
+    "react-native-url-polyfill": "3.0.0",
     "react-native-web": "0.21.2",
     "react-native-worklets": "0.10.1"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.5.8",
+    "@electric-sql/pglite-postgis": "0.2.8",
     "@types/react": "19.2.4",
     "eslint": "9.39.5",
     "eslint-config-expo": "57.0.2",
+    "supabase": "2.119.0",
     "typescript": "6.0.3"
   }
 }
