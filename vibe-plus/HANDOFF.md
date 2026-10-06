@@ -1,16 +1,18 @@
 # HANDOFF: read this first
 
-**Updated:** 2026-10-06, Asia/Manila. **Plan:** Codex desktop / ChatGPT Plus; keep configured model. W3 estimated 7 points, 6 accepted (T07 + T08). Capacity remains 8; no actual window-end/limit signal. A few sessions/week, experienced user, no deadline.
+**Updated:** 2026-10-06, Asia/Manila. **Plan:** Codex desktop / ChatGPT Plus; keep configured model. W3 has all 7 points accepted (T07–T09). Capacity remains 8; no actual usage-window end/limit signal. A few sessions/week, experienced user, no deadline.
 
 ## Current state
 
-- **T07 and T08 complete.** User explicitly confirms all T07 iPhone checks passed: Apple/email, sign-out, cold restore, foreground return/refresh, code recovery and guest/protected routes. H05 checked. T01/T03/T04/T05/T06 done; T02 navigation/large-text/VoiceOver review remains separate and unconfirmed.
+- **T07, T08 and T09 complete.** User explicitly confirms all T07 iPhone checks passed: Apple/email, sign-out, cold restore, foreground return/refresh, code recovery and guest/protected routes. H05 checked. T01/T03/T04/T05/T06 done; T02 navigation/large-text/VoiceOver review remains separate and unconfirmed.
 - T08 migration 20261006090000_authorization.sql adds self-only profiles (only display_name editable), metadata-independent signup trigger/backfill, private admin/moderator assignments and verified venue links. my_account_access reads current DB roles/approved verified owned venues. Owner is venue-specific, not a global role.
 - Role/owner assignment and management RPCs are service-only, with actor authorization. **Server derives actor_user_id from a verified token, never request JSON.** Protected role/owner tables are read-only even to service-role callers; mutations use actor-checked functions. Bootstrap first admin only in trusted SQL. Private helper checks must run inside later mutation transactions; a standalone preflight does not authorize a later write. See docs/authorization.md.
 - Owners require a private link plus approved publication/verified claim state. Admins manage existing venues; moderators review ownership but cannot grant roles or automatically manage owner inventory. Revocation/suspension affects the next DB check. Evidence remains backend-only. No hosted user promoted, review interface, evidence approval or booking mutation added.
 - **Evidence:** five embedded directory/client/authorization tests pass with real PostgreSQL/PostGIS grants, RLS, triggers and functions. Local Docker PostgreSQL17.11 SQL allow/deny suite and real SDK/API tests pass: profiles, ignored metadata, server-only command ACLs, role reads and ownership revocation. Own fixtures removed. Existing local email Auth integration still passes signup, verification, cold restore, refresh and sign-out after the new trigger. Mobile/domain typecheck and lint pass; T08 has no native runtime UI change.
 - Local Supabase now has both T05 and T08 migrations, applied without reset. Docker Desktop WSL2/Linux stack remains running, analytics disabled (Vector log connection failed). Studio127.0.0.1:54323, Mailpit:54324; CLI2.119.0. Existing shells may need %LOCALAPPDATA%/Programs/DockerDesktop/resources/bin on PATH. CLI status/start prints secrets: capture/sanitize, never dump full JSON. Test scripts target local Docker/loopback and never read mobile env.
 - **Hosted migrations not deployed.** Last directory REST probe was503/PGRST002; working Auth does not prove REST/schema health. Verify project/CLI access and health before hosted deployment. Mobile public settings cannot deploy schemas.
+- **T09:** `packages/domain/src/money.ts` exports safe nonnegative integer-centavo validation, exact decimal-peso parsing and PHP display. `booking.ts` exports explicit-offset UTC normalization, named-zone Manila minute fields/display and contemporary (2000+) wall-clock input conversion. Rental checks use an explicit authoritative clock, strict future start, minimum 60 minutes, exact 30-minute duration multiples and inclusive rolling 60 × 24-hour start horizon. End can cross the horizon; start slot alignment/availability are separate schedule checks. See `docs/booking-rules.md` for contracts, precision limits and failure reasons.
+- **T09 evidence:** `npm run test:domain` passes 11 focused tests: unsafe/fractional amount denial and overflow, exact cents at the maximum safe integer, invalid calendar/zone/precision rejection, UTC/Manila midnight/year/leap boundaries, duration and horizon +/-1 ms cases and host-zone independence under UTC/New York/Tokyo. Mobile/domain typecheck and lint pass. No new dependencies, migrations, native UI, booking inventory, prices or payment implementation. No new iPhone build required.
 
 ## Mobile and branding
 
@@ -22,13 +24,13 @@
 
 ## Next
 
-1. **T09 when authorized:** PHP integer-centavo, UTC/Manila display and rental/horizon helpers. Full card in PLAN. No schedule/payment implementation. T08 contracts/helpers are ready for later admin/owner commands.
-2. W4/T10 admin interface and verified server access; first admin bootstrap requires intended project/account selection. Claim/evidence orchestration isT15, action auditingT12. Hosted database deployment needs separate verified access.
+1. **T10 when authorized:** Next.js admin workspace, email-code web auth and verified server/current-DB-role guards. W4/T10–T12 now have full cards in PLAN. Keep the root mobile workspace and one lockfile; admin secrets/server auth stay separate. Test local anonymous/player/admin/moderator denial/access and revocation, admin build and mobile compatibility. Listing CRUD is T11; action auditing is T12.
+2. First hosted admin bootstrap requires intended project/account selection and verified access. Use local role fixtures to implement/test T10 before that gate; do not promote users from metadata or deploy hosted schemas implicitly. Claim/evidence orchestration is T15. T08 authorization and T09 rules are ready for later commands; enforce checks inside mutation transactions with server-derived actor/clock.
 3. Upstash separate staging/production needed beforeT13. T06 docs/payment-integration.md and H03 merchant/provider gates remain beforeT34; no provider messages, payment charges or payment code.
 
 ## Git and gotchas
 
-- Main remote https://github.com/rckycls/picklyph.git. User reported pushing, but fetch/FETCH_HEAD on2026-10-06 confirmed remote main still bc0756f (T05), 9 commits behind local beforeT08. Discrepancy reported. Save T08 locally as T08: add account authorization; no push authorized this turn.
+- Main remote https://github.com/rckycls/picklyph.git. User authorized commit/push everything then T09. Initial push confirmed main advanced from bc0756f (T05) to bc5afe1 (T08), including branding. T09 wraps up as `T09: add booking rule helpers`, with push and clean/synchronized Git verification. No keys, env files or test fixtures committed.
 - Preserve private evidence and approved-only directory reads. Supabase owns transactional allocation/booking authority; Upstash is only rate limiting, no Redis inventory locks/QStash.
 - Prior localhost preview declined: do not work around it or claim UI screenshots from bundling. Windows has no iOS simulator; native visual review needs physical iPhone.
 - Audit remains31 upstream advisories (21high/10moderate); no force fixes, unsupported Maps downgrade, any/route casts or legacy-peer-deps.

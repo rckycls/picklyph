@@ -21,6 +21,8 @@ T08 adds private role assignments, venue-scoped verified ownership, self-only
 profiles and actor-checked server authorization. SQL/API allow-deny tests pass
 on local Supabase; hosted migrations are not deployed.
 See [account authorization](docs/authorization.md).
+T09 adds exact PHP centavo conversion/display, UTC/Manila time helpers and
+validated rental duration/horizon boundaries. See [shared booking rules](docs/booking-rules.md).
 The map still uses demo data; live directory screens, search, reservations,
 payments and owner tools are still planned.
 
@@ -78,6 +80,8 @@ If PowerShell blocks the npm scripts, use `npm.cmd`/`npx.cmd` for these commands
 | `npm run test:directory:local` | Run the same rollback-only SQL suite against the local Docker Supabase database; requires the migrated local stack. |
 | `npm run test:auth` | Check email/Apple contracts, secure-storage recovery and restoration/foreground lifecycle races. |
 | `npm run test:auth:local` | Exercise new/returning email OTP, cold restoration, refresh and sign-out against local Docker Auth/Mailpit; removes its own fixtures. |
+| `npm run test:authorization:local` | Check local SQL/API profile privacy, protected roles and venue ownership; removes its own fixtures. |
+| `npm run test:domain` | Check exact PHP amounts, UTC/Manila conversions and rental duration/horizon boundaries, including host-timezone independence. |
 | `npm run check:dependencies` | Check the installed versions against the Expo SDK. |
 | `npm run bundle:ios` | Export an iOS Hermes bundle to ignored `dist/ios`; does not create an installable `.ipa`. |
 | `npx expo-doctor` | Check Expo project health; not a package script. |

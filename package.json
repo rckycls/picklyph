@@ -23,7 +23,8 @@
     "bundle:ios": "expo export --platform ios --output-dir dist/ios",
     "test:auth": "node --test src/features/auth/__tests__/*.test.cjs",
     "test:auth:local": "node supabase/tests/auth-local.cjs",
-    "test:authorization:local": "node supabase/tests/authorization-local.cjs"
+    "test:authorization:local": "node supabase/tests/authorization-local.cjs",
+    "test:domain": "npm test --workspace @picklyph/domain"
   },
   "dependencies": {
     "@expo-google-fonts/bricolage-grotesque": "0.4.1",
