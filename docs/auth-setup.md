@@ -158,5 +158,8 @@ tokens. Automated bundle/config tests alone do not satisfy this checklist.
    still pending until reported.
 
 At implementation time, hosted Auth health responded successfully, Email was
-enabled and Apple was disabled. No hosted provider/template changes or iPhone
-auth acceptance have been claimed. T07 stays open until H05 passes.
+enabled and Apple was disabled. User subsequently showed the enabled Apple form
+with the correct native Client ID and reports working iPhone sign-in/sign-out.
+Provider coverage and remaining H05 checks await confirmation. Hosted provider
+and template settings have not been independently verified. T07 stays open
+until its device acceptance checks pass.
