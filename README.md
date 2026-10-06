@@ -9,8 +9,9 @@ owners will pin and manage venues through the same account.
 The Expo app opens on Discover, with Bookings and Account tabs and shared branded
 controls. Discovery now has a Google Maps screen, three labeled development-only
 sample locations, a selected-venue sheet, and optional foreground location.
-Native map acceptance is pending the Maps key and an iPhone development build;
-Expo Go shows a setup fallback instead. The live directory, search, sign-in,
+The iPhone development build succeeds, and Google map rendering is confirmed
+on-device; marker/location interaction checks remain pending. Expo Go shows a
+setup fallback instead. The live directory, search, sign-in,
 reservations, payments, and owner tools are still planned.
 
 T01/T02 source checks and iOS bundling passed. Physical iPhone tab switching,
@@ -126,9 +127,11 @@ in T06 before checkout implementation.
 Native Maps/location dependencies, `expo-dev-client`, the config plugins, and
 `eas.json` are now configured. The bundle identifier is `com.rckycls.picklyph`.
 The EAS project is [@rckycls/picklyph](https://expo.dev/accounts/rckycls/projects/picklyph),
-ID `c856cbf6-f323-41b7-9e1a-76ef6f5f2146`. No iPhone build or native acceptance has
-been completed yet. The real restricted Maps key, EAS development environment,
-device registration, and Apple signing must be ready before that check.
+ID `c856cbf6-f323-41b7-9e1a-76ef6f5f2146`. The first development iOS build
+[completed successfully](https://expo.dev/accounts/rckycls/projects/picklyph/builds/a74b7540-d5b7-4d06-b659-da5c22780f12)
+on 2026-10-06, and the user confirmed the map works on the installed iPhone app.
+Maps key/environment and device/signing setup are complete. The interaction
+checks below still need confirmation before T04 is marked complete.
 
 1. Prepare an Expo account, active Apple Developer Program membership, and a
    physical iPhone. The account/device readiness and bundle ID were confirmed
