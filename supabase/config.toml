@@ -19,3 +19,7 @@ enabled = false
 [studio]
 enabled = true
 port = 54323
+
+[analytics]
+# The Windows per-user Docker engine does not expose the TCP logging endpoint.
+enabled = false

@@ -225,8 +225,9 @@ The user confirmed the mobile environment points to staging. Its public URL/key
 are also configured in EAS development; no values are committed. No hosted
 migrations or fixture data were applied. A staging SDK probe returned
 `503 / PGRST002` (schema cache unavailable); confirm dashboard/database/API health
-before connecting live screens. Once Docker Desktop is installed and its Linux
-container engine is running, use the pinned CLI from this project:
+before connecting live screens. Docker Desktop's Linux engine is installed and
+the migration and rollback-only SQL suite pass on local PostgreSQL 17.11 / PostGIS
+3.3.7. Use the pinned CLI from this project:
 
 ```powershell
 npx supabase start
@@ -234,10 +235,26 @@ npx supabase migration up --local
 npm run test:directory:local
 ```
 
+Local SDK smoke checks also pass for public venue/court reads, spatial RPC,
+guest write denial, private-schema exclusion and Auth health. This verifies
+directory API wiring; signup/session and Storage workflows are future tasks.
+Studio is available at http://127.0.0.1:54323 while the stack is running.
+Use `npx supabase stop` to stop services while retaining local data.
+
 The first startup downloads the local service images. `--local` keeps these
 commands on the project database; use the SQL suite only on disposable databases.
-The suite uses SQL assertions, not pgTAP, so use the command above rather than
-`supabase test db`. Hosted staging deployment needs separate CLI project access
+The suite uses SQL assertions, not pgTAP. Its npm command streams SQL into the
+`supabase_db_picklyph` container's `psql`, with `ON_ERROR_STOP=1`; the CLI's
+`db query --file` cannot execute this multi-statement suite. Open a new terminal
+after installing Docker so `docker` is available on PATH.
+
+Local analytics is explicitly disabled in `supabase/config.toml`: the log
+collector could not connect to the Windows per-user engine's TCP endpoint and
+was restarting. Database, Auth, Storage and REST services remain available;
+Studio's aggregated logs are unavailable with this setting. Container logs are
+available in Docker Desktop. [Local analytics configuration](https://supabase.com/docs/guides/local-development/cli/config#analyticsenabled)
+
+Hosted staging deployment needs separate CLI project access
 and verified target selection; a mobile publishable key cannot apply migrations.
 [Supabase CLI setup](https://supabase.com/docs/guides/local-development/cli/getting-started)
 
@@ -253,8 +270,8 @@ and verified target selection; a mobile publishable key cannot apply migrations.
 | `supabase/` | Directory migration, local configuration and database tests; server functions later. |
 | `vibe-plus/` | Task plan and current handoff. |
 
-T04's native map and T05's disposable database checks pass. Docker full-stack
-testing and hosted staging deployment remain separate setup steps. Before T13,
+T04's native map and T05's embedded and Docker database checks pass. Hosted
+staging deployment remains a separate setup step. Before T13,
 prepare separate staging/production Upstash Redis databases near the backend
 region. Begin PayMongo/venue onboarding alongside these tasks; T06 verifies
 the supported payment flow and live activation requirements.

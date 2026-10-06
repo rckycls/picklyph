@@ -18,7 +18,7 @@
     "lint": "eslint . --max-warnings 0",
     "test:discovery": "node --test src/features/discovery/__tests__/*.test.cjs",
     "test:directory": "node --test supabase/tests/*.test.cjs",
-    "test:directory:local": "supabase db query --local --file supabase/tests/directory.sql",
+    "test:directory:local": "docker exec -i supabase_db_picklyph psql -U postgres -d postgres -v ON_ERROR_STOP=1 -X -q < supabase/tests/directory.sql",
     "check:dependencies": "expo install --check",
     "bundle:ios": "expo export --platform ios --output-dir dist/ios"
   },
