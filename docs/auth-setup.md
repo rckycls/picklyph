@@ -129,6 +129,9 @@ exempt-encryption answer as `ITSAppUsesNonExemptEncryption: false`.
 For this profile error, synchronize capabilities and regenerate the profile;
 clearing the build cache does not add missing entitlements.
 See [EAS capability synchronization](https://docs.expo.dev/build-reference/ios-capabilities/).
+The [replacement T07 iPhone development build](https://expo.dev/accounts/rckycls/projects/picklyph/builds/61c23f51-d806-4948-aae5-f903a5dc506a)
+finished successfully on 2026-10-06. Install it, then start Metro with
+`npx expo start --dev-client`; no duplicate native build is needed for these checks.
 
 ## H05: iPhone acceptance
 
