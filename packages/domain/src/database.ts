@@ -4,8 +4,9 @@ import type { VenueInput, CourtInput, DirectoryPage, DirectoryListing, Directory
 import type { DirectoryAuditPage } from './audit.ts';
 import type { VenueSearch, VenueSearchPage } from './search.ts';
 import type { OwnerDuplicate, OwnerSubmission, OwnerSubmitResult, OwnerVenueInput } from './owner.ts';
+import type { OwnershipDecisionResult, OwnershipQueuePage, OwnershipReview, ReviewRejectionReason } from './review.ts';
 
-// Schema-maintained PostgREST contract for the directory, authorization and owner-submission migrations.
+// Schema-maintained PostgREST contract for the directory, authorization, owner-submission and ownership-review migrations.
 // Only the exposed public schema belongs in mobile code. PostGIS geometry is
 // opaque transport data; callers use latitude/longitude instead.
 type VenueRow = Venue & { location: unknown };
@@ -64,6 +65,16 @@ export interface Database {
       owner_submit_venue: {
         Args: { actor_user_id: string; submission_request_id: string; venue_input: OwnerVenueInput; evidence_ref: string; submission_note: string | null; acknowledge_duplicates: boolean };
         Returns: OwnerSubmitResult;
+      };
+      ownership_review_queue: {
+        Args: { actor_user_id: string; after_created_at?: string | null; after_id?: string | null };
+        Returns: OwnershipQueuePage;
+      };
+      ownership_review_read: { Args: { actor_user_id: string; subject_id: string }; Returns: OwnershipReview };
+      ownership_review_evidence: { Args: { actor_user_id: string; subject_id: string }; Returns: string };
+      ownership_review_decide: {
+        Args: { actor_user_id: string; subject_id: string; decision: string; target_venue_id: string | null; rejection_reason: ReviewRejectionReason | null };
+        Returns: OwnershipDecisionResult;
       };
       set_account_role: {
         Args: { actor_user_id: string; target_user_id: string; assigned_role: PrivilegedRole; enabled: boolean };
