@@ -1,4 +1,4 @@
-import type { OwnerSubmission, OwnerSubmissionRequest } from '@picklyph/domain';
+import type { OwnerPhotoAdd, OwnerSubmission, OwnerSubmissionRequest, OwnerVenueSave } from '@picklyph/domain';
 import { File as DeviceFile } from 'expo-file-system';
 
 import { fetchWithDeadline } from '@/lib/fetchWithDeadline';
@@ -9,8 +9,13 @@ import {
   type EvidenceFile, type OwnerOutcome, type OwnerTransport,
 } from './ownerClient';
 import type { Pin } from './ownerForm';
+import {
+  addVenuePhoto, listOwnedVenues, loadOwnedVenue, removeVenuePhoto, saveOwnedVenue,
+  type PhotoFile, type VenueTransport,
+} from './venueClient';
 
 let transport: OwnerTransport | null | undefined;
+let venueTransport: VenueTransport | null | undefined;
 
 /** Public URL/key plus the signed-in user's token; every server secret stays in the function. */
 function liveTransport(): OwnerTransport | null {
@@ -32,6 +37,25 @@ function liveTransport(): OwnerTransport | null {
     transport = null;
   }
   return transport;
+}
+
+/** Same public URL/key and token; photos stream from an expo-file-system File (see evidencePart). */
+function liveVenueTransport(): VenueTransport | null {
+  if (venueTransport !== undefined) return venueTransport;
+  try {
+    const client = getSupabase();
+    venueTransport = {
+      endpoint: `${process.env.EXPO_PUBLIC_SUPABASE_URL?.trim() ?? ''}/functions/v1/owner-venues`,
+      apiKey: process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim() ?? '',
+      accessToken: async () => (await client.auth.getSession()).data.session?.access_token ?? null,
+      // Photo uploads (multipart, not a JSON string) can take longer on mobile data.
+      fetch: (input, init) => fetchWithDeadline(input, init, init.body && typeof init.body !== 'string' ? 60_000 : 15_000),
+      photoPart: (file) => new DeviceFile(file.uri) as unknown as Blob,
+    };
+  } catch {
+    venueTransport = null;
+  }
+  return venueTransport;
 }
 
 const notConfigured = { ok: false, failure: { kind: 'not_configured', retryAfterSeconds: null } } as const;
@@ -59,5 +83,41 @@ export async function loadMySubmissions(): Promise<OwnerOutcome<OwnerSubmission[
     return { ok: true, value: parseMySubmissions(data) };
   } catch {
     return { ok: false, failure: { kind: 'network', retryAfterSeconds: null } };
+  }
+}
+
+export function liveOwnedVenues(signal?: AbortSignal): ReturnType<typeof listOwnedVenues> {
+  const live = liveVenueTransport();
+  return live ? listOwnedVenues(live, signal) : Promise.resolve(notConfigured);
+}
+
+export function liveOwnedVenue(venueId: string, signal?: AbortSignal): ReturnType<typeof loadOwnedVenue> {
+  const live = liveVenueTransport();
+  return live ? loadOwnedVenue(live, venueId, signal) : Promise.resolve(notConfigured);
+}
+
+export function liveSaveVenue(command: OwnerVenueSave): ReturnType<typeof saveOwnedVenue> {
+  const live = liveVenueTransport();
+  return live ? saveOwnedVenue(live, command) : Promise.resolve(notConfigured);
+}
+
+export function liveAddVenuePhoto(request: OwnerPhotoAdd, file: PhotoFile): ReturnType<typeof addVenuePhoto> {
+  const live = liveVenueTransport();
+  return live ? addVenuePhoto(live, request, file) : Promise.resolve(notConfigured);
+}
+
+export function liveRemoveVenuePhoto(venueId: string, photoId: string): ReturnType<typeof removeVenuePhoto> {
+  const live = liveVenueTransport();
+  return live ? removeVenuePhoto(live, { venue_id: venueId, photo_id: photoId }) : Promise.resolve(notConfigured);
+}
+
+/** How many venues this account currently manages (self-only RPC; current DB state, never JWT claims). */
+export async function loadManagedVenueCount(): Promise<number | null> {
+  try {
+    const { data, error } = await getSupabase().rpc('my_account_access');
+    if (error || !Array.isArray(data) || !data[0] || !Array.isArray(data[0].owned_venue_ids)) return null;
+    return data[0].owned_venue_ids.length;
+  } catch {
+    return null;
   }
 }

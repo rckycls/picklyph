@@ -9,7 +9,7 @@ import { screenText } from '@/components/ui/Screen';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { colors } from '@/theme/colors';
 
-import { loadMySubmissions } from './liveOwner';
+import { loadManagedVenueCount, loadMySubmissions } from './liveOwner';
 import { ownerFailureMessage } from './ownerClient';
 import { SubmissionList } from './OwnerLists';
 
@@ -18,6 +18,7 @@ type Submissions = { status: 'loading' } | { status: 'ready'; items: OwnerSubmis
 /** Account-tab entry point for owners: submit a missing venue and follow review status. */
 export function OwnerCard({ signedIn }: { signedIn: boolean }) {
   const [submissions, setSubmissions] = useState<Submissions>({ status: 'loading' });
+  const [managed, setManaged] = useState(0);
   const load = useCallback(() => {
     let active = true;
     setSubmissions({ status: 'loading' });
@@ -25,6 +26,8 @@ export function OwnerCard({ signedIn }: { signedIn: boolean }) {
       if (!active) return;
       setSubmissions(outcome.ok ? { status: 'ready', items: outcome.value } : { status: 'error', message: ownerFailureMessage(outcome.failure) });
     });
+    // Current verified links (any approved claim, merge or admin assignment), never cached roles.
+    void loadManagedVenueCount().then((count) => { if (active) setManaged(count ?? 0); });
     return () => { active = false; };
   }, []);
   // Refresh whenever Account regains focus, e.g. after submitting.
@@ -43,7 +46,10 @@ export function OwnerCard({ signedIn }: { signedIn: boolean }) {
         </>
       ) : (
         <>
-          <Button label="Add a missing venue" onPress={() => router.push('/owner/submit')} />
+          {(managed > 0 || (submissions.status === 'ready' && submissions.items.some((item) => item.status === 'approved'))) && (
+            <Button label={managed > 1 ? `Manage your ${managed} venues` : 'Manage your venue'} onPress={() => router.push('/owner/venues')} />
+          )}
+          <Button label="Add a missing venue" variant={managed > 0 ? 'secondary' : 'primary'} onPress={() => router.push('/owner/submit')} />
           <Text accessibilityRole="header" style={screenText.label}>Your submissions</Text>
           {submissions.status === 'loading' && (
             <View style={styles.row} accessibilityLiveRegion="polite">

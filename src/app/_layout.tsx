@@ -49,6 +49,8 @@ export default function RootLayout() {
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="owner/submit" options={ownerHeader('Add a missing venue')} />
           <Stack.Screen name="owner/claim/[id]" options={ownerHeader('Claim a listing')} />
+          <Stack.Screen name="owner/venues/index" options={ownerHeader('Your venues')} />
+          <Stack.Screen name="owner/venues/[id]" options={ownerHeader('Edit venue')} />
         </Stack>
       </AuthProvider>
     </SafeAreaProvider>

@@ -13,6 +13,8 @@ export type { VenueInput, CourtInput, DirectoryListing, DirectoryPage, Directory
 export type { AccountAccess, PrivilegedRole, Profile } from './authorization';
 export { DUPLICATE_RADIUS_METERS, MAX_EVIDENCE_BYTES, MAX_OWNER_NOTE, MAX_PENDING_OWNER_SUBMISSIONS, MAX_SUBMISSION_COURTS, OwnerInputError, SUBMISSION_BOUNDS, inSubmissionBounds, isUuid, readOwnerLookup, readOwnerNote, readOwnerSubmission, readOwnerVenueInput, sniffEvidence } from './owner';
 export type { AddressCandidate, EvidenceType, OwnerClaimRequest, OwnerDuplicate, OwnerLookup, OwnerSubmission, OwnerSubmissionRequest, OwnerSubmissionStatus, OwnerSubmitResult, OwnerVenueInput, OwnerVenueRequest } from './owner';
+export { MAX_OWNER_COURTS, MAX_PHOTO_BYTES, MAX_PHOTO_PIXELS, MAX_PHOTO_SIDE, MAX_VENUE_PHOTOS, MIN_PHOTO_SIDE, VENUE_PHOTO_BUCKET, VenueInputError, photoDimensionsAllowed, readOwnerCourts, readOwnerPhotoAdd, readOwnerText, readOwnerVenueCommand, readOwnerVenueDetails, readOwnerVenueQuery } from './ownerVenues';
+export type { OwnedVenueSummary, OwnerPhotoAdd, OwnerPhotoAddResult, OwnerPhotoRemove, OwnerPhotoRemoveResult, OwnerVenue, OwnerVenueCommand, OwnerVenueDetails, OwnerVenuePhoto, OwnerVenueSave, PhotoType } from './ownerVenues';
 export { REVIEW_REASON_LABELS, REVIEW_REJECTION_REASONS, ReviewInputError, formatReviewCursor, readOwnershipDecision, readReviewCursor } from './review';
 export type { ClaimReview, OwnershipDecision, OwnershipDecisionResult, OwnershipQueueItem, OwnershipQueuePage, OwnershipReview, ReviewCursor, ReviewOutcome, ReviewRejectionReason, ReviewSubmitter, VenueSubmissionReview } from './review';
 export { PHP_CURRENCY, CENTAVOS_PER_PESO, isPhpCentavos, assertPhpCentavos, pesosToCentavos, formatPhpCentavos } from './money';

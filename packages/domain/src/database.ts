@@ -5,14 +5,16 @@ import type { DirectoryAuditPage } from './audit.ts';
 import type { VenueSearch, VenueSearchPage } from './search.ts';
 import type { OwnerDuplicate, OwnerSubmission, OwnerSubmitResult, OwnerVenueInput } from './owner.ts';
 import type { OwnershipDecisionResult, OwnershipQueuePage, OwnershipReview, ReviewRejectionReason } from './review.ts';
+import type { OwnedVenueSummary, OwnerPhotoAddResult, OwnerPhotoRemoveResult, OwnerVenue, OwnerVenueDetails, OwnerVenuePhoto } from './ownerVenues.ts';
 
-// Schema-maintained PostgREST contract for the directory, authorization, owner-submission and ownership-review migrations.
+// Schema-maintained PostgREST contract for the directory, authorization, owner-submission, ownership-review and owner-venue migrations.
 // Only the exposed public schema belongs in mobile code. PostGIS geometry is
 // opaque transport data; callers use latitude/longitude instead.
 type VenueRow = Venue & { location: unknown };
 type VenueInsert = Pick<Venue, 'name' | 'address_line' | 'city' | 'province' | 'latitude' | 'longitude'> &
   Partial<Omit<Venue, 'name' | 'address_line' | 'city' | 'province' | 'latitude' | 'longitude'>> & { location?: never };
 type CourtInsert = Pick<Court, 'venue_id' | 'name'> & Partial<Omit<Court, 'venue_id' | 'name'>>;
+type VenuePhotoRow = OwnerVenuePhoto & { venue_id: string };
 
 export interface Database {
   public: {
@@ -35,6 +37,19 @@ export interface Database {
         Update: Partial<CourtInsert>;
         Relationships: [{
           foreignKeyName: 'courts_venue_id_fkey';
+          columns: ['venue_id'];
+          isOneToOne: false;
+          referencedRelation: 'venues';
+          referencedColumns: ['id'];
+        }];
+      };
+      // Read-only to every API role (approved venues only); writes go through owner commands.
+      venue_photos: {
+        Row: VenuePhotoRow;
+        Insert: never;
+        Update: never;
+        Relationships: [{
+          foreignKeyName: 'venue_photos_venue_id_fkey';
           columns: ['venue_id'];
           isOneToOne: false;
           referencedRelation: 'venues';
@@ -75,6 +90,20 @@ export interface Database {
       ownership_review_decide: {
         Args: { actor_user_id: string; subject_id: string; decision: string; target_venue_id: string | null; rejection_reason: ReviewRejectionReason | null };
         Returns: OwnershipDecisionResult;
+      };
+      owner_venue_list: { Args: { actor_user_id: string }; Returns: OwnedVenueSummary[] };
+      owner_venue_read: { Args: { actor_user_id: string; target_venue_id: string }; Returns: OwnerVenue };
+      owner_venue_save: {
+        Args: { actor_user_id: string; target_venue_id: string; expected_updated_at: string; venue_input: OwnerVenueDetails; court_inputs: CourtInput[] };
+        Returns: OwnerVenue;
+      };
+      owner_venue_photo_add: {
+        Args: { actor_user_id: string; target_venue_id: string; photo_request_id: string; storage_ref: string; photo_width: number; photo_height: number };
+        Returns: OwnerPhotoAddResult;
+      };
+      owner_venue_photo_remove: {
+        Args: { actor_user_id: string; target_venue_id: string; target_photo_id: string };
+        Returns: OwnerPhotoRemoveResult;
       };
       set_account_role: {
         Args: { actor_user_id: string; target_user_id: string; assigned_role: PrivilegedRole; enabled: boolean };

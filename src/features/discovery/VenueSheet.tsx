@@ -1,11 +1,12 @@
 import type { VenueSearchItem } from '@picklyph/domain';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Button } from '@/components/ui/Button';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { useAuth } from '@/features/auth/AuthProvider';
+import { venuePhotoUrl } from '@/lib/venuePhotos';
 import { colors } from '@/theme/colors';
 import { fonts } from '@/theme/typography';
 
@@ -143,6 +144,14 @@ export function VenueSheet({ venue, onClose, onMissing }: { venue: VenueSearchIt
 
               {expanded && (
                 <View style={styles.details}>
+                  {current.photos.length > 0 && (
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.photos}>
+                      {current.photos.map((photo, index) => (
+                        <Image key={photo.id} source={{ uri: venuePhotoUrl(photo.storage_path) }} resizeMode="cover"
+                          style={styles.photo} accessible accessibilityLabel={`${current.name}, photo ${index + 1} of ${current.photos.length}`} />
+                      ))}
+                    </ScrollView>
+                  )}
                   {current.courts.length === 0
                     ? <Text style={styles.caption}>No active courts are listed for this venue.</Text>
                     : current.courts.map((court) => (
@@ -190,6 +199,8 @@ const styles = StyleSheet.create({
   linkPressed: { backgroundColor: colors.selectedBackground },
   linkText: { fontFamily: fonts.semibold, color: colors.link, fontSize: 14, lineHeight: 20 },
   details: { gap: 6, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 10 },
+  photos: { gap: 8, paddingVertical: 4 },
+  photo: { width: 220, height: 165, borderRadius: 12, backgroundColor: colors.selectedBackground },
   court: { fontFamily: fonts.medium, color: colors.textSecondary, fontSize: 14, lineHeight: 20 },
   courtName: { fontFamily: fonts.semibold, color: colors.text },
 });

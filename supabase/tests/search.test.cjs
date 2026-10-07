@@ -68,10 +68,10 @@ test('Redis throws, SDK success-on-timeout, malformed reply and hanging operatio
     async () => ({ success: true, limit: NaN, remaining: 2, reset: 1000 }),
     () => new Promise(() => {})]) {
     const guard = createRateGuard({ backend, identifier: async () => 'hash', timeoutMs: 10 });
-    for (const action of ['hold-create', 'checkout-create', 'owner-submit']) {
+    for (const action of ['hold-create', 'checkout-create', 'owner-submit', 'owner-edit']) {
       const result = await guard(action, user); assert.equal(result.status, 503); assert.equal(result.allowed, false); assert.equal(result.headers['Retry-After'], '5');
     }
-    for (const action of ['discovery', 'cancel']) { const result = await guard(action, user); assert.equal(result.allowed, true); assert.equal(result.state, 'degraded'); }
+    for (const action of ['discovery', 'cancel', 'owner-read']) { const result = await guard(action, user); assert.equal(result.allowed, true); assert.equal(result.state, 'degraded'); }
     assert.equal((await guard('provider-webhook', { kind: 'provider', id: 'verified-provider' })).state, 'bypassed');
   }
 });

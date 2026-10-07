@@ -1,6 +1,6 @@
 # HANDOFF: read this first
 
-**Updated:** 2026-10-07, Asia/Manila. **Plan:** Codex desktop / ChatGPT Plus; keep configured model. W3/W4 complete (7 points each). W5: T13, T14 and T16 complete (5/7); T15 implemented, device checks partly done. W6: T17 complete (2/7). Hosted staging has T05/T08/T11–T13/T15/T17 plus `venue-search` and `owner-submissions`. Capacity remains 8; no actual usage-window end/limit signal. A few sessions/week, experienced user, no deadline.
+**Updated:** 2026-10-07, Asia/Manila. **Plan:** Codex desktop / ChatGPT Plus; keep configured model. W3/W4 complete (7 points each). W5: T13, T14 and T16 complete (5/7); T15 implemented, device checks partly done. W6: T17/T18 complete (4/7). Hosted staging has T05/T08/T11–T13/T15/T17 plus `venue-search` and `owner-submissions`; T18 is local only. Capacity remains 8; no actual usage-window end/limit signal. A few sessions/week, experienced user, no deadline.
 
 ## Current state
 
@@ -66,6 +66,14 @@
 **For T18:** an owner is a `private.venue_owners` link on an approved, verified listing (`is_verified_venue_owner`); create test owners through this review flow.
 **Evidence:** `test:review:local` → Docker review.sql + production console HTTP PASS (3 runs; race: one 200, one 409, one audit row), fixtures removed; `test:directory` 23, `test:domain` 21, `test:admin` 12, `test:owner` 6, `test:discovery` 30, `test:auth` 16; `test:owner:local`, `test:admin:local` PASS; `typecheck`, `lint`, `admin:typecheck`, `admin:lint`, `admin:build`, `functions:check`, `functions:lint` → exit 0.
 
+## T18 owner editing handoff
+
+**Built:** Account entry, linked-venue list, gated root-stack editor, details/courts and public-photo upload/removal; expanded Discover photo strip. Only current owners of approved/verified venues edit. Exact timestamp conflicts; court IDs preserved; pins/status/ownership untouched. Server-only commands lock listing/owner rows and audit each successful mutation.
+**Files/APIs:** `docs/owner-venues.md`; migration `20261007180000`; `owner-venues` Edge function and `owner_venue_list|read|save|photo_add|photo_remove`; `ownerVenues.ts`; `src/features/owner/Venue*`, `venueClient.ts`, `venueDraft.ts`; public `venue_photos` and `venue-photos` bucket; private request IDs.
+**Gotchas:** 60 reads/20 writes per user/minute; writes/uploads fail closed on Redis outage. Six JPEG/PNG photos, 5 MiB, 320–8192 pixels/side, 25MP. Strips identifying metadata/ICC, retaining minimal orientation. Structure/header validation, not full pixel re-encoding. Public object URLs survive suspension; row RLS hides galleries. Definitive rejected/duplicate uploads cleaned; uncertain RPC replies retain bytes in case committed. T47 needs orphan reconciliation/retention; T22 must guard court deactivation with allocations. T19 reuses command/guard pattern.
+**Rollout:** Local migration applied; hosted T18/function deployment and iPhone checks pending. Missing photo-table errors alone yield an empty gallery during rollout. No native dependency/rebuild added. Restart Metro for new routes: its old watcher regenerated polluted type paths; regenerated clean declarations before passing typecheck. Compatibility check now recommends four upstream Expo patches; pins preserved.
+**Evidence:** `test:venues:local` → Docker SQL + real Auth/Storage/RPC saves/photo-cap races, retry, public photos, bypass/revocation/suspension/audit + actual Edge forged-token/outage checks PASS, fixtures/photos/audit/temp env removed (two runs). `test:directory` 27, `test:owner` 10, `test:domain` 24, `test:discovery` 31, `test:auth` 16, `test:admin` 12, `test:functions` 1 passed; mobile/domain/admin typecheck, mobile/Edge lint and Edge check exit 0; iOS export 1333 modules/3.5 MB. `check:dependencies` exit 1: expected newer patch versions only (expo/constants/linking/router).
+
 ## Mobile and branding
 
 - Expo57.0.26 / React19.2.3 / RN0.86.3 / Router57.0.24 / TS6.0.3 / Supabase-js2.117.2. Map opens first with live T13 directory results (demo pins removed in T14) and optional foreground location. Bookings guarded by restored auth; inventory, payments and owner UI are later tasks.
@@ -76,7 +84,7 @@
 
 ## Next
 
-1. **T18 next** (owner venue/court/photo editing). Register new owner screens in the root stack wrapped in `OwnerGate` (a nested owner stack hides the back button). Never use `instanceof Response` in mobile code. Owner commands go through an Edge function with Upstash limits; uploads must be `expo-file-system` `File` parts.
+1. **T19 next** (opening hours, rates and dated exceptions). Reuse T18's owner-command locking/guard/audit pattern and T09 Manila/money helpers; details in `docs/owner-venues.md`. T18 hosted migration/function deployment and physical iPhone editing/photo acceptance remain separate; existing T15 native modules suffice. Keep new screens in the root stack with `OwnerGate`, and use `expo-file-system` `File` upload parts.
 2. **Device checks still open** on the installed EAS build: T15 address-search results, the submissions list, the duplicate warning and claiming (a published staging test venue now exists); T16 recovery states; T02 navigation/VoiceOver/large text. T14 accepted 2026-10-07.
 3. **Staging:** first admin assigned by operator SQL; one published test venue; the console runs locally against staging (`ADMIN_SUPABASE_SECRET_KEY` in the ignored `apps/admin/.env.local`), not hosted yet. H06 (owner claim/review trial) can run now; the reviewer must differ from the submitter. Decide whether public contact fields belong in a later directory task. H02: production Redis, hosted outage/isolation and per-IP ingress checks remain.
 4. T09 rules are ready for later commands; use server-derived clocks. T46 must review moderator audit permissions and replace unaudited `set_verified_venue_owner` revocation; T47 must define audit UUID and evidence retention.

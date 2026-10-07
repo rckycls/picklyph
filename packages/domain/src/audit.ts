@@ -4,7 +4,10 @@ export type DirectoryAuditAction =
   | 'directory.publish'
   | 'directory.unpublish'
   | 'directory.suspend'
-  | 'directory.import';
+  | 'directory.import'
+  | 'owner.update'
+  | 'owner.photo_add'
+  | 'owner.photo_remove';
 
 /** Safe audit projection; no request bodies, evidence, names or credentials. */
 export type DirectoryAuditEvent = {
