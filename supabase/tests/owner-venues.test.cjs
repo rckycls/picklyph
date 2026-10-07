@@ -8,7 +8,7 @@ test('owner venue editing: owner-only audited saves, version conflicts, photo li
   const { PGlite } = await import('@electric-sql/pglite');
   const { postgis } = await import('@electric-sql/pglite-postgis');
   const { pg_trgm } = await import('@electric-sql/pglite/contrib/pg_trgm');
-  const db = new PGlite({ extensions: { postgis, pg_trgm } });
+  const db = new PGlite({ extensions: { postgis, pg_trgm, btree_gist: (await import('@electric-sql/pglite/contrib/btree_gist')).btree_gist } });
   try {
     await db.exec(`create role anon; create role authenticated; create role service_role bypassrls;
       create schema auth; grant usage on schema auth to anon, authenticated, service_role;

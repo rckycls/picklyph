@@ -24,4 +24,6 @@ export { MANILA_TIME_ZONE, RENTAL_INCREMENT_MINUTES, MINIMUM_RENTAL_MINUTES, BOO
 export type { Instant, ManilaDateTime, RentalValidation } from './booking';
 export { ScheduleInputError, scheduleDate, readVenueSchedule, resolveVenueSchedule, readScheduleSave, readScheduleQuery } from './schedule';
 export type { RateBand, OpeningWindow, ScheduleException, VenueSchedule, ScheduleInterval, ScheduleView, ScheduleSave } from './schedule';
+export { ALLOCATION_INCREMENT_MINUTES, MAX_ALLOCATION_MINUTES, MAX_HOLD_MINUTES, MAX_ALLOCATION_RANGE_DAYS, AllocationInputError, readAllocationBlock, readAllocationRangeQuery, allocationsOverlap, isLiveAllocation, holdUntil } from './allocation';
+export type { AllocationKind, AllocationState, CourtAllocation, AllocationOutcome, AllocationResult, AllocationRange, AllocationBlock, AllocationRangeQuery, AllocationRejection } from './allocation';
 export type { Court, CourtStatus, CourtSurface, MapBounds, Venue, VenueClaimStatus, VenueMapPin, VenuePublicationStatus } from './directory';

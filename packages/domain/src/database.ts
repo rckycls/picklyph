@@ -8,6 +8,7 @@ import type { OwnershipDecisionResult, OwnershipQueuePage, OwnershipReview, Revi
 import type { OwnedVenueSummary, OwnerPhotoAddResult, OwnerPhotoRemoveResult, OwnerVenue, OwnerVenueDetails, OwnerVenuePhoto } from './ownerVenues.ts';
 import type { ScheduleView, VenueSchedule } from './schedule.ts';
 import type { VenuePolicy, VenuePolicyView } from './policy.ts';
+import type { AllocationRange, AllocationResult } from './allocation.ts';
 
 // Schema-maintained PostgREST contract for the directory, authorization, owner-submission, ownership-review and owner-venue migrations.
 // Only the exposed public schema belongs in mobile code. PostGIS geometry is
@@ -98,6 +99,12 @@ export interface Database {
       owner_venue_policy_save: { Args: { actor_user_id: string; target_venue_id: string; expected_revision: string; policy_input: VenuePolicy }; Returns: VenuePolicyView };
       venue_schedule_read: { Args: { actor_user_id: string; target_venue_id: string; start_date: string; days: number }; Returns: ScheduleView };
       venue_schedule_save: { Args: { actor_user_id: string; target_venue_id: string; expected_revision: string | null; schedule_input: VenueSchedule }; Returns: ScheduleView };
+      court_allocation_block: {
+        Args: { actor_user_id: string; target_court_id: string; block_request_id: string; block_starts_at: string; block_ends_at: string };
+        Returns: AllocationResult;
+      };
+      court_allocation_release: { Args: { actor_user_id: string; target_allocation_id: string }; Returns: AllocationResult };
+      court_allocation_read: { Args: { actor_user_id: string; target_venue_id: string; range_start: string; range_end: string }; Returns: AllocationRange };
       owner_venue_read: { Args: { actor_user_id: string; target_venue_id: string }; Returns: OwnerVenue };
       owner_venue_save: {
         Args: { actor_user_id: string; target_venue_id: string; expected_updated_at: string; venue_input: OwnerVenueDetails; court_inputs: CourtInput[] };
