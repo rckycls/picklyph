@@ -114,3 +114,27 @@ test('submission list parsing is strict and private-field free', () => {
   }
   assert.ok(!('evidence_path' in parseSubmission({ ...submission, evidence_path: 'x/y.jpg' })));
 });
+
+// expo/fetch on iOS returns a FetchResponse that implements Response without extending the global class.
+const foreign = (response) => ({ ok: response.ok, status: response.status, headers: response.headers,
+  json: () => response.json(), clone: () => foreign(response.clone()) });
+
+test('responses that are not instanceof Response (expo/fetch on device) still succeed and fail visibly', async () => {
+  const { transport } = server();
+  const device = { ...transport, fetch: async (url, init) => foreign(await transport.fetch(url, init)) };
+  assert.equal((await searchAddress(device, '1 Fixture St')).value.length, 1);
+  assert.deepEqual(plain((await findNearbyListings(device, { latitude: 14.6, longitude: 121 }, null)).value), [duplicate]);
+  const request = plain(form.venueRequest({ ...form.EMPTY_DRAFT, name: 'Corner Courts', address_line: '1 Fixture St', city: 'Manila', province: 'Metro Manila', courts: '2' },
+    { latitude: 14.6, longitude: 121 }, REQUEST, true).request);
+  assert.equal((await submitOwner(device, request, evidence)).value.status, 'created');
+  const limited = server({ limit: async () => ({ allowed: false, status: 429, state: 'enforced', headers: { 'Retry-After': '7' } }) }).transport;
+  const outcome = await findNearbyListings({ ...limited, fetch: async (url, init) => foreign(await limited.fetch(url, init)) }, { latitude: 14.6, longitude: 121 }, null);
+  assert.deepEqual(plain(outcome.failure), { kind: 'rate_limited', retryAfterSeconds: 7 });
+  assert.match(ownerFailureMessage({ kind: 'surprise' }), /Something went wrong/);
+});
+
+test('approved venue submissions may name their resolved listing; pending ones may not', () => {
+  assert.equal(parseSubmission({ ...submission, status: 'approved', venue_id: VENUE.toUpperCase() }).venue_id, VENUE);
+  for (const status of ['pending', 'rejected']) assert.throws(() => parseSubmission({ ...submission, status, venue_id: VENUE }));
+  assert.throws(() => parseSubmission({ ...submission, kind: 'claim', venue_id: null }));
+});

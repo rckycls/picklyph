@@ -49,7 +49,8 @@ export function parseSubmission(raw: unknown): OwnerSubmission {
   if (!(typeof id === 'string' && UUID.test(id)) || (kind !== 'claim' && kind !== 'venue')
     || !STATUSES.includes(status as OwnerSubmission['status']) || !text(item.name, 120) || !text(item.city, 80)
     || !(typeof created === 'string' && Number.isFinite(Date.parse(created)))
-    || (kind === 'claim' ? !(typeof venue === 'string' && UUID.test(venue)) : venue !== null)) return unexpected();
+    // Claims name their listing; a venue submission names one only once approved (T17: new draft or merged listing).
+    || !(venue === null ? kind === 'venue' : typeof venue === 'string' && UUID.test(venue) && (kind === 'claim' || status === 'approved'))) return unexpected();
   return { id: id.toLowerCase(), kind, status: status as OwnerSubmission['status'], venue_id: typeof venue === 'string' ? venue.toLowerCase() : null,
     name: item.name as string, city: item.city as string, created_at: created };
 }
@@ -95,22 +96,27 @@ async function failure(response: Response): Promise<OwnerFailure> {
   return { kind: 'unavailable', retryAfterSeconds: retryAfter(response, null) };
 }
 
-async function send(transport: OwnerTransport, url: string, init: RequestInit): Promise<Response | OwnerFailure> {
+// Tagged, never `instanceof Response`: on iOS, expo/fetch returns a FetchResponse that
+// implements Response without extending React Native's global Response class.
+type Sent = { response: Response } | { failure: OwnerFailure };
+
+async function send(transport: OwnerTransport, url: string, init: RequestInit): Promise<Sent> {
   let token: string | null;
   try { token = await transport.accessToken(); } catch { token = null; }
   // Owner commands are never anonymous; the server verifies this token itself.
-  if (!token) return { kind: 'sign_in', retryAfterSeconds: null };
+  if (!token) return { failure: { kind: 'sign_in', retryAfterSeconds: null } };
   try {
-    return await transport.fetch(url, { ...init, headers: { ...init.headers, apikey: transport.apiKey, Accept: 'application/json', Authorization: `Bearer ${token}` } });
+    return { response: await transport.fetch(url, { ...init, headers: { ...init.headers, apikey: transport.apiKey, Accept: 'application/json', Authorization: `Bearer ${token}` } }) };
   } catch (error) {
     if (init.signal?.aborted) throw error;
-    return { kind: 'network', retryAfterSeconds: null };
+    return { failure: { kind: 'network', retryAfterSeconds: null } };
   }
 }
 
 async function lookup<T>(transport: OwnerTransport, params: URLSearchParams, field: string, parse: (raw: unknown) => T, signal?: AbortSignal): Promise<OwnerOutcome<T>> {
-  const response = await send(transport, `${transport.endpoint}?${params.toString()}`, { method: 'GET', signal });
-  if (!(response instanceof Response)) return { ok: false, failure: response };
+  const sent = await send(transport, `${transport.endpoint}?${params.toString()}`, { method: 'GET', signal });
+  if ('failure' in sent) return { ok: false, failure: sent.failure };
+  const { response } = sent;
   if (!response.ok) return { ok: false, failure: await failure(response) };
   try { return { ok: true, value: parse(record(await response.json())[field]) }; }
   catch (error) {
@@ -135,8 +141,9 @@ export async function submitOwner(transport: OwnerTransport, request: OwnerSubmi
   const form = new FormData();
   form.append('submission', JSON.stringify(request));
   form.append('evidence', transport.evidencePart(evidence));
-  const response = await send(transport, transport.endpoint, { method: 'POST', body: form });
-  if (!(response instanceof Response)) return { ok: false, failure: response };
+  const sent = await send(transport, transport.endpoint, { method: 'POST', body: form });
+  if ('failure' in sent) return { ok: false, failure: sent.failure };
+  const { response } = sent;
   try {
     if (response.status === 409) {
       const body = record(await response.clone().json());
@@ -178,4 +185,6 @@ export function ownerFailureMessage(failure: OwnerFailure): string {
         case 'invalid_evidence': return 'Something in this submission couldn’t be accepted. Check the details and try again.';
       }
   }
+  // Never render a blank failure, even for an unexpected value at runtime.
+  return 'Something went wrong. Nothing was submitted; try again shortly.';
 }
