@@ -30,6 +30,7 @@ export async function handleDirectoryPost(request: Request, operation: 'save' | 
     })();
     if (result.error) {
       const code = result.error.code;
+      if (result.error.hint === 'court_allocated') throw new RequestError(409, 'A court with upcoming blocks or bookings can’t be made inactive. Release them first.');
       if (code === '42501') throw new RequestError(403, 'Administrator access required.');
       if (code === '40001') throw new RequestError(409, 'This listing changed. Reload it before saving again.');
       if (code === '23505') throw new RequestError(409, operation === 'import' ? 'An import reference has different data. Edit its existing listing instead.' : 'A court name already exists. Use a unique name.');

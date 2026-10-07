@@ -9,7 +9,10 @@ export type DirectoryAuditAction =
   | 'owner.photo_add'
   | 'owner.photo_remove'
   | 'schedule.update'
-  | 'policy.update';
+  | 'policy.update'
+  | 'allocation.block'
+  | 'allocation.release'
+  | 'schedule.court_update';
 
 /** Safe audit projection; no request bodies, evidence, names or credentials. */
 export type DirectoryAuditEvent = {

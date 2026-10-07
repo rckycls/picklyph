@@ -37,7 +37,7 @@ export function OwnedVenuesScreen({ includeTop = false }: { includeTop?: boolean
 
   return (
     <OwnerScreen includeTop={includeTop}>
-      <Text style={screenText.body}>Venues pickly has verified you manage. Edit details, courts and photos; players see changes right away.</Text>
+      <Text style={screenText.body}>Venues pickly has verified you manage. Run each court’s calendar, set hours and closures, and edit details, courts and photos.</Text>
       {venues.status === 'loading' && (
         <View style={styles.row} accessibilityLiveRegion="polite">
           <ActivityIndicator color={colors.primary} accessible={false} />
@@ -67,10 +67,14 @@ export function OwnedVenuesScreen({ includeTop = false }: { includeTop?: boolean
               {venue.city}, {venue.province} · {venue.active_court_count === 1 ? '1 active court' : `${venue.active_court_count} active courts`} · {venue.photo_count === 1 ? '1 photo' : `${venue.photo_count} photos`}
             </Text>
             {status.note && <Text style={screenText.body}>{status.note}</Text>}
-            {venue.editable && (
-              <Button label="Edit venue" accessibilityLabel={`Edit ${venue.name}`}
+            {venue.editable && <>
+              <Button label="Court calendar" accessibilityLabel={`Court calendar for ${venue.name}`}
+                onPress={() => router.push({ pathname: '/owner/calendar/[id]', params: { id: venue.id } })} />
+              <Button label="Hours and closures" variant="secondary" accessibilityLabel={`Hours and closures for ${venue.name}`}
+                onPress={() => router.push({ pathname: '/owner/hours/[id]', params: { id: venue.id } })} />
+              <Button label="Edit venue" variant="secondary" accessibilityLabel={`Edit ${venue.name}`}
                 onPress={() => router.push({ pathname: '/owner/venues/[id]', params: { id: venue.id } })} />
-            )}
+            </>}
           </Card>
         );
       })}

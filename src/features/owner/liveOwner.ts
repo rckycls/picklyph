@@ -1,9 +1,12 @@
-import type { OwnerPhotoAdd, OwnerSubmission, OwnerSubmissionRequest, OwnerVenueSave, VenuePolicySave } from '@picklyph/domain';
+import type {
+  AllocationBlock, CourtHoursSave, OwnerPhotoAdd, OwnerSubmission, OwnerSubmissionRequest, OwnerVenueSave, ScheduleSave, VenuePolicySave,
+} from '@picklyph/domain';
 import { File as DeviceFile } from 'expo-file-system';
 
 import { fetchWithDeadline } from '@/lib/fetchWithDeadline';
 import { getSupabase } from '@/lib/supabase';
 
+import { blockCourt, loadCalendar, loadVenueSchedule, releaseBlock, saveCourtHours, saveVenueSchedule } from './calendarClient';
 import {
   findNearbyListings, parseMySubmissions, searchAddress, submitOwner,
   type EvidenceFile, type OwnerOutcome, type OwnerTransport,
@@ -12,11 +15,12 @@ import type { Pin } from './ownerForm';
 import {
   addVenuePhoto, listOwnedVenues, loadOwnedVenue, removeVenuePhoto, saveOwnedVenue,
   loadVenuePolicy, saveVenuePolicy,
-  type PhotoFile, type VenueTransport,
+  type OwnerHttpTransport, type PhotoFile, type VenueTransport,
 } from './venueClient';
 
 let transport: OwnerTransport | null | undefined;
 let venueTransport: VenueTransport | null | undefined;
+let scheduleTransport: OwnerHttpTransport | null | undefined;
 
 /** Public URL/key plus the signed-in user's token; every server secret stays in the function. */
 function liveTransport(): OwnerTransport | null {
@@ -57,6 +61,23 @@ function liveVenueTransport(): VenueTransport | null {
     venueTransport = null;
   }
   return venueTransport;
+}
+
+/** Same public URL/key and token for the owner-schedules function (calendar, blocks, hours). */
+function liveScheduleTransport(): OwnerHttpTransport | null {
+  if (scheduleTransport !== undefined) return scheduleTransport;
+  try {
+    const client = getSupabase();
+    scheduleTransport = {
+      endpoint: `${process.env.EXPO_PUBLIC_SUPABASE_URL?.trim() ?? ''}/functions/v1/owner-schedules`,
+      apiKey: process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim() ?? '',
+      accessToken: async () => (await client.auth.getSession()).data.session?.access_token ?? null,
+      fetch: (input, init) => fetchWithDeadline(input, init, 15_000),
+    };
+  } catch {
+    scheduleTransport = null;
+  }
+  return scheduleTransport;
 }
 
 const notConfigured = { ok: false, failure: { kind: 'not_configured', retryAfterSeconds: null } } as const;
@@ -131,4 +152,34 @@ export async function loadManagedVenueCount(): Promise<number | null> {
   } catch {
     return null;
   }
+}
+
+export function liveCalendar(venueId: string, startDate: string, days: number, signal?: AbortSignal): ReturnType<typeof loadCalendar> {
+  const live = liveScheduleTransport();
+  return live ? loadCalendar(live, venueId, startDate, days, signal) : Promise.resolve(notConfigured);
+}
+
+export function liveVenueSchedule(venueId: string, startDate: string, signal?: AbortSignal): ReturnType<typeof loadVenueSchedule> {
+  const live = liveScheduleTransport();
+  return live ? loadVenueSchedule(live, venueId, startDate, signal) : Promise.resolve(notConfigured);
+}
+
+export function liveSaveVenueSchedule(command: ScheduleSave, signal?: AbortSignal): ReturnType<typeof saveVenueSchedule> {
+  const live = liveScheduleTransport();
+  return live ? saveVenueSchedule(live, command, signal) : Promise.resolve(notConfigured);
+}
+
+export function liveSaveCourtHours(command: CourtHoursSave, signal?: AbortSignal): ReturnType<typeof saveCourtHours> {
+  const live = liveScheduleTransport();
+  return live ? saveCourtHours(live, command, signal) : Promise.resolve(notConfigured);
+}
+
+export function liveBlockCourt(command: AllocationBlock): ReturnType<typeof blockCourt> {
+  const live = liveScheduleTransport();
+  return live ? blockCourt(live, command) : Promise.resolve(notConfigured);
+}
+
+export function liveReleaseBlock(allocationId: string): ReturnType<typeof releaseBlock> {
+  const live = liveScheduleTransport();
+  return live ? releaseBlock(live, allocationId) : Promise.resolve(notConfigured);
 }

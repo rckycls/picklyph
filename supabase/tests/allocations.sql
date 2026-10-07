@@ -164,6 +164,10 @@ reset role;
 delete from private.venue_owners where user_id='71000000-0000-4000-8000-000000000001';
 select allocations_test.expect_error($q$select allocations_test.block('71000000-0000-4000-8000-000000000001','73000000-0000-4000-8000-000000000002','74000000-0000-4000-8000-000000000019',1140,1200)$q$,'42501','not_owner');
 select allocations_test.expect_error($q$select public.court_allocation_release('71000000-0000-4000-8000-000000000001',allocations_test.id('74000000-0000-4000-8000-000000000008'))$q$,'42501','not_owner');
+-- T22: a court with live inventory stays active, even for trusted SQL, until it is released.
+select allocations_test.expect_error($q$update public.courts set status='inactive' where id='73000000-0000-4000-8000-000000000002'$q$,'55006','court_allocated');
+select private.allocation_release(allocations_test.id('74000000-0000-4000-8000-000000000004')),
+  private.allocation_release(allocations_test.id('74000000-0000-4000-8000-000000000018'));
 update public.courts set status='inactive' where id='73000000-0000-4000-8000-000000000002';
 select allocations_test.expect_error($q$select allocations_test.block('71000000-0000-4000-8000-000000000003','73000000-0000-4000-8000-000000000002','74000000-0000-4000-8000-000000000019',1140,1200)$q$,'P0002','court_unavailable');
 update public.venues set publication_status='suspended' where id='72000000-0000-4000-8000-000000000001';

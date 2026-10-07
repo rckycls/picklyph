@@ -86,7 +86,7 @@ test('owners list, load and save their venue through the real handler contract',
 
 test('database rejections, limits, outages and bad input map to actionable owner messages', async () => {
   const command = plain(editor.saveCommand(editor.draftFrom(listing()), listing()).command);
-  for (const reason of ['version_conflict', 'not_owner', 'venue_unavailable', 'duplicate_court', 'active_court_required', 'too_many_courts']) {
+  for (const reason of ['version_conflict', 'not_owner', 'venue_unavailable', 'duplicate_court', 'active_court_required', 'too_many_courts', 'court_allocated']) {
     const result = await saveOwnedVenue(server({ save: async () => { throw new CommandRejected(reason); } }).transport, command);
     assert.equal(result.ok, false); assert.equal(result.failure.kind, 'rejected'); assert.equal(result.failure.reason, reason);
     assert.ok(venueFailureMessage(result.failure).length > 20);

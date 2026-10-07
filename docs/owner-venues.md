@@ -24,7 +24,7 @@ Owners can edit only their own **approved, verified** listings. The database che
 { "kind": "remove_photo", "venue_id": "<uuid>", "photo_id": "<uuid>" }
 ```
 
-Saves preserve the microseconds in `updated_at`; stale versions return 409 `version_conflict`. Reload the latest listing before reapplying edits. Existing courts retain IDs and are deactivated rather than deleted. Omitted courts stay untouched, a venue has at most 40 courts, and at least one must remain active. Court surfaces are `hard`, `synthetic`, `other` or null. T22 must add allocation protection before court deactivation can affect bookings.
+Saves preserve the microseconds in `updated_at`; stale versions return 409 `version_conflict`. Reload the latest listing before reapplying edits. Existing courts retain IDs and are deactivated rather than deleted. Omitted courts stay untouched, a venue has at most 40 courts, and at least one must remain active. Court surfaces are `hard`, `synthetic`, `other` or null. Since T22, a court with a live allocation (block, booking or unexpired hold) that has not ended cannot be deactivated: the save returns 409 `court_allocated` (a `courts` trigger enforces this on every path, including admin curation and trusted SQL). Release blocks in the owner calendar first.
 
 `POST` multipart contains exactly a `photo` JSON string (`venue_id`, `request_id`) and one `file`. Native uploads append an `expo-file-system` `File` and use `expo/fetch` through the existing deadline wrapper; never use `instanceof Response` in mobile code.
 

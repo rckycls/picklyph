@@ -36,3 +36,50 @@ test('schedule conflicts/permissions are actionable and unknown infrastructure e
   deps.save=async()=>{throw new Error('Sensitive infrastructure fixture');};const response=await createScheduleHandler(deps)(request());
   assert.equal(response.status,503);assert.equal(await response.text(),'{"error":"temporarily_unavailable"}');
 });
+const court='63000000-0000-4000-8000-000000000001';const requestId='64000000-0000-4000-8000-000000000001';
+const block={kind:'block',court_id:court,request_id:requestId,starts_at:'2026-10-09T08:00:00+08:00',ends_at:'2026-10-09T09:30:00+08:00'};
+const hours={kind:'save_court_hours',court_id:court,expected_revision:null,hours:{weekly:null,closures:['2026-10-12']}};
+const full=()=>({...base(),calendar:async()=>({courts:[]}),block:async()=>({outcome:'created'}),release:async()=>({outcome:'released'}),saveCourtHours:async()=>({revision:'1'})});
+test('calendar reads and inventory commands use the verified actor, owner limits and strict bodies',async()=>{
+  const seen=[];const deps=full();deps.limit=async(action,principal)=>{seen.push(action);assert.equal(principal.id,'verified-actor');return {allowed:true,headers:{}};};
+  deps.calendar=async(actor,venue,date,days)=>{seen.push([actor,venue,date,days]);return {courts:[]};};
+  deps.block=async(actor,c)=>{seen.push([actor,c.court_id,c.starts_at,c.ends_at]);return {outcome:'created'};};
+  deps.release=async(actor,allocation)=>{seen.push([actor,allocation]);return {outcome:'released'};};
+  deps.saveCourtHours=async(actor,c)=>{seen.push([actor,c.court_id,c.hours.closures]);return {revision:'1'};};
+  const handler=createScheduleHandler(deps);
+  const get=tail=>handler(new Request('https://schedule.local?'+tail,{headers:{authorization:'Bearer valid'}}));
+  assert.equal((await get(`venue_id=${id}&start_date=2026-10-09&days=7&section=calendar`)).status,200);
+  for(const tail of [`venue_id=${id}&start_date=2026-10-09&days=8&section=calendar`,`venue_id=${id}&start_date=2026-10-09&days=1&section=other`,
+    `venue_id=${id}&start_date=2099-12-30&days=3&section=calendar`,`venue_id=${id}&start_date=2026-10-09&days=1&section=calendar&actor_user_id=${id}`])
+    assert.equal((await get(tail)).status,400);
+  assert.equal((await handler(request(block))).status,200);
+  assert.equal((await handler(request({kind:'release_block',allocation_id:requestId}))).status,200);
+  assert.equal((await handler(request(hours))).status,200);
+  for(const body of [{...block,actor_user_id:id},{...block,starts_at:'2026-10-09T08:15:00+08:00'},{...block,kind:'rental'},{kind:'release_block',allocation_id:'nope'},
+    {kind:'release_block',allocation_id:requestId,court_id:court},{...hours,hours:{weekly:[],closures:[]}},{...hours,hours:{weekly:null,closures:['2026-02-30']}},
+    {...command,kind:'save_schedule'}])
+    assert.equal((await handler(request(body))).status,400);
+  assert.deepEqual(JSON.parse(JSON.stringify(seen)),['owner-read',['verified-actor',id,'2026-10-09',7],'owner-read','owner-read','owner-read','owner-read',
+    'owner-edit',['verified-actor',court,'2026-10-09T00:00:00.000Z','2026-10-09T01:30:00.000Z'],'owner-edit',['verified-actor',requestId],
+    'owner-edit',['verified-actor',court,['2026-10-12']],...Array(8).fill('owner-edit')]);
+});
+test('inventory writes fail closed on limiter outage and map inventory refusals',async()=>{
+  let blocks=0;const deps=full();deps.block=async()=>{blocks++;};
+  deps.limit=async()=>({allowed:false,status:503,headers:{'Retry-After':'5'}});
+  const bad=request(block);bad.body.getReader=()=>{throw new Error('Body must not be read');};
+  assert.equal((await createScheduleHandler(deps)(bad)).status,503);assert.equal(blocks,0);
+  deps.limit=async()=>({allowed:true,headers:{}});
+  for(const [reason,status] of [['allocation_conflict',409],['outside_hours',409],['request_reused',409],['court_unavailable',404],['not_owner',403]]){
+    deps.block=async()=>{throw new ScheduleRejected(reason);};
+    const response=await createScheduleHandler(deps)(request(block));assert.equal(response.status,status);assert.deepEqual(await response.json(),{error:reason});
+  }
+  deps.release=async()=>{throw new ScheduleRejected('managed_allocation');};
+  assert.equal((await createScheduleHandler(deps)(request({kind:'release_block',allocation_id:requestId}))).status,403);
+  deps.saveCourtHours=async()=>{throw new ScheduleRejected('hours_conflict');};
+  assert.equal((await createScheduleHandler(deps)(request(hours))).status,409);
+  deps.save=async()=>{throw new ScheduleRejected('hours_conflict');};
+  assert.equal((await createScheduleHandler(deps)(request())).status,409);
+  deps.calendar=async()=>{throw new Error('Sensitive infrastructure fixture');};
+  const hidden=await createScheduleHandler(deps)(new Request(`https://schedule.local?venue_id=${id}&start_date=2026-10-09&days=1&section=calendar`,{headers:{authorization:'Bearer valid'}}));
+  assert.equal(hidden.status,503);assert.equal(await hidden.text(),'{"error":"temporarily_unavailable"}');
+});

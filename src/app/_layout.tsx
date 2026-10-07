@@ -53,6 +53,8 @@ export default function RootLayout() {
             <Stack.Screen name="owner/claim/[id]" options={ownerHeader('Claim a listing')} />
             <Stack.Screen name="owner/venues/index" options={ownerHeader('Your venues')} />
             <Stack.Screen name="owner/venues/[id]" options={ownerHeader('Edit venue')} />
+            <Stack.Screen name="owner/calendar/[id]" options={ownerHeader('Court calendar')} />
+            <Stack.Screen name="owner/hours/[id]" options={ownerHeader('Hours and closures')} />
           </Stack>
         </OwnerModeProvider>
       </AuthProvider>

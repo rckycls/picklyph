@@ -27,16 +27,20 @@ export type VenueTransport = {
 export type VenueRejection =
   | 'invalid_request' | 'invalid_photo' | 'photo_dimensions' | 'photo_too_large' | 'unsupported_photo'
   | 'too_many_courts' | 'active_court_required' | 'account_required' | 'not_owner' | 'venue_unavailable'
-  | 'version_conflict' | 'duplicate_court' | 'too_many_photos' | 'request_reused' | 'merchant_inactive';
-export type VenueFailure =
+  | 'version_conflict' | 'duplicate_court' | 'too_many_photos' | 'request_reused' | 'merchant_inactive' | 'court_allocated';
+/** Transport for the owner JSON endpoints (owner-venues, owner-schedules). */
+export type OwnerHttpTransport = Pick<VenueTransport, 'endpoint' | 'apiKey' | 'accessToken' | 'fetch'>;
+export type HttpFailure<R extends string> =
   | { kind: 'sign_in' | 'network' | 'unavailable' | 'not_configured'; retryAfterSeconds: number | null }
   | { kind: 'rate_limited'; retryAfterSeconds: number }
-  | { kind: 'rejected'; reason: VenueRejection; retryAfterSeconds: null };
-export type VenueOutcome<T> = { ok: true; value: T } | { ok: false; failure: VenueFailure };
+  | { kind: 'rejected'; reason: R; retryAfterSeconds: null };
+export type HttpOutcome<T, R extends string> = { ok: true; value: T } | { ok: false; failure: HttpFailure<R> };
+export type VenueFailure = HttpFailure<VenueRejection>;
+export type VenueOutcome<T> = HttpOutcome<T, VenueRejection>;
 
 const REJECTIONS: readonly VenueRejection[] = ['invalid_request', 'invalid_photo', 'photo_dimensions', 'photo_too_large',
   'unsupported_photo', 'too_many_courts', 'active_court_required', 'account_required', 'not_owner', 'venue_unavailable',
-  'version_conflict', 'duplicate_court', 'too_many_photos', 'request_reused', 'merchant_inactive'];
+  'version_conflict', 'duplicate_court', 'too_many_photos', 'request_reused', 'merchant_inactive', 'court_allocated'];
 const unexpected = (): never => { throw new Error('Unexpected owner venue response.'); };
 const text = (value: unknown, max: number): value is string => typeof value === 'string' && value.length > 0 && value.length <= max;
 const id = (value: unknown): string => (typeof value === 'string' && UUID.test(value) ? value.toLowerCase() : unexpected());
@@ -99,20 +103,20 @@ function retryAfter(response: Response, fallback: number | null): number | null 
   return Math.min(Math.max(Number(raw), 1), 3600);
 }
 
-async function failure(response: Response): Promise<VenueFailure> {
+async function failure<R extends string>(response: Response, rejections: readonly R[]): Promise<HttpFailure<R>> {
   if (response.status === 401) return { kind: 'sign_in', retryAfterSeconds: null };
   if (response.status === 429) return { kind: 'rate_limited', retryAfterSeconds: retryAfter(response, 1) ?? 1 };
   let error: unknown;
   try { error = record(await response.json()).error; } catch { error = null; }
-  if (response.status < 500 && REJECTIONS.includes(error as VenueRejection)) return { kind: 'rejected', reason: error as VenueRejection, retryAfterSeconds: null };
+  if (response.status < 500 && rejections.includes(error as R)) return { kind: 'rejected', reason: error as R, retryAfterSeconds: null };
   return { kind: 'unavailable', retryAfterSeconds: retryAfter(response, null) };
 }
 
 // Tagged, never `instanceof Response`: on iOS, expo/fetch returns a FetchResponse that
 // implements Response without extending React Native's global Response class.
-type Sent = { response: Response } | { failure: VenueFailure };
+type Sent = { response: Response } | { failure: HttpFailure<never> };
 
-async function send(transport: VenueTransport, url: string, init: RequestInit): Promise<Sent> {
+async function send(transport: OwnerHttpTransport, url: string, init: RequestInit): Promise<Sent> {
   let token: string | null;
   try { token = await transport.accessToken(); } catch { token = null; }
   // Owner commands are never anonymous; the server verifies this token itself.
@@ -125,16 +129,22 @@ async function send(transport: VenueTransport, url: string, init: RequestInit): 
   }
 }
 
-async function call<T>(transport: VenueTransport, url: string, init: RequestInit, parse: (body: Record<string, unknown>) => T): Promise<VenueOutcome<T>> {
+/** One owner JSON request; `rejections` are the endpoint's actionable refusals (anything else is unavailable). */
+export async function ownerRequest<T, R extends string>(transport: OwnerHttpTransport, url: string, init: RequestInit,
+  parse: (body: Record<string, unknown>) => T, rejections: readonly R[]): Promise<HttpOutcome<T, R>> {
   const sent = await send(transport, url, init);
   if ('failure' in sent) return { ok: false, failure: sent.failure };
   const { response } = sent;
-  if (!response.ok) return { ok: false, failure: await failure(response) };
+  if (!response.ok) return { ok: false, failure: await failure(response, rejections) };
   try { return { ok: true, value: parse(record(await response.json())) }; }
   catch (error) {
     if (init.signal?.aborted) throw error;
     return { ok: false, failure: { kind: 'unavailable', retryAfterSeconds: null } };
   }
+}
+
+function call<T>(transport: VenueTransport, url: string, init: RequestInit, parse: (body: Record<string, unknown>) => T): Promise<VenueOutcome<T>> {
+  return ownerRequest(transport, url, init, parse, REJECTIONS);
 }
 
 const json = (body: unknown): RequestInit => ({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -198,6 +208,7 @@ export function venueFailureMessage(failure: VenueFailure): string {
         case 'not_owner': return 'You no longer manage this venue. Contact pickly support if this is a mistake.';
         case 'venue_unavailable': return 'This venue can’t be edited right now because it isn’t published. Contact pickly support.';
         case 'duplicate_court': return 'Another court at this venue already has that name. Give each court its own name.';
+        case 'court_allocated': return 'A court with upcoming blocks or bookings can’t be made inactive. Release its blocks in the calendar first.';
         case 'active_court_required': return 'Keep at least one court active. To close the venue, contact pickly support.';
         case 'too_many_courts': return 'A venue can list at most 40 courts.';
         case 'too_many_photos': return 'A venue can show up to 6 photos. Remove one before adding another.';

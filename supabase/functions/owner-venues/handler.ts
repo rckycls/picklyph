@@ -22,6 +22,7 @@ export const REJECTIONS: Record<string, { status: number; error: string }> = {
   venue_unavailable: { status: 404, error: 'venue_unavailable' },
   version_conflict: { status: 409, error: 'version_conflict' },
   duplicate_court: { status: 409, error: 'duplicate_court' },
+  court_allocated: { status: 409, error: 'court_allocated' },
   too_many_photos: { status: 409, error: 'too_many_photos' },
   request_reused: { status: 409, error: 'request_reused' },
 };
