@@ -1,6 +1,6 @@
 # HANDOFF: read this first
 
-**Updated:** 2026-10-07, Asia/Manila. **Plan:** Codex desktop / ChatGPT Plus; keep configured model. W3/W4 complete (7 points each). W5: T13, T14 and T16 complete (5/7); T15 implemented, device checks partly done. W6: T17–T20 complete (7/7). W7: T21–T23 complete (7/7), T24 next; W8 cards expanded. Outside the plan: Account tab redesigned as a profile page (b43e8d4). Hosted staging has T05/T08/T11–T13/T15/T17 plus `venue-search` and `owner-submissions`; T18–T23 are local only. Capacity remains 8; no actual usage-window end/limit signal. A few sessions/week, experienced user, no deadline.
+**Updated:** 2026-10-07, Asia/Manila. **Plan:** Codex desktop / ChatGPT Plus; keep configured model. W3/W4 complete (7 points each). W5: T13, T14 and T16 complete (5/7); T15 implemented, device checks partly done. W6: T17–T20 complete (7/7). W7: T21–T23 complete (7/7). W8: T24 complete (4/7), T25 next. Outside the plan: Account tab redesigned as a profile page (b43e8d4). Hosted staging has T05/T08/T11–T13/T15/T17 plus `venue-search` and `owner-submissions`; T18–T24 are local only. Capacity remains 8; no actual usage-window end/limit signal. A few sessions/week, experienced user, no deadline.
 
 ## Current state
 
@@ -119,6 +119,15 @@
 **Verify:** `npm run test:rentals:local`, `test:rentals`, `test:domain`, `test:directory`, `typecheck`, `lint`.
 **Evidence:** `test:rentals:local` → Docker SQL and real PostgreSQL schedule/policy races both orders, six retries, expired hold and later-failure rollback PASS twice, own fixtures removed; `test:rentals` 1, `test:domain` 43, `test:directory` 38, `typecheck`, `lint`, `bundle:ios` (1358 modules/3.7MB) → exit0. Local dry-run/application only `20261008090000`, no seeds/roles; final local dry-run up to date.
 
+## T24 rental lifecycle handoff
+
+**Built:** Guarded arrival rental quote/request/accept/decline/cancel/expire API; instant firm confirmation, approval holds capped at two hours/start; self history/detail and current-owner pending requests. Immutable T23 snapshots and private lifecycle events commit atomically. Elapsed holds read expired and free inventory without cron.
+**Files/APIs:** `20261008120000_rental_bookings.sql`; `supabase/functions/rental-bookings/`; `packages/domain/src/rentalBooking.ts`; `docs/rental-bookings.md`; `rental_booking_quote|request|change|read` service-only RPCs.
+**Decisions:** Required exact review token (total plus schedule/court/policy revisions); stale review409. Per-player/request advisory lock protects cross-court retries. New request/accept fails closed; release/read continues during Redis outage. Current venue link required, never admin/moderator role alone.
+**Gotchas:** Local only; no payment execution, native UI, outbox or hosted deployment. History uses ascending UUID pages25; refresh page one for new bookings. Owner decline/read and player cancellation work during suspension. Events/snapshots cascade; T47 retention pending.
+**For T25:** Fetch quote, review full total/policy, send `expected_quote`; keep original body/request UUID on uncertain replies. Read authoritative booking status; confirmation remains unpaid. T26 expands races; T32 adds cleanup.
+**Evidence:** `test:bookings`4, `test:domain`45, `test:directory`42, `test:auth`16, `test:owner`18, `test:functions`1; `test:bookings:local` Docker SQL + real Auth/handler/PostgREST retries/overlap/cross-court/accept-cancel/waited-expiry/stale-editor/revocation/suspension and served Edge forgedJWT401/outagehold503/cancel200 PASS; `test:rentals:local` PASS; fixtures/env/child removed. `typecheck`, `lint`, `admin:typecheck`, `functions:check`, `functions:lint`, `bundle:ios` (1359 modules/3.7MB) exit0. Local migration dry-run/application only20261008120000, no seeds/roles; final dry-run up to date.
+
 ## Account profile redesign handoff (outside the plan)
 
 **Built:** User-requested restyle of the Account tab from stacked cards into a profile page: a compact navy court hero (lime pickleball avatar with initials, name, email, Player/Court owner/Joined chips; Venues · Submitted · In review stats only when there is something to count), a Player/Owner segmented switch for verified owners (replaces the "Your context" card), and settings-style grouped rows (Your venues, Your submissions, Account details, sign-out). Guests get a guest hero above `SignInForm`. An Edit sheet (iOS page sheet) sets `profiles.display_name`; empty clears it. Without a saved name, the hero shows a name derived from the email (Apple relay addresses → "Pickly player").
@@ -137,7 +146,7 @@
 
 ## Next
 
-1. **T24 next** (private-booking requests/acceptance/expiry API); W8 cards expanded. Read only its listed context. T18–T23 hosted migrations/functions and physical iPhone acceptance (including the T22 calendar/hours screens) remain separate. Future management screens use `VerifiedOwnerGate`; submission/claim screens remain auth-only. Use `expo-file-system` `File` upload parts.
+1. **T25 next** (private-rental selection and booking/history screens). Read only its listed context, including `docs/rental-bookings.md` and `rentalBooking.ts`. T18–T24 hosted migrations/functions and physical iPhone acceptance (including the T22 calendar/hours screens) remain separate. Future management screens use `VerifiedOwnerGate`; submission/claim screens remain auth-only. Use `expo-file-system` `File` upload parts.
 2. **Device checks still open** on the installed EAS build: T15 address-search results, the submissions list, the duplicate warning and claiming (a published staging test venue now exists); T16 recovery states; T02 navigation/VoiceOver/large text; the redesigned Account page (hero, Player/Owner switch, display-name save against staging). T14 accepted 2026-10-07.
 3. **Staging:** first admin assigned by operator SQL; one published test venue; the console runs locally against staging (`ADMIN_SUPABASE_SECRET_KEY` in the ignored `apps/admin/.env.local`), not hosted yet. H06 (owner claim/review trial) can run now; the reviewer must differ from the submitter. Decide whether public contact fields belong in a later directory task. H02: production Redis, hosted outage/isolation and per-IP ingress checks remain.
 4. T09 rules are ready for later commands; use server-derived clocks. T46 must review moderator audit permissions and replace unaudited `set_verified_venue_owner` revocation; T47 must define audit UUID and evidence retention.

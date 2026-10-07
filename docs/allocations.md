@@ -1,6 +1,6 @@
 # Shared court allocations (T21)
 
-`private.court_allocations` is the single authoritative court inventory. Owner blocks (outside bookings, maintenance, walk-ins), private rentals and open-play sessions all consume the same rows. T21 adds the table, server-only primitives, owner/admin block commands and tests; T22 adds court hours, the owner calendar, the Edge wiring and displacement guards. T23 adds immutable rental price/policy snapshots; booking lifecycles (T24+) and scheduled cleanup (T32) are later tasks. Redis never locks or caches inventory.
+`private.court_allocations` is the single authoritative court inventory. Owner blocks (outside bookings, maintenance, walk-ins), private rentals and open-play sessions all consume the same rows. T21 adds the table, server-only primitives, owner/admin block commands and tests; T22 adds court hours, the owner calendar, the Edge wiring and displacement guards. T23 adds immutable rental price/policy snapshots; T24 adds the [arrival rental lifecycle](rental-bookings.md). Scheduled cleanup (T32) remains separate. Redis never locks or caches inventory.
 
 ## Model
 

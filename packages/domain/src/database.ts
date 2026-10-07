@@ -10,6 +10,7 @@ import type { ScheduleView, VenueSchedule } from './schedule.ts';
 import type { VenuePolicy, VenuePolicyView } from './policy.ts';
 import type { AllocationRange, AllocationResult } from './allocation.ts';
 import type { CalendarView, CourtHours, CourtHoursView } from './calendar.ts';
+import type { RentalBooking, RentalBookingPage, RentalBookingResult, RentalQuote, RentalQuoteVersion } from './rentalBooking.ts';
 
 // Schema-maintained PostgREST contract for the directory, authorization, owner-submission, ownership-review and owner-venue migrations.
 // Only the exposed public schema belongs in mobile code. PostGIS geometry is
@@ -63,6 +64,10 @@ export interface Database {
     };
     Views: { [_ in never]: never };
     Functions: {
+      rental_booking_quote: { Args: { actor_user_id: string; target_court_id: string; starts: string; ends: string }; Returns: RentalQuote };
+      rental_booking_request: { Args: { actor_user_id: string; target_court_id: string; request_id: string; starts: string; ends: string; expected_quote: RentalQuoteVersion }; Returns: RentalBookingResult };
+      rental_booking_change: { Args: { actor_user_id: string; target_booking_id: string; command: string }; Returns: RentalBookingResult };
+      rental_booking_read: { Args: { actor_user_id: string; target_booking_id?: string | null; target_venue_id?: string | null; after_id?: string | null }; Returns: RentalBookingPage | { booking: RentalBooking } };
       venues_in_bounds: { Args: MapBounds; Returns: VenueMapPin[] };
       directory_search: { Args: { search: VenueSearch }; Returns: VenueSearchPage };
       my_account_access: { Args: Record<PropertyKey, never>; Returns: AccountAccess[] };

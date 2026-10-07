@@ -84,13 +84,14 @@ gates are independent of the shared horizon default.
 Migration `20261008090000_rental_snapshots.sql` adds transaction-only helpers and
 `private.rental_snapshots`, keyed by allocation ID. All API roles, including
 `service_role`, have no table access or helper execution. RLS is enabled; a
-trigger refuses snapshot updates. No player RPC or booking endpoint exists yet.
+trigger refuses snapshot updates. T24 now wraps these helpers with guarded
+arrival booking commands; see [rental booking API](rental-bookings.md).
 
 `private.rental_acquire(actor_user_id, court_id, starts, ends, hold_until, request)`
 returns `{outcome, allocation, snapshot}`. It acquires a T21 rental allocation,
 then calls `private.rental_snapshot_create(allocation_id)` in the same transaction.
 Validation, pricing or later booking-command failure rolls both writes back.
-The future T24 command must derive actor from verified Auth; the private primitive
+The T24 command derives actor from verified Auth; the private primitive
 only verifies that the player account exists. It is not an exposed Auth boundary.
 
 New snapshots require an approved/verified venue with an owner link, active
@@ -130,7 +131,7 @@ original allocation and snapshot even after release/expiry, without reviving
 inventory. Changed acquisition parameters fail `request_reused`. An old snapshot
 does not promise that a booking is live or merchant still eligible for checkout.
 
-**T24 contract:** call `rental_acquire` inside one authorized booking transaction
+**T24 contract (implemented):** call `rental_acquire` inside one authorized booking transaction
 after the fail-closed `hold-create` Upstash guard. Apply effective policy and hold
 choice under these same locks, persist lifecycle/audit rows, and return stored
 snapshots on retries. Never trust client totals, policy or clocks. If offering a

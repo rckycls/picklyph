@@ -24,6 +24,8 @@ export { MANILA_TIME_ZONE, RENTAL_INCREMENT_MINUTES, MINIMUM_RENTAL_MINUTES, BOO
 export type { Instant, ManilaDateTime, RentalValidation } from './booking';
 export { RENTAL_PRICING, RentalRuleError, requireRentalWindow, priceRental } from './rental';
 export type { RentalPriceBand, RentalPrice, RentalSnapshot } from './rental';
+export { RentalInputError, readRentalCommand, readRentalQuery } from './rentalBooking';
+export type { RentalQuoteVersion, RentalQuote, RentalBooking, RentalBookingResult, RentalBookingPage, RentalRequest, RentalChange, RentalCommand, RentalQuery } from './rentalBooking';
 export { ScheduleInputError, scheduleDate, readVenueSchedule, resolveVenueSchedule, readScheduleSave, readScheduleQuery } from './schedule';
 export type { RateBand, OpeningWindow, ScheduleException, VenueSchedule, ScheduleInterval, ScheduleView, ScheduleSave } from './schedule';
 export { ALLOCATION_INCREMENT_MINUTES, MAX_ALLOCATION_MINUTES, MAX_HOLD_MINUTES, MAX_ALLOCATION_RANGE_DAYS, AllocationInputError, readAllocationBlock, readAllocationRangeQuery, allocationsOverlap, isLiveAllocation, holdUntil } from './allocation';
