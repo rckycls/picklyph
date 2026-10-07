@@ -22,6 +22,8 @@ export type { ClaimReview, OwnershipDecision, OwnershipDecisionResult, Ownership
 export { PHP_CURRENCY, CENTAVOS_PER_PESO, isPhpCentavos, assertPhpCentavos, pesosToCentavos, formatPhpCentavos } from './money';
 export { MANILA_TIME_ZONE, RENTAL_INCREMENT_MINUTES, MINIMUM_RENTAL_MINUTES, BOOKING_HORIZON_DAYS, toUtcIso, toManilaDateTime, fromManilaDateTime, formatManilaDateTime, validateRentalWindow } from './booking';
 export type { Instant, ManilaDateTime, RentalValidation } from './booking';
+export { RENTAL_PRICING, RentalRuleError, requireRentalWindow, priceRental } from './rental';
+export type { RentalPriceBand, RentalPrice, RentalSnapshot } from './rental';
 export { ScheduleInputError, scheduleDate, readVenueSchedule, resolveVenueSchedule, readScheduleSave, readScheduleQuery } from './schedule';
 export type { RateBand, OpeningWindow, ScheduleException, VenueSchedule, ScheduleInterval, ScheduleView, ScheduleSave } from './schedule';
 export { ALLOCATION_INCREMENT_MINUTES, MAX_ALLOCATION_MINUTES, MAX_HOLD_MINUTES, MAX_ALLOCATION_RANGE_DAYS, AllocationInputError, readAllocationBlock, readAllocationRangeQuery, allocationsOverlap, isLiveAllocation, holdUntil } from './allocation';

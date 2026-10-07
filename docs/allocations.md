@@ -1,6 +1,6 @@
 # Shared court allocations (T21)
 
-`private.court_allocations` is the single authoritative court inventory. Owner blocks (outside bookings, maintenance, walk-ins), private rentals and open-play sessions all consume the same rows. T21 adds the table, server-only primitives, owner/admin block commands and tests; T22 adds court hours, the owner calendar, the Edge wiring and displacement guards. Rental snapshots (T23), booking lifecycles (T24+) and any scheduled cleanup (T32) are later tasks. Redis never locks or caches inventory.
+`private.court_allocations` is the single authoritative court inventory. Owner blocks (outside bookings, maintenance, walk-ins), private rentals and open-play sessions all consume the same rows. T21 adds the table, server-only primitives, owner/admin block commands and tests; T22 adds court hours, the owner calendar, the Edge wiring and displacement guards. T23 adds immutable rental price/policy snapshots; booking lifecycles (T24+) and scheduled cleanup (T32) are later tasks. Redis never locks or caches inventory.
 
 ## Model
 
@@ -47,7 +47,8 @@ Service-role RPCs for owners/admins, with the same editors and locks as T19 sche
 ## For later tasks
 
 - **T22 (done):** court hours/closures, owner calendar and Edge wiring. Venue schedule saves and court-hours saves refuse to leave any live, unended allocation outside its court's hours (`hours_conflict`); a `courts` trigger refuses deactivating a court with one (`court_allocated`). Both run under the venue editor lock that every acquisition shares first.
-- **T23/T24/T27:** authorize the player (approved, verified, configured, not suspended) and call `allocation_acquire` with `rental`/`session` in the booking transaction. Apply the `hold-create` Upstash guard (fail closed) before it. Snapshot prices/policies separately.
+- **T23 (done)/T24:** `private.rental_acquire` atomically acquires a rental and stores its immutable price/policy snapshot. All API roles are denied execution; T24 must invoke it inside its guarded, authorized booking transaction. See [rental snapshot contract](booking-rules.md#authoritative-rental-snapshots-t23). Generic allocation primitives alone do not create snapshots.
+- **T27:** authorize the player (approved, verified, configured, not suspended), call `allocation_acquire` with `session` inside its transaction and snapshot session prices/policy. Apply the fail-closed `hold-create` Upstash guard before inventory creation.
 - **T47:** `requested_by` has no FK (retention policy pending); deleting a venue or court cascades to its rows.
 
 ## Verification and rollout

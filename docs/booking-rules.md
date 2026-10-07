@@ -21,8 +21,8 @@ calculate a stored amount by rounding a floating-point peso value.
 `formatPhpCentavos(125050)` returns `₱1,250.50`. It groups whole pesos with an
 explicit English Philippine locale and formats the centavo remainder separately
 so even the maximum safe integer retains its exact cents. Display strings are
-not payment-provider payloads. Rate calculations, provider amount limits,
-price snapshots and payment/refund policy remain later tasks.
+not payment-provider payloads. T23 adds checked rental prices and immutable
+snapshots below. Provider amount limits and payment/refund execution remain later tasks.
 
 ## Instants and Manila display
 
@@ -75,8 +75,73 @@ feedback; future booking commands must validate again during their transaction.
   `invalid_time`, `start_not_future`, `outside_horizon`, `minimum_duration` or
   `duration_increment`. Checks run in that order for deterministic feedback.
 
-Start-slot alignment, opening hours, overnight schedules, closures, owner
-authorization, rate calculations and availability require later schedule and
-transactional inventory checks. T09 does not implement bookings, holds,
-cancellation/refunds or payments. The T06 provider/refund activation gates are
-independent of the shared horizon default.
+T23 adds start-slot alignment, opening/rate coverage and price/policy snapshots
+below. T09 alone does not check inventory. The T06 provider/refund activation
+gates are independent of the shared horizon default.
+
+## Authoritative rental snapshots (T23)
+
+Migration `20261008090000_rental_snapshots.sql` adds transaction-only helpers and
+`private.rental_snapshots`, keyed by allocation ID. All API roles, including
+`service_role`, have no table access or helper execution. RLS is enabled; a
+trigger refuses snapshot updates. No player RPC or booking endpoint exists yet.
+
+`private.rental_acquire(actor_user_id, court_id, starts, ends, hold_until, request)`
+returns `{outcome, allocation, snapshot}`. It acquires a T21 rental allocation,
+then calls `private.rental_snapshot_create(allocation_id)` in the same transaction.
+Validation, pricing or later booking-command failure rolls both writes back.
+The future T24 command must derive actor from verified Auth; the private primitive
+only verifies that the player account exists. It is not an exposed Auth boundary.
+
+New snapshots require an approved/verified venue with an owner link, active
+court, configured schedule and live allocation. The DB clock is read after
+venue→court→allocation locks (and a merchant read lock). T09's strict future
+start, inclusive rolling 60×24-hour start horizon, one-hour minimum and exact
+30-minute duration increments apply. T21 also requires half-hour boundary marks,
+maximum 24 hours and Manila 2000–2099 limits. SQL `validate_rental_window` and
+shared `requireRentalWindow` express the combined rules; the generic allocator
+can reject malformed inventory boundaries first with `invalid_input`.
+
+Prices use **current resolved court hours**, including narrowed court windows,
+closures, special rates and overnight spill. SQL `rental_price` and shared
+`priceRental` clip ordered rate intervals to the rental, reject gaps/overlaps or
+invalid rates, and calculate exactly:
+
+`total_centavos = floor((sum(hourly_centavos × duration_minutes) + 30) / 60)`
+
+SQL uses exact numeric arithmetic; TypeScript uses BigInt. Round half up **once
+on the total**, never per band: two half hours at 1 centavo/hour cost 1 centavo,
+regardless of a rate or midnight split. Zero rates are allowed. Inputs and rounded
+totals must fit nonnegative safe integer centavos; excess totals fail
+`price_overflow` before commit. Bands store rates and minutes without rounded
+subtotals. Pricing ID: `hourly_prorated_half_up_total_v1`.
+
+`RentalSnapshot` includes version 1, allocation/venue/court IDs, UTC start/end and
+DB creation time, currency/pricing ID, minutes, total, clipped bands and independent
+schedule/court-hours/policy revision strings. Its effective policy contains
+confirmation/payment and merchant-active state (inactive merchants force arrival),
+plus the locked 24-hour player-refund cutoff, 120-minute approval hold maximum and
+15-minute payment hold maximum. These constants do not execute refunds or choose
+a booking's expiry.
+
+Rate/policy edits serialize with creation through the venue lock. Waiting rentals
+see committed edits. Existing snapshots remain unchanged; retries return the
+original allocation and snapshot even after release/expiry, without reviving
+inventory. Changed acquisition parameters fail `request_reused`. An old snapshot
+does not promise that a booking is live or merchant still eligible for checkout.
+
+**T24 contract:** call `rental_acquire` inside one authorized booking transaction
+after the fail-closed `hold-create` Upstash guard. Apply effective policy and hold
+choice under these same locks, persist lifecycle/audit rows, and return stored
+snapshots on retries. Never trust client totals, policy or clocks. If offering a
+client quote, compare its version/total under the locks and reject stale quotes
+before commit. Generic `allocation_acquire` does not automatically create a
+snapshot: rental commands must use this wrapper. T35 must also check current
+merchant activation/payment eligibility. Snapshots cascade with allocation
+deletion; T47 must establish retention before account/directory deletion ships.
+
+**Verify:** `npm run test:domain`, `npm run test:rentals` and
+`npm run test:rentals:local`. The local suite uses real Docker PostgreSQL sessions,
+checks both lock orders for schedule/policy races, six concurrent retries and
+surrounding-command rollback, and removes its own fixtures/accounts. Migration
+applied locally only; hosted rollout remains separate.
