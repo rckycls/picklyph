@@ -172,13 +172,15 @@ test('failures clear search results but keep loaded pages when only load-more fa
   assert.match(resultsSummary(empty), /No approved venues/);
 });
 
-test('every listing state offers contact/directions copy and never booking', () => {
-  for (const claim of ['unclaimed', 'pending', 'verified']) {
+test('unverified listings stay contact-only; verified listings defer rental availability to the server', () => {
+  for (const claim of ['unclaimed', 'pending']) {
     const notice = listingNotice(claim);
     assert.match(notice.text, /Contact the venue directly/);
     assert.match(notice.text, /can’t be booked|isn’t available/);
     assert.match(markerDescription(claim), /Not bookable/);
   }
+  assert.match(listingNotice('verified').text, /Availability is checked when you reserve/);
+  assert.match(markerDescription('verified'), /availability checked by the server/);
   assert.equal(listingNotice('unclaimed').badge, 'Unclaimed listing');
   const links = directionsLinks(14.5995, 120.9842);
   assert.equal(new URL(links.apple).searchParams.get('daddr'), '14.599500,120.984200');
@@ -188,7 +190,7 @@ test('every listing state offers contact/directions copy and never booking', () 
   assert.equal(courtSummary({ surface: null, is_indoor: true, is_covered: true }), 'Indoor');
 });
 
-test('the venue card always says not bookable/contact the venue and keeps the selected pin above it', () => {
+test('unverified venue caption stays contact-only and selection keeps the pin above the card', () => {
   assert.match(NOT_BOOKABLE_CAPTION, /Not bookable/);
   assert.match(NOT_BOOKABLE_CAPTION, /Contact the venue directly/);
   assert.equal(courtCount(1), '1 court'); assert.equal(courtCount(3), '3 courts');

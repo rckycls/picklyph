@@ -80,7 +80,8 @@ export function VenueSheet({ venue, onClose, onMissing }: { venue: VenueSearchIt
               </>}
           </View>
           <Text accessibilityLiveRegion="polite" style={styles.caption}>
-            {missing ? 'This venue is no longer in the approved directory. It has been removed from your results.' : NOT_BOOKABLE_CAPTION}
+            {missing ? 'This venue is no longer in the approved directory. It has been removed from your results.'
+              : current?.claim_status === 'verified' ? 'Review a court rental below. Availability and price are checked by the server.' : NOT_BOOKABLE_CAPTION}
           </Text>
 
           {detail.status === 'loading' && (
@@ -101,6 +102,9 @@ export function VenueSheet({ venue, onClose, onMissing }: { venue: VenueSearchIt
 
           {current && (
             <>
+              {current.claim_status === 'verified' && current.courts.length > 0 && <Button
+                label={signedIn ? 'Choose a court & time' : 'Sign in to reserve a court'} variant="accent"
+                onPress={() => router.push({ pathname: '/rental/venue/[id]', params: { id: current.id } })} />}
               <View style={styles.actions}>
                 <Button
                   label="Apple Maps"

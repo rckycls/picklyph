@@ -137,6 +137,30 @@ async function main() {
     assert.equal((await get(1,{section:'quote',court_id:courts[0],starts_at:at(930),ends_at:at(990)})).status,404);
     assert.equal((await change(1,'cancel',revoked.id)).status,200);
     psql(`update public.venues set publication_status='approved' where id='${venue}';`);
+    // T25: exercise the actual mobile parser/journal against verified Auth + real PostgreSQL.
+    const mobile=require('../../src/features/rental/__tests__/helpers.cjs');
+    const store=mobile.memory();let loseMobileReply=true;
+    const mobileTransport={endpoint:'https://rental.local',apiKey:config.ANON_KEY,accessToken:async()=>sessions[1].access_token,
+      fetch:async(url,init)=>{
+        const response=await handler(new Request(url,init));
+        if(init.method==='POST'&&JSON.parse(init.body).kind==='request'&&loseMobileReply){loseMobileReply=false;throw new Error('Lost reply after commit');}
+        return {ok:response.ok,status:response.status,headers:response.headers,json:()=>response.json()};
+      }};
+    const mobileWindow={court_id:courts[0],starts_at:at(1080),ends_at:at(1170)};
+    const mobileQuote=await mobile.client.loadQuote(mobileTransport,mobileWindow);assert.equal(mobileQuote.ok,true,'Mobile quote parser');
+    const mobileCommand=mobile.model.reviewedRequest(mobileQuote.value,randomUUID());
+    const journal=mobile.createAttemptJournal(store,'local.player');
+    assert.equal((await journal.run(mobileCommand,c=>mobile.client.requestRental(mobileTransport,c))).failure.kind,'network');
+    const restoredJournal=mobile.createAttemptJournal(store,'local.player');
+    const recovered=await restoredJournal.run(await restoredJournal.read(),c=>mobile.client.requestRental(mobileTransport,c));
+    assert.equal(recovered.ok,true,'Mobile recovered reply');assert.equal(recovered.value.outcome,'existing');assert.equal(recovered.value.booking.status,'pending');
+    assert.equal(psql(`select count(*) from private.court_allocations where requested_by='${users[1]}' and request_id='${mobileCommand.request_id}'`),'1');
+    assert.equal(await restoredJournal.read(),null);
+    const mobileCancel=await mobile.client.cancelRental(mobileTransport,recovered.value.booking.id);assert.equal(mobileCancel.ok,true);assert.equal(mobileCancel.value.booking.status,'cancelled');
+    assert.deepEqual(mobile.plain(mobileCancel.value.booking.snapshot),mobile.plain(recovered.value.booking.snapshot));
+    const mobileHistory=await mobile.client.loadHistory(mobileTransport,null);assert.equal(mobileHistory.ok,true,'Mobile history parser');
+    assert.ok(mobileHistory.value.bookings.some(b=>b.status==='expired'));assert.ok(mobileHistory.value.bookings.some(b=>b.id===recovered.value.booking.id));
+    console.log('PASS: T25 actual mobile quote/history/status parsers, durable lost-reply recovery with one allocation, unpaid approval and cancellation with unchanged snapshot.');
     const servedCancel=await reserve(930);const countBefore=psql(`select count(*) from private.court_allocations where venue_id='${venue}'`);
     console.log('PASS: Owner revocation/admin-role isolation, suspended request/accept refusal and suspended player cancellation.');
 

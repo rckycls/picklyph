@@ -5,7 +5,7 @@ import type { SearchFailure } from './searchClient';
 
 type Notice = { badge: string; tone: 'neutral' | 'pending' | 'success'; text: string };
 
-// No listing is bookable until a later task adds owner schedules; a verified claim never implies booking.
+// A verified claim permits a rental selection; only the booking server decides eligibility and inventory.
 export function listingNotice(claim: VenueClaimStatus): Notice {
   switch (claim) {
     case 'unclaimed':
@@ -13,15 +13,15 @@ export function listingNotice(claim: VenueClaimStatus): Notice {
     case 'pending':
       return { badge: 'Ownership under review', tone: 'pending', text: 'An ownership claim is being reviewed. Booking isn’t available in pickly yet. Contact the venue directly before you go.' };
     case 'verified':
-      return { badge: 'Verified owner', tone: 'success', text: 'The owner has verified this listing. Booking isn’t available for this venue yet. Contact the venue directly before you go.' };
+      return { badge: 'Verified owner', tone: 'success', text: 'The owner has verified this listing. Choose a court and time to check the rental price and policy. Availability is checked when you reserve.' };
   }
 }
 
-/** One line every venue card shows: nothing here is bookable yet. */
+/** Unverified listings remain contact-only. */
 export const NOT_BOOKABLE_CAPTION = 'Not bookable in pickly yet. Contact the venue directly before you go.';
 
 export function markerDescription(claim: VenueClaimStatus): string {
-  return `${listingNotice(claim).badge}. Not bookable in pickly.`;
+  return `${listingNotice(claim).badge}. ${claim === 'verified' ? 'Rental eligibility and availability checked by the server.' : 'Not bookable in pickly.'}`;
 }
 
 export function courtCount(count: number): string {
