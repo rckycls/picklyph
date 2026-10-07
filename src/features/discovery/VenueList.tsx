@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/Button';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { colors } from '@/theme/colors';
 import { fonts } from '@/theme/typography';
+import { PicklyMascot } from '@/components/mascot/PicklyMascot';
+import { useDiscoveryMascot } from '@/components/mascot/useDiscoveryMascot';
 
 import { courtCount, failureMessage, listingNotice, resultsSummary } from './listing';
 import { retryLabel, type Recovery } from './recovery';
@@ -22,13 +24,16 @@ type ResultsProps = {
 };
 
 /** Status, retry and paging controls shared by the map and list views. */
-function ResultsStatus({ results, recovery, onLoadMore, onRetry, onClearFilters, onZoomOut, extra, paging = true }: ResultsProps & { extra?: ReactNode; paging?: boolean }) {
+function ResultsStatus({ results, recovery, onLoadMore, onRetry, onClearFilters, onZoomOut, extra, paging = true, compact = false }: ResultsProps & { extra?: ReactNode; paging?: boolean; compact?: boolean }) {
+  const pose = useDiscoveryMascot(results.status, results.venues.length, results.requestId);
   const moreFailed = results.status === 'ready' && results.failure !== null;
   const waiting = Boolean(recovery && recovery.waitSeconds > 0);
   return (
     <View style={styles.status}>
+      {!compact && pose && <View style={styles.mascot}><PicklyMascot pose={pose} size={160} /></View>}
       <View style={styles.row} accessibilityLiveRegion="polite">
-        {results.status === 'loading' && <ActivityIndicator color={colors.primary} accessible={false} />}
+        {compact && pose && <PicklyMascot pose={pose} size={64} />}
+        {results.status === 'loading' && pose !== 'thinking' && <ActivityIndicator color={colors.primary} accessible={false} />}
         <Text style={[styles.summary, results.status === 'error' && styles.error]}>{resultsSummary(results)}</Text>
       </View>
       {moreFailed && results.failure && <Text accessibilityLiveRegion="polite" style={[styles.summary, styles.error]}>{failureMessage(results.failure)}</Text>}
@@ -63,6 +68,7 @@ export function ResultsBar(props: ResultsProps & { onShowList: () => void }) {
     <View style={styles.bar}>
       <ResultsStatus
         {...props}
+        compact
         extra={props.results.venues.length > 0 && <Button label="Show list" variant="secondary" style={styles.action} onPress={props.onShowList} />}
       />
     </View>
@@ -106,6 +112,7 @@ export function VenueList({ selectedId, onSelect, ...status }: ResultsProps & {
 }
 
 const styles = StyleSheet.create({
+  mascot: { alignItems: 'center', paddingVertical: 8 },
   bar: { backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border, paddingHorizontal: 16, paddingVertical: 12 },
   status: { gap: 10 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10 },

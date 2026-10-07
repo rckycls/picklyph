@@ -49,6 +49,7 @@ export default function RootLayout() {
             }}
           >
             <Stack.Screen name="(tabs)" />
+            <Stack.Screen name="welcome" options={{ gestureEnabled: false, animation: 'none' }} />
             <Stack.Screen name="rental/venue/[id]" options={ownerHeader('Reserve a court')} />
             <Stack.Screen name="rental/booking/[id]" options={ownerHeader('Rental booking')} />
             <Stack.Screen name="owner/submit" options={ownerHeader('Add a missing venue')} />

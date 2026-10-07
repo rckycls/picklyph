@@ -1,7 +1,8 @@
 import { formatManilaDateTime, formatPhpCentavos, type RentalBooking } from '@picklyph/domain';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
-import { AppState, Text } from 'react-native';
+import { AppState, Text, View } from 'react-native';
+import { PicklyMascot } from '@/components/mascot/PicklyMascot';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Screen, screenText } from '@/components/ui/Screen';
@@ -43,7 +44,7 @@ export function RentalHistory({ actor }: { actor: string }) {
     <Button label={wait ? `Refresh in ${wait}s` : busy ? 'Checking bookings…' : 'Refresh bookings'} variant="secondary" loading={busy} disabled={wait > 0} onPress={refresh} />
     {failure && <RentalError failure={failure} />}
     {failure && rows.length > 0 && <Text style={screenText.body}>The list below shows the last received records. Refresh to check current statuses.</Text>}
-    {loaded && rows.length === 0 && !busy && !failure && <Card><Text style={screenText.title}>Find your next game.</Text>
+    {loaded && rows.length === 0 && !busy && !failure && <Card><View style={{ alignItems: 'center' }}><PicklyMascot size={160} /></View><Text style={screenText.title}>Find your next game.</Text>
       <Text style={screenText.body}>Your reservations and requests will appear here. Choose a verified venue in Discover to review a rental.</Text></Card>}
     {rows.map((b) => { const status = bookingStatus(b); return <Card key={b.id}>
       <StatusBadge label={status.label} tone={status.tone} />

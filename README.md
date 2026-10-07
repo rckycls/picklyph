@@ -6,8 +6,10 @@ owners will pin and manage venues through the same account.
 
 ## Current state
 
-The Expo app opens on Discover, with Bookings and Account tabs and shared branded
-controls. Discovery has a Google Maps screen, optional foreground location and,
+The Expo app shows an animated mascot welcome on first launch, then opens on
+Discover, with Bookings and Account tabs and shared branded controls. Mascots
+also accompany search states and bookings; see [mascot behavior and iPhone checks](docs/mascot.md).
+Discovery has a Google Maps screen, optional foreground location and,
 since T14, live approved directory results with a shared map/list selection,
 court filters, current venue details and Apple/Google Maps directions.
 The iPhone development build succeeds, and Google map rendering, marker/detail

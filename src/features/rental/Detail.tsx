@@ -13,6 +13,7 @@ import { rentalServices } from './live';
 import { BookingSummary, PriceReview, RentalError } from './ui';
 import { useRentalRead } from './useRentalRead';
 import { useRetryWait } from './useRetryWait';
+import { BookingMascot } from './BookingMascot';
 
 export function RentalDetail({ actor, bookingId }: { actor: string; bookingId: string }) {
   const services = useMemo(() => rentalServices(actor), [actor]);
@@ -48,7 +49,7 @@ export function RentalDetail({ actor, bookingId }: { actor: string; bookingId: s
     <Button label={wait ? `Refresh in ${wait}s` : state.busy ? 'Checking current status…' : 'Refresh status'} variant="secondary" loading={state.busy} disabled={changing || wait > 0} onPress={state.refresh} />
     {state.failure && <RentalError failure={state.failure} />}{failure && <RentalError failure={failure} />}
     {(state.busy || state.failure) && <Text accessibilityLiveRegion="polite" style={screenText.body}>Any details below are the last received record. Refresh to check the server’s current status.</Text>}
-    {b && <><BookingSummary booking={b} /><PriceReview value={b.snapshot} />
+    {b && <><BookingSummary booking={b}><BookingMascot actor={actor} booking={b} fresh={!state.busy && !state.failure && !failure && !cancelUncertain && !changing} /></BookingSummary><PriceReview value={b.snapshot} />
       <Text style={screenText.body}>The total and policy above were saved with this booking and do not change with current venue rates.</Text>
       {canCancel && <Button label={cancelUncertain ? 'Retry original cancellation' : 'Cancel rental'} variant="secondary" loading={changing}
         disabled={state.busy || wait > 0 || Boolean(state.failure)} onPress={cancelUncertain ? () => void cancel() : confirmCancel} />}

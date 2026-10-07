@@ -19,12 +19,17 @@ import { VenueSheet } from '@/features/discovery/VenueSheet';
 import type { LocationResult } from '@/lib/location';
 import { colors } from '@/theme/colors';
 import { fonts } from '@/theme/typography';
+import { FirstLaunchWelcome } from '@/features/welcome/FirstLaunchWelcome';
 
 const NATIONAL_BOUNDS = regionToBounds(PHILIPPINES_REGION) as MapBounds;
 // Settled camera moves only; avoids a request per animation frame.
 const REGION_DEBOUNCE_MS = 600;
 
-export default function DiscoverScreen() {
+export default function DiscoverEntry() {
+  return <FirstLaunchWelcome><DiscoverScreen /></FirstLaunchWelcome>;
+}
+
+function DiscoverScreen() {
   const [view, setView] = useState<DiscoveryView>('map');
   const [filters, setFilters] = useState<DiscoveryFilters>(NO_FILTERS);
   const [bounds, setBounds] = useState<MapBounds>(NATIONAL_BOUNDS);

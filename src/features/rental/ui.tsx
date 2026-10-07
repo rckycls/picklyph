@@ -44,9 +44,9 @@ export function PriceReview({ value }: { value: RentalQuote | RentalSnapshot }) 
     {!('version' in value) && <Text style={screenText.body}>Price checked by the server at {formatManilaDateTime(value.quoted_at)}. This quote does not hold the court or guarantee availability.</Text>}
   </Card>;
 }
-export function BookingSummary({ booking }: { booking: RentalBooking }) {
+export function BookingSummary({ booking, children }: { booking: RentalBooking; children?: ReactNode }) {
   const status = bookingStatus(booking);
-  return <Card><StatusBadge label={status.label} tone={status.tone} />
+  return <Card>{children}<StatusBadge label={status.label} tone={status.tone} />
     <Text style={screenText.body}>{status.text}</Text>
     <Text style={screenText.label}>{booking.status === 'pending' || booking.status === 'confirmed'
       ? 'Payment: unpaid · pay at venue' : 'Payment record: unpaid · no online charge'}</Text>

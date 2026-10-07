@@ -15,6 +15,7 @@ import { createGeneration, defaultRentalDate, rentalWindow, reviewedRequest } fr
 import { Recovery, useAttempt } from './Recovery';
 import { PriceReview, RentalError } from './ui';
 import { useRetryWait } from './useRetryWait';
+import { rentalCelebrations } from './celebration';
 
 export function RentalSelection({ actor, venueId }: { actor: string; venueId: string }) {
   const recovery = useAttempt(actor); const { transport, journal } = recovery;
@@ -59,7 +60,10 @@ export function RentalSelection({ actor, venueId }: { actor: string; venueId: st
       const result = await journal.run(reviewedRequest(reviewed, randomUUID()), (command) => requestRental(transport, command));
       if (!focused.current) return;
       setQuote(null); recovery.refresh();
-      if (result.ok) router.push({ pathname: '/rental/booking/[id]', params: { id: result.value.booking.id } });
+      if (result.ok) {
+        rentalCelebrations.requested(actor, result.value.booking);
+        router.push({ pathname: '/rental/booking/[id]', params: { id: result.value.booking.id } });
+      }
       else setFailure(result.failure);
     } catch { if (focused.current) { setQuote(null); setMessage('Couldn’t confirm the reservation. Check original-request recovery before trying again.'); recovery.refresh(); } }
     finally { lock.current = false; if (focused.current) setBusy(null); }

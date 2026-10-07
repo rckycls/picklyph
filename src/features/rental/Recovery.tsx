@@ -9,6 +9,7 @@ import { requestRental, type RentalFailure } from './client';
 import { rentalServices } from './live';
 import { RentalError } from './ui';
 import { useRetryWait } from './useRetryWait';
+import { rentalCelebrations } from './celebration';
 
 /** Used in history and selection, so a lost response is recoverable after navigation, sign-in or restart. */
 export function useAttempt(actor: string) {
@@ -24,7 +25,7 @@ export function useAttempt(actor: string) {
       () => { if (active) { setError('Couldn’t read reservation recovery. Try again before starting another reservation.'); setChecked(true); } });
     return () => { active = false; };
   }, [services, revision]));
-  return { ...services, attempt, checked, error, refresh: () => setRevision((v) => v + 1) };
+  return { ...services, actor, attempt, checked, error, refresh: () => setRevision((v) => v + 1) };
 }
 export function Recovery({ recovery }: { recovery: ReturnType<typeof useAttempt> }) {
   const [busy, setBusy] = useState(false); const [failure, setFailure] = useState<RentalFailure | null>(null);
@@ -40,7 +41,10 @@ export function Recovery({ recovery }: { recovery: ReturnType<typeof useAttempt>
     try {
       const result = await recovery.journal.run(attempt, (command) => requestRental(recovery.transport, command));
       if (!alive.current) return;
-      if (result.ok) router.push({ pathname: '/rental/booking/[id]', params: { id: result.value.booking.id } });
+      if (result.ok) {
+        rentalCelebrations.requested(recovery.actor, result.value.booking);
+        router.push({ pathname: '/rental/booking/[id]', params: { id: result.value.booking.id } });
+      }
       else setFailure(result.failure);
       recovery.refresh();
     } catch { if (alive.current) setError('Couldn’t finish recovery. The original request remains saved; retry it before reserving again.'); }
