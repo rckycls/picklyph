@@ -5,6 +5,7 @@ export type DirectoryAuditAction =
   | 'directory.unpublish'
   | 'directory.suspend'
   | 'directory.import'
+  | 'owner.create'
   | 'owner.update'
   | 'owner.photo_add'
   | 'owner.photo_remove'

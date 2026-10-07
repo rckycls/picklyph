@@ -39,7 +39,7 @@ export function OwnedVenuesScreen({ includeTop = false }: { includeTop?: boolean
   return (
     <OwnerScreen includeTop={includeTop}>
       {includeTop && <PageHeader title="Venues" />}
-      <Text style={screenText.body}>Venues pickly has verified you manage. Run each court’s calendar, set hours and closures, and edit details, courts and photos.</Text>
+      <Text style={screenText.body}>Venues you manage, including ones pickly is still reviewing. Run each court’s calendar, set hours and closures, and edit details, courts and photos.</Text>
       {venues.status === 'loading' && (
         <View style={styles.row} accessibilityLiveRegion="polite">
           <ActivityIndicator color={colors.primary} accessible={false} />
@@ -55,7 +55,7 @@ export function OwnedVenuesScreen({ includeTop = false }: { includeTop?: boolean
       {venues.status === 'ready' && venues.items.length === 0 && (
         <Card>
           <Text style={screenText.body}>
-            You don’t manage a venue yet. Claim a listing from Discover, or add a missing venue from Account. pickly reviews every request.
+            You don’t manage a venue yet. Claim a listing from Discover, or add your venue from Account. pickly reviews every request.
           </Text>
         </Card>
       )}

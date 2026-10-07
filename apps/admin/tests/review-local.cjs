@@ -126,6 +126,10 @@ async function main() {
       evidence_ref: venuePath, submission_note: null, acknowledge_duplicates: true }), 'Fixture submission.');
     assert.equal(submitted.outcome, 'created');
     const submissionId = submitted.submission.id;
+    // The submission is the owner's private draft from the start.
+    const draftId = submitted.submission.venue_id;
+    venues.add(draftId);
+    assert.equal(value(`select publication_status || ':' || claim_status from public.venues where id = '${draftId}';`), 'draft:pending', 'Owner draft is private.');
 
     stage = 'production server';
     const reservation = net.createServer();
@@ -187,9 +191,9 @@ async function main() {
     assert.equal((await decide(jars.moderator, claimId, 'approve', null, null, { Origin: 'https://attacker.invalid' })).status, 403, 'Cross-site decision denied.');
     const smuggled = await request('/api/console/ownership/decide', jars.moderator, { subject_id: claimId, decision: 'approve', target_venue_id: null, rejection_reason: null, actor_user_id: users.admin.id });
     assert.equal(smuggled.status, 400, 'Caller cannot supply an actor.');
-    const venuesBefore = value('select count(*) from public.venues;');
-    assert.equal((await decide(jars.moderator, submissionId, 'approve_new')).status, 403, 'Moderators cannot create listings.');
-    assert.equal(value('select count(*) from public.venues;'), venuesBefore, 'Denied approval created nothing.');
+    assert.equal((await decide(jars.moderator, submissionId, 'approve_new')).status, 400, 'The retired decision is rejected.');
+    assert.equal((await decide(jars.moderator, submissionId, 'approve')).status, 403, 'Moderators cannot publish listings.');
+    assert.equal(value(`select publication_status from public.venues where id = '${draftId}';`), 'draft', 'Denied approval published nothing.');
 
     stage = 'concurrent conflicting decisions';
     const raced = await Promise.all([decide(jars.moderator, claimId, 'approve'), decide(jars.admin, claimId, 'reject', 'not_owner')]);
@@ -207,17 +211,16 @@ async function main() {
     assert.equal(listed[0].claim_status, approved ? 'verified' : 'unclaimed', 'Public badge follows the decision.');
 
     stage = 'new listing approval';
-    const created = await decide(jars.admin, submissionId, 'approve_new');
-    assert.equal(created.status, 200, 'Admin approves as a new listing.');
+    const created = await decide(jars.admin, submissionId, 'approve');
+    assert.equal(created.status, 200, 'Admin approves and publishes the owner draft.');
     const item = (await created.json()).data.item;
-    const newVenueId = item.review.resolved_venue_id;
-    venues.add(newVenueId);
+    assert.equal(item.review.resolved_venue_id, draftId, 'Approval resolves to the owner draft.');
     assert.equal(item.review.resolution, 'new');
-    assert.equal(check(await publicClient.from('venues').select('id').eq('id', newVenueId), 'Public read.').length, 0, 'New listing stays a private draft.');
-    assert.equal(value(`select publication_status || ':' || claim_status || ':' || (select count(*) from public.courts c where c.venue_id = v.id) from public.venues v where id = '${newVenueId}';`), 'draft:verified:2');
-    assert.equal(value(`select count(*) from private.venue_owners where venue_id = '${newVenueId}' and user_id = '${users.submitter.id}';`), '1', 'Submitter owns the draft.');
-    const audit = check(await service.rpc('directory_admin_audit_read', { actor_user_id: users.admin.id, target_venue_id: newVenueId }), 'Directory audit.');
-    assert.deepEqual(audit.items.map((event) => event.action), ['directory.create'], 'Listing creation is directory-audited.');
+    assert.equal(check(await publicClient.from('venues').select('id').eq('id', draftId), 'Public read.').length, 1, 'Approved listing is public.');
+    assert.equal(value(`select publication_status || ':' || claim_status || ':' || (select count(*) from public.courts c where c.venue_id = v.id) from public.venues v where id = '${draftId}';`), 'approved:verified:2');
+    assert.equal(value(`select count(*) from private.venue_owners where venue_id = '${draftId}' and user_id = '${users.submitter.id}';`), '1', 'Submitter owns the listing.');
+    const audit = check(await service.rpc('directory_admin_audit_read', { actor_user_id: users.admin.id, target_venue_id: draftId }), 'Directory audit.');
+    assert.deepEqual(audit.items.map((event) => event.action).sort(), ['directory.publish', 'owner.create'], 'Draft creation and publication are directory-audited.');
 
     stage = 'submitter privacy';
     const mobile = createClient(api.href, settings.ANON_KEY, options);
@@ -225,7 +228,7 @@ async function main() {
     check(await mobile.auth.signInWithPassword({ email: users.submitter.email, password: users.submitter.password }), 'Submitter sign-in.');
     const mine = check(await mobile.rpc('my_owner_submissions'), 'Own submissions.');
     const own = mine.find((entry) => entry.id === submissionId);
-    assert.ok(own && own.status === 'approved' && own.venue_id === newVenueId, 'Submitter sees approval and the resolved listing.');
+    assert.ok(own && own.status === 'approved' && own.venue_id === draftId, 'Submitter sees approval and the resolved listing.');
     assert.deepEqual(Object.keys(own).sort(), ['city', 'created_at', 'id', 'kind', 'name', 'status', 'venue_id']);
     assert.ok(!JSON.stringify(mine).includes(venuePath) && !JSON.stringify(mine).includes(venueId), 'No evidence path or reviewer duplicate snapshot.');
     assert.equal((await mobile.rpc('ownership_review_read', { actor_user_id: users.admin.id, subject_id: submissionId })).error?.code, '42501', 'Clients cannot call review RPCs.');
@@ -252,12 +255,13 @@ async function main() {
     if (evidence.length) {
       try { if ((await service.storage.from('owner-evidence').remove(evidence)).error) cleanupFailed = true; } catch { cleanupFailed = true; }
     }
-    for (const id of venues) {
-      try { if ((await service.from('venues').delete().eq('id', id)).error) cleanupFailed = true; } catch { cleanupFailed = true; }
-    }
+    // Users first: their submissions cascade, so no pending submission ever loses its draft.
     const ids = Object.values(users).map((user) => user.id);
     for (const id of ids) {
       try { if ((await service.auth.admin.deleteUser(id)).error) cleanupFailed = true; } catch { cleanupFailed = true; }
+    }
+    for (const id of venues) {
+      try { if ((await service.from('venues').delete().eq('id', id)).error) cleanupFailed = true; } catch { cleanupFailed = true; }
     }
     // Audit tables have no cascading FKs; trusted local SQL removes only this run's actor history.
     if (ids.length) {

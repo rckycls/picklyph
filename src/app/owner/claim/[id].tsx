@@ -91,8 +91,8 @@ function ClaimScreen() {
       {listing.status === 'missing' && (
         <Card>
           <StatusBadge label="No longer listed" tone="error" />
-          <Text style={screenText.body}>This venue isn’t in the approved directory, so it can’t be claimed. You can add it as a missing venue instead.</Text>
-          <Button label="Add a missing venue" onPress={() => router.replace('/owner/submit')} />
+          <Text style={screenText.body}>This venue isn’t in the approved directory, so it can’t be claimed. You can add it as your own venue instead.</Text>
+          <Button label="Add your venue" onPress={() => router.replace('/owner/submit')} />
         </Card>
       )}
       {listing.status === 'ready' && (

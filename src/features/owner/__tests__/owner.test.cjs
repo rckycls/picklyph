@@ -109,7 +109,7 @@ test('form drafts produce requests the server parser accepts, and block bad pins
 
 test('submission list parsing is strict and private-field free', () => {
   assert.equal(parseMySubmissions([submission, { ...submission, id: VENUE, kind: 'claim', venue_id: VENUE }]).length, 2);
-  for (const bad of [{ ...submission, status: 'published' }, { ...submission, kind: 'claim' }, { ...submission, venue_id: VENUE }, { ...submission, created_at: 'soon' }]) {
+  for (const bad of [{ ...submission, status: 'published' }, { ...submission, kind: 'claim' }, { ...submission, status: 'rejected', venue_id: VENUE }, { ...submission, created_at: 'soon' }]) {
     assert.throws(() => parseSubmission(bad));
   }
   assert.ok(!('evidence_path' in parseSubmission({ ...submission, evidence_path: 'x/y.jpg' })));
@@ -133,8 +133,11 @@ test('responses that are not instanceof Response (expo/fetch on device) still su
   assert.match(ownerFailureMessage({ kind: 'surprise' }), /Something went wrong/);
 });
 
-test('approved venue submissions may name their resolved listing; pending ones may not', () => {
+test('new venues name the owner’s draft while pending and the listing once approved, never once rejected', () => {
+  assert.equal(parseSubmission({ ...submission, venue_id: VENUE.toUpperCase() }).venue_id, VENUE);
   assert.equal(parseSubmission({ ...submission, status: 'approved', venue_id: VENUE.toUpperCase() }).venue_id, VENUE);
-  for (const status of ['pending', 'rejected']) assert.throws(() => parseSubmission({ ...submission, status, venue_id: VENUE }));
+  // Servers without owner drafts name none while pending.
+  assert.equal(parseSubmission(submission).venue_id, null);
+  assert.throws(() => parseSubmission({ ...submission, status: 'rejected', venue_id: VENUE }));
   assert.throws(() => parseSubmission({ ...submission, kind: 'claim', venue_id: null }));
 });

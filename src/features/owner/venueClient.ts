@@ -206,7 +206,7 @@ export function venueFailureMessage(failure: VenueFailure): string {
         case 'merchant_inactive': return 'Online payment needs verified merchant activation. Choose pay on arrival for now.';
         case 'version_conflict': return 'This listing changed since you opened it. Reload to see the latest, then make your changes again.';
         case 'not_owner': return 'You no longer manage this venue. Contact pickly support if this is a mistake.';
-        case 'venue_unavailable': return 'This venue can’t be edited right now because it isn’t published. Contact pickly support.';
+        case 'venue_unavailable': return 'This venue can’t be edited right now. It isn’t published or under review. Contact pickly support.';
         case 'duplicate_court': return 'Another court at this venue already has that name. Give each court its own name.';
         case 'court_allocated': return 'A court with upcoming blocks or bookings can’t be made inactive. Release its blocks in the calendar first.';
         case 'active_court_required': return 'Keep at least one court active. To close the venue, contact pickly support.';

@@ -82,7 +82,7 @@ export function SignedInProfile({ session }: { session: Session }) {
         {accessError && (
           <MenuRow icon="retry" tone="lime" title="Couldn’t check your venue access" subtitle="Tap to try again" onPress={refresh} />
         )}
-        <MenuRow icon="plus" tone="green" title="Add a missing venue" subtitle="List a court that isn’t on the map yet"
+        <MenuRow icon="plus" tone="green" title="Add your venue" subtitle="Set up your courts; it goes live once pickly approves"
           onPress={() => router.push('/owner/submit')} />
         <MenuRow icon="flag" tone="lime" title="Claim your listing" subtitle="Open your venue on Discover, then tap Claim"
           onPress={() => router.navigate('/(tabs)')} />

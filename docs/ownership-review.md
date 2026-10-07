@@ -1,15 +1,18 @@
 # Ownership review (T17)
 
-Console reviewers decide the claims and missing-venue submissions that owners send from the app ([owner submissions](owner-submissions.md)). Approving one makes the owner a verified owner of a listing in the same audited database transaction. Nothing here publishes a listing or grants a role.
+Console reviewers decide the claims and new venues that owners send from the app ([owner submissions](owner-submissions.md)). Approving one makes the owner a verified owner of a listing in the same audited database transaction. Since 2026-10-08 a new venue is already the owner's private draft, so approving it also publishes that draft; nothing here grants a role.
 
 ## Who can do what
 
 | Decision | Applies to | Who | Effect |
 | --- | --- | --- | --- |
 | Approve | Claim on a listing | Admin or moderator | Claim approved; listing `claim_status` becomes `verified`; claimant linked as owner. |
-| Reject (reason) | Claim or submission | Admin or moderator | Rejected with a fixed reason; nothing else changes. |
-| Create draft listing and approve (`approve_new`) | Missing-venue submission | **Admin only** (it is directory curation) | New **draft** listing with the submitted details and `Court 1…N`, `claim_status = verified`, submitter linked as owner. An admin publishes it later from the directory. |
-| Merge and approve (`merge`) | Missing-venue submission | Admin or moderator | Resolved as an existing listing (not suspended); that listing becomes `verified` and the submitter is linked as its owner. |
+| Reject (reason) | Claim on a listing | Admin or moderator | Rejected with a fixed reason; nothing else changes. |
+| Approve and publish (`approve`) | New venue | **Admin only** (it is directory curation) | The owner's draft, as they have set it up, becomes `approved` and `verified` and the submitter is linked as its owner. Needs an active court (`active_court_required`). `approve_new` (T17) no longer exists. |
+| Merge and approve (`merge`) | New venue | Admin or moderator | Resolved as an existing listing (not suspended, not the draft itself); that listing becomes `verified` and the submitter is linked as its owner. The draft is retired. |
+| Reject (reason) | New venue | Admin or moderator | Rejected with a fixed reason; the draft is retired. |
+
+Retiring a draft suspends it (with a `directory.suspend` directory audit row) and ends the creator's editing. If an admin already published the draft from the directory, it stays published but its claim status returns to `unclaimed`. A decision locks the draft before the submission, the same order owner edits use, so an edit and a decision serialize.
 
 Rejection reasons: `insufficient_evidence`, `not_owner`, `duplicate`, `not_a_venue`, `other`. Reviewers can never decide their own requests (`self_review`). Suspended listings cannot gain owners. A request is decided once: repeating the recorded decision returns `outcome: "existing"`, and any other decision gets 409 `already_decided`. Concurrent conflicting decisions serialize on the request row; exactly one wins.
 
@@ -28,7 +31,8 @@ Console times go through `toDisplayInstant`: Postgres returns microseconds, and 
 
 - Claims and submissions gain `reviewed_by`, `reviewed_at` and `review_reason`; submissions also gain `resolution` (`new`/`merge`) and `resolved_venue_id`. Check constraints tie them to the status.
 - Service-only RPCs, all taking a server-verified `actor_user_id`: `ownership_review_queue`, `ownership_review_read`, `ownership_review_evidence` (object name for the trusted server only) and `ownership_review_decide`. `private.require_ownership_reviewer` locks the actor's admin/moderator row until commit, so revocation cannot race a decision.
-- `ownership_audit_events` gains `claim.approve`, `claim.reject`, `venue.approve`, `venue.merge` and `venue.reject`, one row per decision in the same transaction. `approve_new` also writes `directory.create` to the directory audit.
+- `ownership_audit_events` gains `claim.approve`, `claim.reject`, `venue.approve`, `venue.merge` and `venue.reject`, one row per decision in the same transaction. Since 2026-10-08 approval writes `directory.publish` to the directory audit (T17's `approve_new` wrote `directory.create`), and `venue.submit`/`venue.reject` name the draft.
+- 2026-10-08: the detail adds `draft` (the owner's current listing: details, status, active courts, photos) beside `proposed` (as first submitted); nearby lists never include the item's own draft, and the queue names pending venues by the draft's current name.
 - `my_owner_submissions()` (mobile, self-only) now returns the resolved `venue_id` for an approved venue submission. It still returns no evidence, notes, reasons or reviewer snapshot.
 
 ## Verification

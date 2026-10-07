@@ -184,6 +184,7 @@ test('editor helpers keep saved courts, explain blocked venues and precheck phot
   assert.match(editor.photoProblem({ uri: 'file:///a.png', width: 200, height: 900 }).problem, /320 pixels/);
   assert.deepEqual(plain(editor.photoProblem({ uri: 'file:///a.png', width: 1200, height: 900, fileSize: 1000 })), { type: 'image/png' });
   assert.equal(editor.summaryStatus({ editable: true, publication_status: 'approved' }).tone, 'success');
+  assert.match(editor.summaryStatus({ editable: true, publication_status: 'draft' }).label, /Under review/);
   assert.match(editor.summaryStatus({ editable: false, publication_status: 'draft' }).note, /once it’s published/);
   assert.match(editor.summaryStatus({ editable: false, publication_status: 'suspended' }).note, /suspended/);
 });

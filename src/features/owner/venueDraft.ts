@@ -74,6 +74,10 @@ export function photoProblem(asset: { uri: string; mimeType?: string | null; fil
 
 /** Why a linked venue can or can't be edited, in owner terms. */
 export function summaryStatus(venue: Pick<OwnedVenueSummary, 'editable' | 'publication_status'>): { label: string; tone: 'success' | 'pending' | 'error'; note: string | null } {
+  // Only the owner's own new venue is editable as a draft, while pickly reviews it.
+  if (venue.editable && venue.publication_status === 'draft') {
+    return { label: 'Under review · Not on Discover yet', tone: 'pending', note: 'Set up courts, hours, photos and policies now. Players see it once pickly approves your proof.' };
+  }
   if (venue.editable) return { label: 'Published · You manage this venue', tone: 'success', note: null };
   if (venue.publication_status === 'draft') {
     return { label: 'Waiting to be published', tone: 'pending', note: 'pickly is preparing this listing. You can edit it once it’s published.' };

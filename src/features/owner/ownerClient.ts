@@ -49,8 +49,9 @@ export function parseSubmission(raw: unknown): OwnerSubmission {
   if (!(typeof id === 'string' && UUID.test(id)) || (kind !== 'claim' && kind !== 'venue')
     || !STATUSES.includes(status as OwnerSubmission['status']) || !text(item.name, 120) || !text(item.city, 80)
     || !(typeof created === 'string' && Number.isFinite(Date.parse(created)))
-    // Claims name their listing; a venue submission names one only once approved (T17: new draft or merged listing).
-    || !(venue === null ? kind === 'venue' : typeof venue === 'string' && UUID.test(venue) && (kind === 'claim' || status === 'approved'))) return unexpected();
+    // Claims name their listing; a new venue names the owner's draft while pending and the listing once approved,
+    // never one once rejected. Servers without owner drafts name none while pending.
+    || !(venue === null ? kind === 'venue' : typeof venue === 'string' && UUID.test(venue) && (kind === 'claim' || status !== 'rejected'))) return unexpected();
   return { id: id.toLowerCase(), kind, status: status as OwnerSubmission['status'], venue_id: typeof venue === 'string' ? venue.toLowerCase() : null,
     name: item.name as string, city: item.city as string, created_at: created };
 }

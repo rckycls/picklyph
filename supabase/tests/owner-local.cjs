@@ -41,7 +41,7 @@ async function main() {
   const venueId = randomUUID();
   // A random spot in the Sulu Sea area keeps this run's duplicates to its own fixture.
   const latitude = Number((6 + Math.random()).toFixed(5)); const longitude = Number((120.5 + Math.random()).toFixed(5));
-  const users = []; let venueCreated = false; let child;
+  const users = []; let venueCreated = false; let draftId = null; let child;
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'pickly-owner-'));
   const objects = async (userId) => (check(await service.storage.from('owner-evidence').list(userId), 'List evidence (service)') ?? []).length;
   try {
@@ -115,6 +115,13 @@ async function main() {
     assert.equal(await objects(ownerId), 1, 'warning stores nothing');
     const accepted = await submitOwner(transport(sessions[0]), { ...pin, acknowledge_duplicates: true }, photo);
     assert.ok(accepted.ok && accepted.value.status === 'created' && accepted.value.submission.kind === 'venue', 'acknowledged submission');
+    draftId = accepted.value.submission.venue_id;
+    assert.ok(draftId, 'the new venue is the owner’s draft');
+    assert.equal(psql(`select publication_status || ':' || claim_status || ':' || (select count(*) from public.courts c where c.venue_id = v.id) from public.venues v where id = '${draftId}'`),
+      'draft:pending:2', 'private draft with its courts');
+    assert.equal(check(await anonymous.from('venues').select('id').eq('id', draftId), 'Public draft read').length, 0, 'drafts stay out of public reads');
+    const access = check(await owner.rpc('my_account_access'), 'Own access')[0];
+    assert.deepEqual([access.owned_venue_ids, access.pending_venue_ids], [[], [draftId]], 'the draft is pending, never owned');
     const competing = await submitOwner(transport(sessions[1]), { ...claim, request_id: randomUUID() }, photo);
     assert.ok(competing.ok && competing.value.status === 'created', 'second account may also claim');
     const pdf = await handler(new Request('https://owner.local/functions/v1/owner-submissions', { method: 'POST', headers: { authorization: `Bearer ${sessions[1].access_token}` },
@@ -163,8 +170,11 @@ async function main() {
     }
     if (venueCreated) steps.push(() => service.from('venues').delete().eq('id', venueId).then((r) => check(r, 'Own venue cleanup')));
     for (const userId of users) steps.push(() => service.auth.admin.deleteUser(userId).then((r) => check(r, 'Own user cleanup')));
+    // After the users: their submissions cascade first, so the pending draft can go.
+    if (draftId) steps.push(() => service.from('venues').delete().eq('id', draftId).then((r) => check(r, 'Own draft cleanup')));
     // Audit history deliberately survives account deletion (no FK); remove only this run's synthetic events.
-    if (users.length) steps.push(() => psql(`delete from private.ownership_audit_events where actor_user_id in (${users.map((id) => `'${id}'`).join(',')})`));
+    if (users.length) steps.push(() => psql(`delete from private.ownership_audit_events where actor_user_id in (${users.map((id) => `'${id}'`).join(',')});
+      delete from private.directory_audit_events where actor_user_id in (${users.map((id) => `'${id}'`).join(',')})`));
     steps.push(() => {
       assert.equal(path.dirname(path.resolve(temp)), path.resolve(os.tmpdir()), 'Cleanup target must remain in the intended temp directory.');
       assert.match(path.basename(temp), /^pickly-owner-/, 'Cleanup target must be this test’s directory.');

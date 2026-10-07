@@ -11,10 +11,11 @@ export type ReviewRejection = { status: number; message: string };
 export function reviewRejection(error: { code?: string | null; hint?: string | null }): ReviewRejection | null {
   switch (error.hint) {
     case 'self_review': return { status: 403, message: 'You can’t review your own submission. Ask another reviewer.' };
-    case 'admin_required': return { status: 403, message: 'Only administrators can create a new listing. Merge or reject it, or ask an administrator.' };
+    case 'admin_required': return { status: 403, message: 'Only administrators can publish a new listing. Merge or reject it, or ask an administrator.' };
+    case 'active_court_required': return { status: 409, message: 'The draft has no active court. Activate a court in the directory, then approve.' };
     case 'reviewer_required': return { status: 403, message: 'Ownership reviewer access required.' };
     case 'already_decided': return { status: 409, message: 'Another reviewer already decided this request. Reload to see the decision.' };
-    case 'listing_unavailable': return { status: 409, message: 'That listing is suspended or no longer exists. Choose another listing.' };
+    case 'listing_unavailable': return { status: 409, message: 'That listing or the owner’s draft is suspended or no longer exists. Reload the request.' };
     case 'not_found': return { status: 404, message: 'This request no longer exists.' };
     case 'invalid_input': return { status: 400, message: 'Check the decision and try again.' };
   }

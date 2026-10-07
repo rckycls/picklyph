@@ -13,7 +13,7 @@ signup metadata, an email-domain heuristic or cached JWT role claims.
 | `private.account_roles` | Protected admin/moderator assignments; clients cannot read or mutate this table. |
 | `private.venue_owners` | Verified user-to-venue links; clients cannot read or mutate this table. |
 | `private.venue_claims` | Private claim evidence; T15 writes it only through the audited `owner_submit_claim` command. |
-| `public.my_account_access()` | Signed-in caller's current privileged roles and approved, verified owned venue IDs. No target-user argument. |
+| `public.my_account_access()` | Signed-in caller's current privileged roles and approved, verified owned venue IDs, plus (2026-10-08) `pending_venue_ids`: drafts the caller created that await review. No target-user argument. |
 
 The auth-user insert trigger creates a profile with a null display name and
 ignores all user metadata, including malformed name data. Migration backfills
@@ -54,6 +54,12 @@ draft/suspended venue grants no owner-management access. Revocation and venue
 suspension affect the next database authorization check. Admins can manage any
 existing venue; moderators can review ownership but get no automatic owner
 management scope. Moderators/admins still use server operations for evidence.
+
+Since 2026-10-08 the creator of a draft venue may also set it up while its review
+is pending (`private.is_venue_editor` = verified owner, or `is_pending_venue_creator`).
+That creator has no `venue_owners` link: ownership, bookings and
+`authorize_venue_management` still need the reviewed, verified link above. See
+[owner-created drafts](owner-submissions.md#owner-created-drafts-2026-10-08).
 
 T15 adds private evidence uploads and audited claim/missing-venue submissions
 ([owner submissions](owner-submissions.md)); T17 adds audited evidence review and

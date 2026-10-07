@@ -56,7 +56,10 @@ export function useOwnerMode() {
   return context;
 }
 
-/** Inventory screens need current verified links and owner context. Submission/claim gates stay auth-only. */
+/**
+ * Inventory screens need a venue the account manages now (a verified link, or its own draft under
+ * review) and owner context. Submission/claim gates stay auth-only.
+ */
 export function VerifiedOwnerGate({ children }: { children: ReactNode }) {
   const { session, status } = useAuth();
   const { count, mode, error, refresh } = useOwnerMode();

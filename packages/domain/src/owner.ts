@@ -37,6 +37,7 @@ export type OwnerSubmission = {
   id: string;
   kind: 'claim' | 'venue';
   status: OwnerSubmissionStatus;
+  /** Claims: the listing. New venues: the owner's draft under review, the listing once approved, none once rejected. */
   venue_id: string | null;
   name: string;
   city: string;

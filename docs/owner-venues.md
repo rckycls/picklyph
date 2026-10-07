@@ -2,7 +2,7 @@
 
 From Account, an account with a current verified, approved venue selects **Owner mode**, opens **Manage your venue(s)** or the **Venues** tab, and edits a listing’s details, courts, photos and booking policies. Player mode hides venue management controls. Approved submission history alone never enables management. Editor routes remain in the root stack with a native back button; `VerifiedOwnerGate` checks current access. Submission/claim routes retain the auth-only `OwnerGate` so new owners can apply.
 
-Owners can edit only their own **approved, verified** listings. The database checks the current private ownership link on every command. It locks the listing and ownership row for writes, so revocation, suspension and competing saves serialize. Pins, publication, claim status and ownership remain admin/reviewer controls. Admins still curate through their existing console commands; an admin role alone does not grant access to these owner endpoints.
+Owners can edit only their own **approved, verified** listings, plus (since 2026-10-08) the **draft they created** while its review is pending ([owner-created drafts](owner-submissions.md#owner-created-drafts-2026-10-08)). The database checks the current private ownership link, or the creator's pending submission, on every command. It locks the listing and ownership row for writes, so revocation, suspension and competing saves serialize. Pins, publication, claim status and ownership remain admin/reviewer controls. Admins still curate through their existing console commands; an admin role alone does not grant access to these owner endpoints.
 
 ## Contract and boundaries
 

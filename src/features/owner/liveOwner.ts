@@ -143,12 +143,16 @@ export function liveRemoveVenuePhoto(venueId: string, photoId: string): ReturnTy
   return live ? removeVenuePhoto(live, { venue_id: venueId, photo_id: photoId }) : Promise.resolve(notConfigured);
 }
 
-/** How many venues this account currently manages (self-only RPC; current DB state, never JWT claims). */
+/**
+ * How many venues this account currently manages, including drafts it is setting up under review
+ * (self-only RPC; current DB state, never JWT claims). Servers without owner drafts report none pending.
+ */
 export async function loadManagedVenueCount(): Promise<number | null> {
   try {
     const { data, error } = await getSupabase().rpc('my_account_access');
     if (error || !Array.isArray(data) || !data[0] || !Array.isArray(data[0].owned_venue_ids)) return null;
-    return data[0].owned_venue_ids.length;
+    const pending: unknown = data[0].pending_venue_ids;
+    return data[0].owned_venue_ids.length + (Array.isArray(pending) ? pending.length : 0);
   } catch {
     return null;
   }

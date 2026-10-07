@@ -69,6 +69,8 @@ export function VenueEditor({ venueId }: { venueId: string }) {
   }
 
   const dirty = isDirty(draft, venue);
+  // The owner's own new venue, editable while pickly reviews their proof.
+  const underReview = venue.publication_status === 'draft';
   const edit = (patch: Partial<VenueDraft>) => { setDraft({ ...draft, ...patch }); setMessage(null); };
   const editCourt = (key: string, patch: Partial<Omit<CourtDraft, 'key' | 'id'>>) => { setDraft(updateCourt(draft, key, patch)); setMessage(null); };
   const save = async () => {
@@ -79,7 +81,7 @@ export function VenueEditor({ venueId }: { venueId: string }) {
     setSaving(false);
     if (outcome.ok) {
       setVenue(outcome.value); setDraft(draftFrom(outcome.value));
-      setMessage({ text: 'Saved. Players see the updated listing now.', conflict: false });
+      setMessage({ text: underReview ? 'Saved. Players see it once pickly approves your venue.' : 'Saved. Players see the updated listing now.', conflict: false });
       return;
     }
     const conflict = outcome.failure.kind === 'rejected' && outcome.failure.reason === 'version_conflict';
@@ -90,12 +92,19 @@ export function VenueEditor({ venueId }: { venueId: string }) {
     <OwnerScreen>
       <Card>
         <View style={styles.chips}>
-          <StatusBadge label="Published" tone="success" />
-          <StatusBadge label="You manage this venue" tone="neutral" />
+          {underReview ? <>
+            <StatusBadge label="Under review" tone="pending" />
+            <StatusBadge label="Not on Discover yet" tone="neutral" />
+          </> : <>
+            <StatusBadge label="Published" tone="success" />
+            <StatusBadge label="You manage this venue" tone="neutral" />
+          </>}
         </View>
         <Text accessibilityRole="header" style={screenText.title}>{venue.name}</Text>
         <Text style={screenText.body}>
-          Changes save to your public listing. The map pin and listing status are managed by pickly; contact pickly support to move the pin.
+          {underReview
+            ? 'Set up your courts, photos, hours and policies now. pickly checks your proof photo, then publishes the venue so players can find and book it. The map pin is managed by pickly; contact pickly support to move it.'
+            : 'Changes save to your public listing. The map pin and listing status are managed by pickly; contact pickly support to move the pin.'}
         </Text>
       </Card>
 

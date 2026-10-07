@@ -60,7 +60,7 @@ async function readBounded(request: Request): Promise<Uint8Array<ArrayBuffer> | 
  * Authenticated owner commands. Native-only: no browser CORS.
  * GET ?address=…                       address suggestions (owner-lookup limit)
  * GET ?latitude=…&longitude=…[&name=…] approved listings nearby (owner-lookup limit)
- * POST multipart {submission, evidence} claim or missing-venue submission (owner-submit limit)
+ * POST multipart {submission, evidence} claim, or new venue (the owner's draft) for review (owner-submit limit)
  */
 export function createOwnerHandler(deps: Dependencies) {
   return async (request: Request): Promise<Response> => {

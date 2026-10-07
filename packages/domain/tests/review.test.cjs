@@ -8,14 +8,13 @@ const body = (patch) => ({ subject_id: id, decision: 'approve', target_venue_id:
 
 test('review decisions keep exactly the documented shape and normalize IDs', () => {
   assert.deepEqual(readOwnershipDecision(body({})), { subject_id: id.toLowerCase(), decision: 'approve', target_venue_id: null, rejection_reason: null });
-  assert.equal(readOwnershipDecision(body({ decision: 'approve_new' })).decision, 'approve_new');
   assert.deepEqual(readOwnershipDecision(body({ decision: 'merge', target_venue_id: venue })).target_venue_id, venue.toLowerCase());
   assert.equal(readOwnershipDecision(body({ decision: 'reject', rejection_reason: 'duplicate' })).rejection_reason, 'duplicate');
 });
 
 test('actor fields, mismatched targets/reasons and unknown decisions are rejected', () => {
   for (const input of [null, [], 'approve', body({ actor_user_id: id }), { subject_id: id, decision: 'approve' },
-    body({ subject_id: 'x' }), body({ decision: 'publish' }), body({ decision: 'approve', rejection_reason: 'other' }),
+    body({ subject_id: 'x' }), body({ decision: 'publish' }), body({ decision: 'approve_new' }), body({ decision: 'approve', rejection_reason: 'other' }),
     body({ decision: 'approve', target_venue_id: venue }), body({ decision: 'merge' }), body({ decision: 'merge', target_venue_id: 'x' }),
     body({ decision: 'merge', target_venue_id: venue, rejection_reason: 'other' }), body({ decision: 'reject' }),
     body({ decision: 'reject', rejection_reason: 'rude' }), body({ decision: 'reject', rejection_reason: 'other', target_venue_id: venue })]) {

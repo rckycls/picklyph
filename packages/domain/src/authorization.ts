@@ -11,5 +11,8 @@ export type Profile = {
 /** Current database assignments. Read for UI; server commands enforce access. */
 export type AccountAccess = {
   privileged_roles: PrivilegedRole[];
+  /** Approved listings this account is a verified owner of. */
   owned_venue_ids: string[];
+  /** Draft venues this account created and is setting up while pickly reviews them. */
+  pending_venue_ids: string[];
 };

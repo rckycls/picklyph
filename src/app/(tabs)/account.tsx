@@ -25,8 +25,8 @@ export default function AccountScreen() {
             {welcome === 'owner' && <View style={styles.ownerIntroduction}>
               <Text accessibilityRole="header" style={styles.ownerTitle}>Let’s get your court on Pickly.</Text>
               <Text style={styles.ownerDescription}>{session
-                ? 'Add a missing venue below, or find your existing listing on Discover to claim it.'
-                : 'Sign in below, then add a missing venue or claim your existing listing on Discover.'} A Pickly reviewer verifies ownership before you can manage a venue.</Text>
+                ? 'Add your venue below, or find your existing listing on Discover to claim it.'
+                : 'Sign in below, then add your venue or claim your existing listing on Discover.'} A Pickly reviewer checks your proof before players can see or book it.</Text>
             </View>}
             {session ? <SignedInProfile key={session.user.id} session={session} /> : <GuestProfile restoring={auth.status === 'restoring'} />}
             <View style={styles.footer} accessible accessibilityLabel={`pickly, version ${Constants.expoConfig?.version ?? 'unknown'}`}>

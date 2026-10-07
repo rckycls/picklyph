@@ -15,6 +15,7 @@ test('database rejections map to reviewer messages; unexpected errors stay unava
   assert.match(reviewRejection({ hint: 'admin_required', code: '42501' }).message, /administrators/i);
   assert.equal(reviewRejection({ hint: 'already_decided', code: '23505' }).status, 409);
   assert.equal(reviewRejection({ hint: 'listing_unavailable', code: 'P0002' }).status, 409);
+  assert.match(reviewRejection({ hint: 'active_court_required', code: '22023' }).message, /active court/);
   assert.equal(reviewRejection({ hint: 'not_found', code: 'P0002' }).status, 404);
   assert.equal(reviewRejection({ code: '42501' }).status, 403);
   assert.equal(reviewRejection({ code: '22023' }).status, 400);

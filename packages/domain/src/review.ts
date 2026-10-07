@@ -12,9 +12,12 @@ export const REVIEW_REASON_LABELS: Record<ReviewRejectionReason, string> = {
   other: 'Other reason',
 };
 
-/** Claims: approve|reject. Missing venues: approve_new (admin only), merge into a listing, or reject. */
+/**
+ * Claims: approve|reject. New venues: approve (admin only: publishes the owner's draft),
+ * merge into an existing listing, or reject; merge and reject retire the draft.
+ */
 export type OwnershipDecision =
-  | { subject_id: string; decision: 'approve' | 'approve_new'; target_venue_id: null; rejection_reason: null }
+  | { subject_id: string; decision: 'approve'; target_venue_id: null; rejection_reason: null }
   | { subject_id: string; decision: 'merge'; target_venue_id: string; rejection_reason: null }
   | { subject_id: string; decision: 'reject'; target_venue_id: null; rejection_reason: ReviewRejectionReason };
 
@@ -66,7 +69,13 @@ export type ClaimReview = ReviewBase & {
 };
 export type VenueSubmissionReview = ReviewBase & {
   kind: 'venue';
+  /** As first submitted. */
   proposed: { name: string; address_line: string; city: string; province: string; latitude: number; longitude: number; court_count: number };
+  /** The owner's listing as they have set it up since. Null for submissions decided before owners created drafts. */
+  draft: {
+    id: string; name: string; address_line: string; city: string; province: string; latitude: number; longitude: number;
+    publication_status: VenuePublicationStatus; claim_status: VenueClaimStatus; active_court_count: number; photo_count: number;
+  } | null;
   duplicates_acknowledged: boolean;
   nearby_venues: {
     id: string; name: string; address_line: string; city: string; province: string;
@@ -94,7 +103,7 @@ export function readOwnershipDecision(raw: unknown): OwnershipDecision {
   if (Object.keys(input).sort().join(',') !== 'decision,rejection_reason,subject_id,target_venue_id') throw new ReviewInputError();
   const subject_id = uuid(input.subject_id);
   const { decision, target_venue_id: target, rejection_reason: reason } = input;
-  if ((decision === 'approve' || decision === 'approve_new') && target === null && reason === null) {
+  if (decision === 'approve' && target === null && reason === null) {
     return { subject_id, decision, target_venue_id: null, rejection_reason: null };
   }
   if (decision === 'merge' && reason === null) return { subject_id, decision, target_venue_id: uuid(target), rejection_reason: null };

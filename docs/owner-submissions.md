@@ -1,13 +1,14 @@
 # Owner pin submissions and ownership claims (T15)
 
-Signed-in owners can **claim** an approved listing or **submit a missing venue** with a map pin. Both need one private proof photo. A submission is only a record for review: it never publishes a listing, changes the public `claim_status`, links an owner, or grants a role. Review and approval are in the console ([ownership review](ownership-review.md)). Sign-in uses the same account as players; there is no owner signup.
+Signed-in owners can **claim** an approved listing or **add their own venue** with a map pin. Both need one private proof photo. A claim is only a record for review. A new venue becomes the owner's private **draft listing** at once (since 2026-10-08, see [owner-created drafts](#owner-created-drafts-2026-10-08)): the owner can set it up while it is reviewed, but nothing is public, verified, owned or bookable until a reviewer approves it. Review and approval are in the console ([ownership review](ownership-review.md)). Sign-in uses the same account as players; there is no owner signup.
 
 ## Mobile flow
 
-- **Account → Add a missing venue** (`/owner/submit`), in three steps:
+- **Account → Add your venue** (`/owner/submit`), in three steps:
   1. Locate: address search (server-side Google geocoding), **Use my location**, or tap the map, then drag the pin onto the courts.
   2. Nearby: approved listings within 150 m, or with a similar name within 2 km, appear with **Claim this listing**. **My venue isn't listed here** acknowledges them.
   3. Details: name, address, city, province, court count (1–40), optional note (500 characters) and proof photo.
+  4. Done: **Set up your venue** switches to Owner mode and opens the draft in the venue editor (details, courts, photos, policies), with hours and the court calendar under **Venues**.
 - **Discover → venue details → Own this venue? Claim it** (`/owner/claim/[id]`) for unclaimed or under-review listings. Signed-out players are sent to Account.
 - **Account → Your submissions** lists the user's own claims and venues with their review status.
 
@@ -36,11 +37,23 @@ The bucket is private (5 MiB, `image/jpeg`/`image/png`) and has **no `storage.ob
 ## Database (`20261007120000_owner_submissions.sql`)
 
 - `private.venue_claims` (T05) gains `request_id` and `note`. One pending claim per user per venue; evidence paths are unique. `service_role` loses direct write privileges, so writes go through the audited command.
-- `private.venue_submissions` holds proposed venues (PH box, 1–40 courts, evidence, note, `duplicates_acknowledged`). It also keeps a reviewer-only snapshot: nearby approved/draft venue IDs and other users' pending submissions within 150 m. It never creates a draft listing.
+- `private.venue_submissions` holds proposed venues (PH box, 1–40 courts, evidence, note, `duplicates_acknowledged`). It also keeps a reviewer-only snapshot: nearby approved/draft venue IDs and other users' pending submissions within 150 m. (Since 2026-10-08 it also creates the owner's draft listing; see below.)
 - `private.ownership_audit_events` (`claim.submit`/`venue.submit`) is written in the same transaction. It has no FK, so history survives deletion (retention is T47).
 - Service-only `owner_submit_claim`, `owner_submit_venue` and `owner_duplicate_candidates` take an `actor_user_id` that **must** come from the verified token. They lock the actor's profile and serialize per actor. They check that the evidence object exists under the actor's folder and is unused, that the listing is approved and not verified, and enforce a cap of 5 pending submissions per account. A repeated `request_id` returns the original record. Without acknowledgement, approved public duplicates return `outcome:"duplicates"` and nothing is written. Drafts and other claimants are never revealed.
 - `my_owner_submissions()` (authenticated, self-only, 50 newest) returns id, kind, status, venue id, name, city and time, with no evidence, notes or reviewer data.
 - Rejections carry a stable SQL `hint` that the function maps to the errors above.
+
+## Owner-created drafts (2026-10-08)
+
+Migration `20261008150000_owner_created_venues.sql` replaces "a reviewer creates the listing" with "the owner creates it". The endpoint, request and evidence rules above are unchanged.
+
+- `owner_submit_venue` also creates the draft in the same audited transaction: `publication_status = draft`, `claim_status = pending`, `Court 1…N`, an `owner.create` directory audit row (actor: the owner), and `venue_submissions.venue_id` pointing at it. `venue.submit` audit rows now name the draft. The returned submission's `venue_id` is the draft.
+- Every pending submission has a draft (`venue_submissions_draft` check); the migration backfilled drafts for T15 submissions that were still pending.
+- While the review is pending, the creator is a **venue editor** (`private.is_pending_venue_creator`) but holds no `venue_owners` link. Owner reads/commands (details, courts, photos, hours, court hours, policies, calendar and blocks) admit them; bookings, `rental_require_owner` and `authorize_venue_management` still require a verified owner. `my_account_access()` returns the drafts as `pending_venue_ids` (owned venues keep their T08 meaning), so Owner mode and the Venues tab open for them.
+- `my_owner_submissions()` names the draft (by its current name) while pending, the resolved listing once approved, and none once rejected.
+- Decisions (see [ownership review](ownership-review.md)): approving publishes the draft and links the owner; merging or rejecting retires it (`suspended`), so the creator can no longer edit it.
+
+Drafts stay out of every public read (venue/court RLS, `venue_photos` rows, search). Owner photo uploads still go to the public bucket under unguessable names, as in T18.
 
 ## Configuration
 

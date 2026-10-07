@@ -107,7 +107,7 @@ select owner_test.assert_that((public.owner_submit_claim('41000000-0000-4000-800
   '42000000-0000-4000-8000-000000000005','41000000-0000-4000-8000-000000000001/43000000-0000-4000-8000-000000000002.png',null)->>'outcome') = 'created',
   'a listing already under review can still be claimed');
 
--- Missing venue: input bounds.
+-- New venue: input bounds.
 select owner_test.expect_error(format($q$select public.owner_submit_venue('41000000-0000-4000-8000-000000000001',gen_random_uuid(),%L,'x',null,false)$q$, input), '22023', 'invalid_input')
 from unnest(array[
   '{}', '[]',
@@ -146,8 +146,19 @@ insert into owner_result select 'venue', public.owner_submit_venue('41000000-000
   '44000000-0000-4000-8000-000000000002','{"name":"Corner Courts","address_line":"12 Fixture St","city":"Manila","province":"Metro Manila","latitude":14.6003,"longitude":121.0003,"court_count":3}',
   '41000000-0000-4000-8000-000000000001/43000000-0000-4000-8000-000000000003.jpg','Opened last month.',true);
 select owner_test.assert_that((select data->>'outcome' = 'created' and data->'submission'->>'kind' = 'venue'
-  and data->'submission'->>'venue_id' is null and jsonb_array_length(data->'duplicates') = 1
-  from owner_result where label = 'venue'), 'acknowledged submission is created and still lists the warning');
+  and data->'submission'->>'venue_id' is not null and jsonb_array_length(data->'duplicates') = 1
+  from owner_result where label = 'venue'), 'acknowledged submission is created, names its draft and still lists the warning');
+create temp table owner_draft as select (data->'submission'->>'venue_id')::uuid as id from owner_result where label = 'venue';
+reset role;
+select owner_test.assert_that((select v.publication_status = 'draft' and v.claim_status = 'pending' and v.name = 'Corner Courts'
+  and (select count(*) from public.courts c where c.venue_id = v.id and c.status = 'active') = 3
+  and s.venue_id = v.id and not exists (select 1 from private.venue_owners o where o.venue_id = v.id)
+  and exists (select 1 from private.directory_audit_events a where a.target_venue_id = v.id and a.action = 'owner.create'
+    and a.actor_user_id = '41000000-0000-4000-8000-000000000001')
+  from owner_draft d join public.venues v on v.id = d.id join private.venue_submissions s on s.venue_id = v.id),
+  'the submission creates a private draft with its courts, audited, and no owner link');
+grant select on owner_draft to service_role, authenticated;
+set local role service_role;
 select owner_test.assert_that((public.owner_submit_venue('41000000-0000-4000-8000-000000000001',
   '44000000-0000-4000-8000-000000000002','{"name":"Corner Courts","address_line":"12 Fixture St","city":"Manila","province":"Metro Manila","latitude":14.6003,"longitude":121.0003,"court_count":3}',
   '41000000-0000-4000-8000-000000000001/43000000-0000-4000-8000-000000000003.jpg','Opened last month.',true)->>'outcome') = 'existing',
@@ -165,7 +176,36 @@ select owner_test.assert_that((select nearby_venue_ids = array['42000000-0000-40
   from private.venue_submissions where submitter_user_id = '41000000-0000-4000-8000-000000000001'),
   'reviewer snapshot keeps approved and draft neighbours, not suspended');
 select owner_test.assert_that((select nearby_submission_ids = array[(select id from private.venue_submissions where submitter_user_id = '41000000-0000-4000-8000-000000000001')]
-  from private.venue_submissions where submitter_user_id = '41000000-0000-4000-8000-000000000002'), 'competing pending submission recorded for reviewers');
+  and (select id from owner_draft) = any(nearby_venue_ids)
+  from private.venue_submissions where submitter_user_id = '41000000-0000-4000-8000-000000000002'), 'competing pending submission and its draft recorded for reviewers');
+
+-- The creator sets the draft up while it is reviewed; nobody else can.
+set local role service_role;
+select owner_test.assert_that((select r->>'publication_status' = 'draft' and jsonb_array_length(r->'courts') = 3
+  from owner_draft d, public.owner_venue_read('41000000-0000-4000-8000-000000000001', d.id) r), 'creator reads the draft');
+select owner_test.expect_error(format($q$select public.owner_venue_read('41000000-0000-4000-8000-000000000002',%L)$q$, id), '42501', 'not_owner') from owner_draft;
+select owner_test.assert_that((select r->>'name' = 'Corner Courts Annex' and jsonb_array_length(r->'courts') = 4
+  from owner_draft d join public.venues v on v.id = d.id,
+    public.owner_venue_save('41000000-0000-4000-8000-000000000001', d.id, v.updated_at,
+      '{"name":"Corner Courts Annex","address_line":"12 Fixture St","city":"Manila","province":"Metro Manila"}',
+      '[{"id":null,"name":"Court 4","surface":"hard","is_indoor":false,"is_covered":true,"status":"active"}]') r),
+  'creator edits details and adds a court');
+select owner_test.expect_error(format($q$select public.owner_venue_save('41000000-0000-4000-8000-000000000002',%L,now(),'{"name":"X","address_line":"A","city":"C","province":"P"}','[]')$q$, id), '42501', 'not_owner') from owner_draft;
+select owner_test.assert_that((select r->>'venue_id' = d.id::text
+  from owner_draft d, public.owner_venue_policy_read('41000000-0000-4000-8000-000000000001', d.id) r), 'creator reads booking policy');
+select owner_test.assert_that((select jsonb_agg(x->>'id') = jsonb_build_array(d.id) and bool_and((x->>'editable')::boolean)
+  and bool_and(x->>'publication_status' = 'draft')
+  from owner_draft d, jsonb_array_elements(public.owner_venue_list('41000000-0000-4000-8000-000000000001')) x group by d.id),
+  'venue list includes the draft under review as editable');
+reset role;
+select set_config('request.jwt.claims', '{"sub":"41000000-0000-4000-8000-000000000001","role":"authenticated"}', true);
+set local role authenticated;
+select owner_test.assert_that((select owned_venue_ids = '{}' and pending_venue_ids = array[(select id from owner_draft)]
+  from public.my_account_access()), 'a draft under review is pending, never an owned venue');
+select owner_test.assert_that((select name = 'Corner Courts Annex' and venue_id = (select id from owner_draft)
+  from public.my_owner_submissions() where kind = 'venue' and status = 'pending' and city = 'Manila'), 'submitter sees the draft by its current name');
+select owner_test.assert_that((select count(*) = 0 from public.venues where name like 'Corner Courts%'), 'drafts stay out of public reads');
+reset role;
 
 -- Audit is part of the same transaction; a failing audit write aborts the command.
 create function owner_test.fail_audit() returns trigger language plpgsql as $$ begin raise exception 'audit unavailable'; end; $$;
@@ -174,7 +214,8 @@ set local role service_role;
 select owner_test.expect_error($q$select public.owner_submit_venue('41000000-0000-4000-8000-000000000001',gen_random_uuid(),'{"name":"Audit Failure Courts","address_line":"A","city":"Quezon City","province":"Metro Manila","latitude":14.65,"longitude":121.05,"court_count":1}','41000000-0000-4000-8000-000000000001/43000000-0000-4000-8000-000000000004.jpg',null,false)$q$, 'P0001');
 reset role;
 drop trigger owner_test_fail_audit on private.ownership_audit_events;
-select owner_test.assert_that((select count(*) = 0 from private.venue_submissions where name = 'Audit Failure Courts'), 'audit failure rolls back the submission');
+select owner_test.assert_that((select count(*) = 0 from private.venue_submissions where name = 'Audit Failure Courts')
+  and (select count(*) = 0 from public.venues where name = 'Audit Failure Courts'), 'audit failure rolls back the submission and its draft');
 
 -- Pending cap: claims + submissions, per account.
 set local role service_role;
@@ -197,19 +238,22 @@ reset role;
 select set_config('request.jwt.claims', '{"sub":"41000000-0000-4000-8000-000000000001","role":"authenticated"}', true);
 set local role authenticated;
 select owner_test.assert_that((select count(*) = 5 and count(*) filter (where kind = 'claim') = 2
-  and count(*) filter (where kind = 'venue' and venue_id is null) = 3 from public.my_owner_submissions()), 'own claims and submissions only');
+  and count(*) filter (where kind = 'venue' and venue_id is not null) = 3 from public.my_owner_submissions()), 'own claims and submissions only');
 reset role;
 select set_config('request.jwt.claims', '', true);
 set local role authenticated;
 select owner_test.expect_error($q$select public.my_owner_submissions()$q$, '42501');
 reset role;
 
--- Submissions never publish, verify, link owners or grant roles.
-select owner_test.assert_that((select count(*) = 5 from public.venues where id::text like '42000000-%'), 'no listing created');
+-- Submissions never publish, verify, link owners or grant roles; each new venue is one private draft.
+select owner_test.assert_that((select count(*) = 4 and bool_and(publication_status = 'draft' and claim_status = 'pending')
+  from public.venues where id::text not like '42000000-%'), 'one private draft per created submission, none published');
 select owner_test.assert_that((select array_agg(claim_status::text order by id) = array['unclaimed','verified','unclaimed','unclaimed','pending']
   from public.venues where id::text like '42000000-%'), 'public claim status unchanged');
 select owner_test.assert_that((select count(*) = 0 from private.venue_owners) and (select count(*) = 0 from private.account_roles), 'no ownership or role granted');
 select owner_test.assert_that((select count(*) = 3 from private.venue_claims) and (select count(*) = 4 from private.venue_submissions), 'claims and submissions stored privately');
 select owner_test.assert_that((select count(*) = 7 and count(*) filter (where action = 'claim.submit' and target_venue_id is not null) = 3
+  and count(*) filter (where action = 'venue.submit' and target_venue_id is not null) = 4
   from private.ownership_audit_events), 'one audit event per created command, none for retries or warnings');
+select owner_test.assert_that((select count(*) = 4 from private.directory_audit_events where action = 'owner.create'), 'one draft audit per created venue');
 rollback;

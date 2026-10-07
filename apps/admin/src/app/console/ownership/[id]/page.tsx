@@ -23,8 +23,8 @@ function Outcome({ item, admin }: { item: OwnershipReview; admin: boolean }) {
   return <section className="workspace-panel"><div className="panel-top"><h2>Decision</h2><span className={`badge review-${item.status}`}>{statusLabel[item.status]}</span></div>
     <dl className="fact-list"><dt>Decided</dt><dd>{when(review.reviewed_at)}</dd>
       {review.reason && <><dt>Reason</dt><dd>{REVIEW_REASON_LABELS[review.reason]}</dd></>}
-      {review.resolved_venue_id && <><dt>{review.resolution === 'new' ? 'New draft listing' : 'Merged into'}</dt><dd>{admin ? <Link href={`/console/directory/${review.resolved_venue_id}`}>Open listing</Link> : <code>{review.resolved_venue_id}</code>}</dd></>}</dl>
-    {review.resolution === 'new' && <p className="muted small-note">The new listing is a private draft. An administrator publishes it after checking its courts and pin.</p>}</section>;
+      {review.resolved_venue_id && <><dt>{review.resolution === 'new' ? 'Owner’s listing' : 'Merged into'}</dt><dd>{admin ? <Link href={`/console/directory/${review.resolved_venue_id}`}>Open listing</Link> : <code>{review.resolved_venue_id}</code>}</dd></>}</dl>
+    {item.kind === 'venue' && item.draft && review.resolution !== 'new' && <p className="muted small-note">The owner’s draft was retired and is not published.</p>}</section>;
 }
 
 export default async function OwnershipItemPage({ params }: { params: Promise<{ id: string }> }) {
@@ -37,10 +37,10 @@ export default async function OwnershipItemPage({ params }: { params: Promise<{ 
   if (item === null) notFound();
   const admin = access.roles.includes('admin');
   const own = item.submitter.id === access.actorId;
-  const name = item.kind === 'claim' ? item.venue.name : item.proposed.name;
+  const name = item.kind === 'claim' ? item.venue.name : item.draft?.name ?? item.proposed.name;
   const candidates = item.kind === 'venue' ? item.nearby_venues.filter(venue => venue.publication_status !== 'suspended') : [];
 
-  return <><div className="page-heading"><Link className="back-link" href="/console/ownership">← Ownership review</Link><p className="eyebrow">{item.kind === 'claim' ? 'OWNERSHIP CLAIM' : 'NEW VENUE SUBMISSION'}</p><h1>{name}</h1><p className="muted">Submitted {when(item.created_at)} · <span className={`badge review-${item.status}`}>{statusLabel[item.status]}</span></p></div>
+  return <><div className="page-heading"><Link className="back-link" href="/console/ownership">← Ownership review</Link><p className="eyebrow">{item.kind === 'claim' ? 'OWNERSHIP CLAIM' : 'NEW VENUE'}</p><h1>{name}</h1><p className="muted">Submitted {when(item.created_at)} · <span className={`badge review-${item.status}`}>{statusLabel[item.status]}</span></p></div>
     <div className="review-layout"><div className="review-column">
       {item.kind === 'claim' ? <section className="workspace-panel"><h2>Listing being claimed</h2><dl className="fact-list">
         <dt>Listing</dt><dd><Listing id={item.venue.id} name={item.venue.name} admin={admin} /></dd>
@@ -50,12 +50,22 @@ export default async function OwnershipItemPage({ params }: { params: Promise<{ 
         <dt>Verified owners</dt><dd>{item.venue.owner_count}</dd>
         <dt>Other pending claims</dt><dd>{item.other_pending_claims}</dd></dl>
         {(item.venue.owner_count > 0 || item.other_pending_claims > 0) && <p className="notice">Others manage or are claiming this listing. Approving adds this person as another verified owner.</p>}</section>
-      : <><section className="workspace-panel"><h2>Proposed venue</h2><dl className="fact-list">
+      : <><section className="workspace-panel">{item.draft ? <><h2>Owner’s venue</h2><dl className="fact-list">
+        <dt>Listing</dt><dd><Listing id={item.draft.id} name={item.draft.name} admin={admin} /></dd>
+        <dt>Address</dt><dd>{item.draft.address_line}, {item.draft.city}, {item.draft.province}</dd>
+        <dt>Pin</dt><dd><a href={mapLink(item.draft.latitude, item.draft.longitude)} target="_blank" rel="noopener noreferrer">{item.draft.latitude}, {item.draft.longitude}</a></dd>
+        <dt>Status</dt><dd>{listingLabel(item.draft.publication_status, item.draft.claim_status)}</dd>
+        <dt>Active courts</dt><dd>{item.draft.active_court_count}</dd>
+        <dt>Photos</dt><dd>{item.draft.photo_count}</dd>
+        <dt>As submitted</dt><dd>{item.proposed.name} · {item.proposed.court_count} {item.proposed.court_count === 1 ? 'court' : 'courts'}</dd>
+        <dt>Nearby listings</dt><dd>{item.duplicates_acknowledged ? 'Submitter said it isn’t one of the public listings shown nearby.' : 'No public listings were shown nearby.'}</dd></dl>
+        <p className="muted small-note">The owner can keep editing this private draft while it awaits review. Check the listing before approving.</p></>
+      : <><h2>Proposed venue</h2><dl className="fact-list">
         <dt>Name</dt><dd>{item.proposed.name}</dd>
         <dt>Address</dt><dd>{item.proposed.address_line}, {item.proposed.city}, {item.proposed.province}</dd>
         <dt>Pin</dt><dd><a href={mapLink(item.proposed.latitude, item.proposed.longitude)} target="_blank" rel="noopener noreferrer">{item.proposed.latitude}, {item.proposed.longitude}</a></dd>
         <dt>Courts</dt><dd>{item.proposed.court_count}</dd>
-        <dt>Nearby listings</dt><dd>{item.duplicates_acknowledged ? 'Submitter said it isn’t one of the public listings shown nearby.' : 'No public listings were shown nearby.'}</dd></dl></section>
+        <dt>Nearby listings</dt><dd>{item.duplicates_acknowledged ? 'Submitter said it isn’t one of the public listings shown nearby.' : 'No public listings were shown nearby.'}</dd></dl></>}</section>
         <section className="workspace-panel"><h2>Possible duplicates</h2><p className="muted small-note">Listings within 150 m, or with a similar name within 2 km, including drafts and suspended listings the submitter never saw.</p>
           {item.nearby_venues.length ? <ul className="nearby-list">{item.nearby_venues.map(venue => <li key={venue.id}><div><strong><Listing id={venue.id} name={venue.name} admin={admin} /></strong><span className="muted"> · {venue.distance_m} m · {venue.city}</span></div><span className="muted small-note">{listingLabel(venue.publication_status, venue.claim_status)}{venue.in_snapshot ? '' : ' · found after submission'}</span></li>)}</ul> : <p className="muted">No listings nearby.</p>}
           <h3>Other submissions here</h3>
