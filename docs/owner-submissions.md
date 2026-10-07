@@ -52,7 +52,7 @@ Server secrets are project-wide. `owner-submissions` reuses the T13 `DISCOVERY_S
 
 The function uses Geocoding API v4 (`geocode.googleapis.com/v4/geocode/address/…?regionCode=PH&languageCode=en`). The key goes in the `X-Goog-Api-Key` header, never the URL. Results are filtered to the PH country component and never cached or stored. The stored pin is the owner-confirmed coordinate. The screen shows the Google map and an "Address results from Google" note. Re-check Google's display and caching terms if suggestions ever appear away from the map.
 
-Operator steps (not done in T15): enable the Geocoding API on a server key, apply the migration to staging, add `GOOGLE_MAPS_SERVER_API_KEY` with `supabase secrets set`, and deploy with `supabase functions deploy owner-submissions` (`config.toml` sets `verify_jwt=false` and the shared import map; tokens are verified in code). Then build a new EAS development client for the image picker.
+Staging status (2026-10-07): migration applied, `GOOGLE_MAPS_SERVER_API_KEY` set from the ignored `supabase/.env.owner-submissions.staging`, `owner-submissions` deployed; an unsigned request returns 401 `sign_in_required`. Signed-in device review needs the new EAS build. Operator steps for another environment: enable the Geocoding API on a server key, apply the migration to staging, add `GOOGLE_MAPS_SERVER_API_KEY` with `supabase secrets set`, and deploy with `supabase functions deploy owner-submissions` (`config.toml` sets `verify_jwt=false` and the shared import map; tokens are verified in code). Then build a new EAS development client for the image picker.
 
 ## Verification
 
