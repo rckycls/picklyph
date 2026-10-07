@@ -1,5 +1,10 @@
 // Pure ownership-review helpers shared by the route handlers and unit tests.
 
+/** Postgres timestamps carry microseconds; the shared Manila formatter accepts at most milliseconds. */
+export function toDisplayInstant(value: string): string {
+  return value.replace(/(\.\d{3})\d+(?=Z$|[+-]\d{2}:\d{2}$)/, '$1');
+}
+
 export type ReviewRejection = { status: number; message: string };
 
 /** Maps the database's machine-readable hint (then SQLSTATE) to a reviewer message. Null = unexpected. */

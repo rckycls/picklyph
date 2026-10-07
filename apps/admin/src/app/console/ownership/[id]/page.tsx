@@ -3,6 +3,9 @@ import { notFound } from 'next/navigation';
 import { REVIEW_REASON_LABELS, formatManilaDateTime, isUuid, type OwnershipReview } from '@picklyph/domain';
 import { readOwnershipReview, readReviewAccess } from '@/lib/ownership-server';
 import { OwnershipDecisionForm, ReviewUnavailable } from '@/components/ownership-review';
+import { toDisplayInstant } from '@/lib/ownership';
+
+const when = (value: string) => formatManilaDateTime(toDisplayInstant(value));
 
 const mapLink = (latitude: number, longitude: number) => `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`;
 const statusLabel = { pending: 'Awaiting review', approved: 'Approved', rejected: 'Rejected' } as const;
@@ -18,7 +21,7 @@ function Outcome({ item, admin }: { item: OwnershipReview; admin: boolean }) {
   if (!item.review) return null;
   const { review } = item;
   return <section className="workspace-panel"><div className="panel-top"><h2>Decision</h2><span className={`badge review-${item.status}`}>{statusLabel[item.status]}</span></div>
-    <dl className="fact-list"><dt>Decided</dt><dd>{formatManilaDateTime(review.reviewed_at)}</dd>
+    <dl className="fact-list"><dt>Decided</dt><dd>{when(review.reviewed_at)}</dd>
       {review.reason && <><dt>Reason</dt><dd>{REVIEW_REASON_LABELS[review.reason]}</dd></>}
       {review.resolved_venue_id && <><dt>{review.resolution === 'new' ? 'New draft listing' : 'Merged into'}</dt><dd>{admin ? <Link href={`/console/directory/${review.resolved_venue_id}`}>Open listing</Link> : <code>{review.resolved_venue_id}</code>}</dd></>}</dl>
     {review.resolution === 'new' && <p className="muted small-note">The new listing is a private draft. An administrator publishes it after checking its courts and pin.</p>}</section>;
@@ -37,7 +40,7 @@ export default async function OwnershipItemPage({ params }: { params: Promise<{ 
   const name = item.kind === 'claim' ? item.venue.name : item.proposed.name;
   const candidates = item.kind === 'venue' ? item.nearby_venues.filter(venue => venue.publication_status !== 'suspended') : [];
 
-  return <><div className="page-heading"><Link className="back-link" href="/console/ownership">← Ownership review</Link><p className="eyebrow">{item.kind === 'claim' ? 'OWNERSHIP CLAIM' : 'NEW VENUE SUBMISSION'}</p><h1>{name}</h1><p className="muted">Submitted {formatManilaDateTime(item.created_at)} · <span className={`badge review-${item.status}`}>{statusLabel[item.status]}</span></p></div>
+  return <><div className="page-heading"><Link className="back-link" href="/console/ownership">← Ownership review</Link><p className="eyebrow">{item.kind === 'claim' ? 'OWNERSHIP CLAIM' : 'NEW VENUE SUBMISSION'}</p><h1>{name}</h1><p className="muted">Submitted {when(item.created_at)} · <span className={`badge review-${item.status}`}>{statusLabel[item.status]}</span></p></div>
     <div className="review-layout"><div className="review-column">
       {item.kind === 'claim' ? <section className="workspace-panel"><h2>Listing being claimed</h2><dl className="fact-list">
         <dt>Listing</dt><dd><Listing id={item.venue.id} name={item.venue.name} admin={admin} /></dd>
@@ -60,7 +63,7 @@ export default async function OwnershipItemPage({ params }: { params: Promise<{ 
       <section className="workspace-panel"><h2>Submitter</h2><dl className="fact-list">
         <dt>Name</dt><dd>{item.submitter.display_name ?? 'No display name'}</dd>
         <dt>Account</dt><dd><code>{item.submitter.id}</code></dd>
-        <dt>Joined</dt><dd>{formatManilaDateTime(item.submitter.joined_at)}</dd>
+        <dt>Joined</dt><dd>{when(item.submitter.joined_at)}</dd>
         <dt>Requests</dt><dd>{item.submitter.pending} pending · {item.submitter.approved} approved · {item.submitter.rejected} rejected</dd></dl>
         {item.note && <><h3>Note from submitter</h3><p className="submitter-note">{item.note}</p></>}</section>
     </div><div className="review-column">
