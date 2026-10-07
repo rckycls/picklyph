@@ -15,6 +15,7 @@ import { EvidencePicker } from '@/features/owner/EvidencePicker';
 import { liveAddressSearch, liveNearbyListings, liveSubmit } from '@/features/owner/liveOwner';
 import { ownerFailureMessage, type EvidenceFile } from '@/features/owner/ownerClient';
 import { applyCandidate, EMPTY_DRAFT, pinProblem, venueRequest, type Pin, type VenueDraft } from '@/features/owner/ownerForm';
+import { OwnerGate } from '@/features/owner/OwnerGate';
 import { DuplicateList } from '@/features/owner/OwnerLists';
 import { OwnerScreen } from '@/features/owner/OwnerScreen';
 import PinMap from '@/features/owner/PinMap';
@@ -25,7 +26,11 @@ import { fonts } from '@/theme/typography';
 type Step = 'locate' | 'nearby' | 'details' | 'done';
 type Busy = 'search' | 'locate' | 'nearby' | 'submit' | null;
 
-export default function SubmitVenueScreen() {
+export default function SubmitVenueRoute() {
+  return <OwnerGate><SubmitVenueScreen /></OwnerGate>;
+}
+
+function SubmitVenueScreen() {
   const [step, setStep] = useState<Step>('locate');
   const [pin, setPin] = useState<Pin | null>(null);
   const [focus, setFocus] = useState<MapRegion>(PHILIPPINES_REGION);

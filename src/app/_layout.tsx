@@ -8,7 +8,19 @@ import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { colors } from '@/theme/colors';
+import { fonts } from '@/theme/typography';
 import { AuthProvider } from '@/features/auth/AuthProvider';
+
+// Owner screens sit directly in the root stack (no nested owner stack), so the first one
+// opened from a tab still gets the native back button. OwnerGate guards each of them.
+const ownerHeader = (title: string) => ({
+  headerShown: true,
+  title,
+  headerBackTitle: 'Back',
+  headerTintColor: colors.primary,
+  headerStyle: { backgroundColor: colors.surface },
+  headerTitleStyle: { fontFamily: fonts.semibold, color: colors.text },
+});
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
@@ -35,6 +47,8 @@ export default function RootLayout() {
           }}
         >
           <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="owner/submit" options={ownerHeader('Add a missing venue')} />
+          <Stack.Screen name="owner/claim/[id]" options={ownerHeader('Claim a listing')} />
         </Stack>
       </AuthProvider>
     </SafeAreaProvider>

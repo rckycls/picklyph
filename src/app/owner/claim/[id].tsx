@@ -11,6 +11,7 @@ import { StatusBadge } from '@/components/ui/StatusBadge';
 import { listingNotice } from '@/features/discovery/listing';
 import { loadLiveVenueDetail } from '@/features/discovery/liveDirectory';
 import type { VenueDetail } from '@/features/discovery/venueDetail';
+import { OwnerGate } from '@/features/owner/OwnerGate';
 import { EvidencePicker } from '@/features/owner/EvidencePicker';
 import { liveSubmit } from '@/features/owner/liveOwner';
 import { ownerFailureMessage, type EvidenceFile } from '@/features/owner/ownerClient';
@@ -21,7 +22,11 @@ import { colors } from '@/theme/colors';
 type Listing = { status: 'loading' } | { status: 'ready'; venue: VenueDetail } | { status: 'missing' } | { status: 'error' };
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export default function ClaimScreen() {
+export default function ClaimRoute() {
+  return <OwnerGate><ClaimScreen /></OwnerGate>;
+}
+
+function ClaimScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const venueId = typeof id === 'string' && UUID.test(id) ? id.toLowerCase() : null;
   const [listing, setListing] = useState<Listing>(venueId ? { status: 'loading' } : { status: 'missing' });

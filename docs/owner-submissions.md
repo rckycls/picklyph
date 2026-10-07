@@ -11,7 +11,7 @@ Signed-in owners can **claim** an approved listing or **submit a missing venue**
 - **Discover → venue details → Own this venue? Claim it** (`/owner/claim/[id]`) for unclaimed or under-review listings. Signed-out players are sent to Account.
 - **Account → Your submissions** lists the user's own claims and venues with their review status.
 
-The `/owner` stack redirects signed-out users to Account. The system photo picker (`expo-image-picker` 57.0.20) needs no photo-library permission prompt and requests HEIC as JPEG. Camera and microphone permissions are disabled. **This is a new native module: device review needs a new EAS development build.**
+Owner routes sit directly in the root stack (so the first one opened from a tab keeps the native back button) and each is wrapped in `OwnerGate`, which redirects signed-out users to Account. The system photo picker (`expo-image-picker` 57.0.20) needs no photo-library permission prompt and requests HEIC as JPEG. Camera and microphone permissions are disabled. **This is a new native module: device review needs a new EAS development build.**
 
 ## Endpoint: `/functions/v1/owner-submissions`
 
