@@ -5,9 +5,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '@/theme/colors';
 
 /** Scrolling, keyboard-safe body under the owner stack header. */
-export function OwnerScreen({ children }: { children: ReactNode }) {
+export function OwnerScreen({ children, includeTop = false }: { children: ReactNode; includeTop?: boolean }) {
   return (
-    <SafeAreaView style={styles.screen} edges={['left', 'right', 'bottom']}>
+    <SafeAreaView style={styles.screen} edges={includeTop ? ['top', 'left', 'right', 'bottom'] : ['left', 'right', 'bottom']}>
       <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={96}>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">{children}</ScrollView>
       </KeyboardAvoidingView>

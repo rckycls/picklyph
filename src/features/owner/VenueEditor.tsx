@@ -19,6 +19,7 @@ import {
   type CourtDraft, type VenueDraft,
 } from './venueDraft';
 import { VenuePhotos } from './VenuePhotos';
+import { VenuePolicyForm } from './VenuePolicyForm';
 
 type Loaded = { status: 'loading' } | { status: 'ready' } | { status: 'error'; failure: VenueFailure };
 
@@ -132,6 +133,7 @@ export function VenueEditor({ venueId }: { venueId: string }) {
         <VenuePhotos venueId={venue.id} photos={venue.photos} disabled={saving}
           onChange={(photos) => setVenue((current) => (current ? { ...current, photos } : current))} />
       </Card>
+      <Card><VenuePolicyForm venueId={venue.id} /></Card>
     </OwnerScreen>
   );
 }

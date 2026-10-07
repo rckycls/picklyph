@@ -5,6 +5,7 @@ import {
 } from '../../../packages/domain/src/ownerVenues.ts';
 import type { RateAction, RateDecision, RatePrincipal } from '../_shared/rate-limit.ts';
 import { cleanPhoto } from './photo.ts';
+import { readPolicySave, type VenuePolicySave, type VenuePolicyView } from '../../../packages/domain/src/policy.ts';
 
 /** A database rejection the client can act on; `reason` is the SQL hint. */
 export class CommandRejected extends Error {
@@ -17,6 +18,7 @@ export const REJECTIONS: Record<string, { status: number; error: string }> = {
   active_court_required: { status: 400, error: 'active_court_required' },
   actor_required: { status: 403, error: 'account_required' },
   not_owner: { status: 403, error: 'not_owner' },
+  merchant_inactive: { status: 403, error: 'merchant_inactive' },
   venue_unavailable: { status: 404, error: 'venue_unavailable' },
   version_conflict: { status: 409, error: 'version_conflict' },
   duplicate_court: { status: 409, error: 'duplicate_court' },
@@ -33,6 +35,8 @@ type Dependencies = {
   list: (actor: string) => Promise<OwnedVenueSummary[]>;
   read: (actor: string, venueId: string) => Promise<OwnerVenue>;
   save: (actor: string, command: OwnerVenueSave) => Promise<OwnerVenue>;
+  readPolicy: (actor: string, venueId: string) => Promise<VenuePolicyView>;
+  savePolicy: (actor: string, command: VenuePolicySave) => Promise<VenuePolicyView>;
   upload: (path: string, bytes: Uint8Array, type: PhotoType) => Promise<void>;
   remove: (path: string) => Promise<void>;
   addPhoto: (actor: string, request: OwnerPhotoAdd, path: string, width: number, height: number) => Promise<OwnerPhotoAddResult>;
@@ -100,10 +104,19 @@ export function createVenueHandler(deps: Dependencies) {
 
     if (request.method === 'GET') {
       let query;
-      try { query = readOwnerVenueQuery(new URL(request.url).searchParams); } catch { return respond(400, { error: 'invalid_request' }); }
+      let policies = false;
+      try {
+        const params = new URL(request.url).searchParams;
+        if (params.has('section')) {
+          if (params.getAll('section').length !== 1 || params.get('section') !== 'policies' || !params.has('venue_id')) throw new Error();
+          policies = true; params.delete('section');
+        }
+        query = readOwnerVenueQuery(params);
+      } catch { return respond(400, { error: 'invalid_request' }); }
       const decision = await deps.limit('owner-read', principal);
       if (!decision.allowed) return respond(decision.status, { error: decision.status === 429 ? 'rate_limited' : 'temporarily_unavailable' }, decision.headers);
       try {
+        if (policies && query.venue_id) return respond(200, { policy: await deps.readPolicy(actor, query.venue_id) }, decision.headers);
         return query.venue_id === null
           ? respond(200, { venues: await deps.list(actor) }, decision.headers)
           : respond(200, { venue: await deps.read(actor, query.venue_id) }, decision.headers);
@@ -116,12 +129,19 @@ export function createVenueHandler(deps: Dependencies) {
     const contentType = request.headers.get('content-type') ?? '';
 
     if (/^application\/json(?:;|$)/i.test(contentType)) {
-      let command: OwnerVenueCommand;
+      let command: OwnerVenueCommand | VenuePolicySave;
       try {
         const body = await readBounded(request, MAX_JSON);
         if (!body) return respond(413, { error: 'request_too_large' }, decision.headers);
-        command = readOwnerVenueCommand(new TextDecoder('utf-8', { fatal: true }).decode(body));
+        const json = new TextDecoder('utf-8', { fatal: true }).decode(body);
+        const raw: unknown = JSON.parse(json);
+        command = raw && typeof raw === 'object' && 'kind' in raw && raw.kind === 'save_policy'
+          ? readPolicySave(raw) : readOwnerVenueCommand(json);
       } catch { return respond(400, { error: 'invalid_request' }, decision.headers); }
+      if (command.kind === 'save_policy') {
+        try { return respond(200, { policy: await deps.savePolicy(actor, command) }, decision.headers); }
+        catch (error) { return refuse(error, decision.headers); }
+      }
       if (command.kind === 'save') {
         try { return respond(200, { venue: await deps.save(actor, command) }, decision.headers); }
         catch (error) { return refuse(error, decision.headers); }

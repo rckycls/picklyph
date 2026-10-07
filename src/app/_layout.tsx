@@ -10,9 +10,10 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { colors } from '@/theme/colors';
 import { fonts } from '@/theme/typography';
 import { AuthProvider } from '@/features/auth/AuthProvider';
+import { OwnerModeProvider } from '@/features/owner/OwnerMode';
 
 // Owner screens sit directly in the root stack (no nested owner stack), so the first one
-// opened from a tab still gets the native back button. OwnerGate guards each of them.
+// opened from a tab still gets the native back button. Each route checks its required access.
 const ownerHeader = (title: string) => ({
   headerShown: true,
   title,
@@ -39,19 +40,21 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <AuthProvider>
-        <StatusBar style="dark" />
-        <Stack
-          screenOptions={{
-            headerShown: false,
-            contentStyle: { backgroundColor: colors.background },
-          }}
-        >
-          <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="owner/submit" options={ownerHeader('Add a missing venue')} />
-          <Stack.Screen name="owner/claim/[id]" options={ownerHeader('Claim a listing')} />
-          <Stack.Screen name="owner/venues/index" options={ownerHeader('Your venues')} />
-          <Stack.Screen name="owner/venues/[id]" options={ownerHeader('Edit venue')} />
-        </Stack>
+        <OwnerModeProvider>
+          <StatusBar style="dark" />
+          <Stack
+            screenOptions={{
+              headerShown: false,
+              contentStyle: { backgroundColor: colors.background },
+            }}
+          >
+            <Stack.Screen name="(tabs)" />
+            <Stack.Screen name="owner/submit" options={ownerHeader('Add a missing venue')} />
+            <Stack.Screen name="owner/claim/[id]" options={ownerHeader('Claim a listing')} />
+            <Stack.Screen name="owner/venues/index" options={ownerHeader('Your venues')} />
+            <Stack.Screen name="owner/venues/[id]" options={ownerHeader('Edit venue')} />
+          </Stack>
+        </OwnerModeProvider>
       </AuthProvider>
     </SafeAreaProvider>
   );

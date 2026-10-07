@@ -24,6 +24,7 @@
     "test:owner:local": "node supabase/tests/owner-local.cjs",
     "test:venues:local": "node supabase/tests/owner-venues-local.cjs",
     "test:schedules:local": "node supabase/tests/schedules-local.cjs",
+    "test:policies:local": "node supabase/tests/policies-local.cjs",
     "functions:check": "npm exec --yes --package=deno@2.9.6 -- deno check --config supabase/functions/deno.json supabase/functions/venue-search/index.ts supabase/functions/owner-submissions/index.ts supabase/functions/owner-venues/index.ts supabase/functions/owner-schedules/index.ts",
     "functions:lint": "npm exec --yes --package=deno@2.9.6 -- deno lint --config supabase/functions/deno.json supabase/functions",
     "test:functions": "npm exec --yes --package=deno@2.9.6 -- deno test --allow-env --config supabase/functions/deno.json supabase/functions/tests",

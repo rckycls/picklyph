@@ -3,12 +3,14 @@ import { StyleSheet, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { TabIcon } from '@/components/ui/TabIcon';
+import { useOwnerMode } from '@/features/owner/OwnerMode';
 import { colors } from '@/theme/colors';
 import { fonts } from '@/theme/typography';
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const { fontScale } = useWindowDimensions();
+  const { mode } = useOwnerMode();
 
   return (
     <Tabs
@@ -51,6 +53,8 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => <TabIcon name="account" color={color} />,
         }}
       />
+      <Tabs.Screen name="owner" options={{ href: mode === 'owner' ? '/owner' : null, title: 'Venues',
+        tabBarAccessibilityLabel: 'Manage your venues', tabBarIcon: ({ color }) => <TabIcon name="bookings" color={color} /> }} />
     </Tabs>
   );
 }

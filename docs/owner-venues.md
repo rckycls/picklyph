@@ -1,6 +1,6 @@
 # Owner venue editing (T18)
 
-From Account, a verified owner opens **Manage your venue(s)**, selects a listing, and edits its name, street address, city/municipality, province, courts and public photos. Approved submission history also provides the entry point while a newly approved draft awaits publication. Each route has `OwnerGate` and is registered in the root stack so the native back button remains visible. This is the editor; T20 adds the owner/player mode switch.
+From Account, an account with a current verified, approved venue selects **Owner mode**, opens **Manage your venue(s)** or the **Venues** tab, and edits a listing’s details, courts, photos and booking policies. Player mode hides venue management controls. Approved submission history alone never enables management. Editor routes remain in the root stack with a native back button; `VerifiedOwnerGate` checks current access. Submission/claim routes retain the auth-only `OwnerGate` so new owners can apply.
 
 Owners can edit only their own **approved, verified** listings. The database checks the current private ownership link on every command. It locks the listing and ownership row for writes, so revocation, suspension and competing saves serialize. Pins, publication, claim status and ownership remain admin/reviewer controls. Admins still curate through their existing console commands; an admin role alone does not grant access to these owner endpoints.
 
@@ -52,3 +52,23 @@ Run `npm run test:venues:local` with local Supabase/Docker running. It never rea
 Additional checks: `npm run test:directory`, `npm run test:owner`, `npm run test:domain`, `npm run test:discovery`, `npm run typecheck`, `npm run lint`, `npm run functions:check`, `npm run functions:lint`, `npm run test:functions`, `npm run admin:typecheck`, `npm run test:admin`, `npm run bundle:ios`.
 
 Physical iPhone acceptance remains: after staging deployment and Metro restart, sign in as a verified owner of an approved venue; check entry/list/back navigation, detail/court saves, unsaved-change behavior, stale-version recovery, JPEG/PNG selection/upload/retry/removal, photo strip in Discover and revocation/suspension failures. Check large text/VoiceOver. Existing T15 image-picker/file-system modules suffice; a native rebuild is unnecessary for these JavaScript-only changes. No device or browser layout acceptance is claimed.
+
+## Owner mode and policies (T20)
+
+Mode starts in Player context on each account identity/cold restore. `OwnerModeProvider` calls the self-only `my_account_access()` on navigation and every AppState change; controls stay unavailable while access is unknown or failed. Requests carry identity/generation guards, and changing accounts discards pending callbacks and prior mode. Revocation/suspension removes mode on the next check. Account shows a checking/error/retry state. During foreground checks an already authorized editor stays mounted with its content hidden and interactions/accessibility disabled, preserving unsaved changes and photo-picker results. The chosen Venues tab remains present while checking; definitive denial removes it.
+
+`GET /functions/v1/owner-venues?venue_id=<uuid>&section=policies` returns `{policy:{venue_id,revision,confirmation,payment,merchant_active}}`. `POST` JSON accepts exactly:
+
+```json
+{"kind":"save_policy","venue_id":"<uuid>","expected_revision":"0","policy":{"confirmation":"approval","payment":"arrival"}}
+```
+
+Confirmation is `instant` or `approval`; payment is `arrival`, `online` or `both`. An absent private policy record reads as **instant/arrival**, revision `"0"`. Successful saves increment an independent bigint-string revision; concurrent/stale forms return409. Detail/photo/schedule saves do not change the policy version. The same T18 verified-owner checks, body bounds, verified-actor limits and fail-closed write guard apply. Owner/admin role alone cannot edit another venue. Each success atomically appends `policy.update`; audit failure rolls back the policy/version.
+
+Private `venue_merchants` holds trusted activation state. Both merchant/policy tables have RLS and no API-role grants (including service role); only service-only read/save wrappers execute. Neither owner JSON nor a client/service table write can activate a merchant. T20 adds **no merchant onboarding/activation endpoint**. Online/both saves require current activation; loss of activation makes the effective read return arrival. UI choices remain disabled without activation, and forged bodies cannot override the database. Synthetic SQL test fixtures alone exercise activation.
+
+T36 must implement verified provider activation with the same venue-first, merchant-second lock order and increment policy revision on activation changes. T24/T27/T35 must read the effective policy inside their booking transaction and snapshot it; the owner UI’s mode/policy is presentation, never command authorization or an availability promise. Existing bookings will use their snapshots.
+
+Migration `20261008000000_venue_policies.sql` is applied locally only. Hosted rollout needs T18–T20 migrations plus `owner-venues` redeployment. Reuse existing server secret names; no new dependencies/native modules. `npm run test:policies:local` covers Docker SQL plus real Auth/mobile-client/handler/PostgREST races and served Edge forged-token/outage denial, then removes only its fixtures/temp credentials. Restart Metro if generated route types/cache include outside-app paths.
+
+Device acceptance remains: player has no mode/management; verified owner switches both ways and navigates Venues/editor/back; instant/approval and arrival saves persist; online choices remain disabled; concurrent form conflicts reload; foreground/revocation/account-change checks hide stale controls; photo picker and unsaved detail/policy state survive an access recheck. Review VoiceOver and large text. No iPhone acceptance or hosted deployment is claimed.

@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '../../../packages/domain/src/database.ts';
 import type { OwnerPhotoAdd, OwnerPhotoRemove, OwnerVenueSave, PhotoType } from '../../../packages/domain/src/ownerVenues.ts';
 import { CommandRejected, REJECTIONS } from './handler.ts';
+import type { VenuePolicySave } from '../../../packages/domain/src/policy.ts';
 
 function rejected(error: { hint?: string | null } | null): never {
   if (error?.hint && REJECTIONS[error.hint]) throw new CommandRejected(error.hint);
@@ -37,6 +38,17 @@ export function createSupabaseVenueDeps(verifier: () => SupabaseClient<Database>
     save: async (actor: string, command: OwnerVenueSave) => {
       const { data, error } = await server().rpc('owner_venue_save', { actor_user_id: actor, target_venue_id: command.venue_id,
         expected_updated_at: command.expected_updated_at, venue_input: command.venue, court_inputs: command.courts });
+      if (error || !data) return rejected(error);
+      return data;
+    },
+    readPolicy: async (actor: string, venueId: string) => {
+      const { data, error } = await server().rpc('owner_venue_policy_read', { actor_user_id: actor, target_venue_id: venueId });
+      if (error || !data) return rejected(error);
+      return data;
+    },
+    savePolicy: async (actor: string, command: VenuePolicySave) => {
+      const { data, error } = await server().rpc('owner_venue_policy_save', { actor_user_id: actor, target_venue_id: command.venue_id,
+        expected_revision: command.expected_revision, policy_input: command.policy });
       if (error || !data) return rejected(error);
       return data;
     },

@@ -31,7 +31,7 @@ test('owner venue editing: owner-only audited saves, version conflicts, photo li
       where n.nspname in ('public', 'private') and (p.proname like 'owner_venue%' or p.proname in ('require_venue_owner', 'valid_owner_text'))
         and has_function_privilege(r.rolname, p.oid, 'execute') order by 1, 2`)).rows.map((row) => `${row.proname}:${row.rolname}`);
     assert.deepEqual(grants, ['owner_venue_list:service_role', 'owner_venue_photo_add:service_role', 'owner_venue_photo_remove:service_role',
-      'owner_venue_read:service_role', 'owner_venue_save:service_role']);
+      'owner_venue_policy_read:service_role', 'owner_venue_policy_save:service_role', 'owner_venue_read:service_role', 'owner_venue_save:service_role']);
     const table = (await db.query(`select r.rolname, has_table_privilege(r.rolname, 'public.venue_photos', 'select') as can_read,
       has_table_privilege(r.rolname, 'public.venue_photos', 'insert,update,delete') as can_write
       from (values ('anon'), ('authenticated'), ('service_role')) r(rolname) order by 1`)).rows;

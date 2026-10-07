@@ -1,6 +1,7 @@
 import type {
   Court, CourtStatus, CourtSurface, OwnedVenueSummary, OwnerPhotoAdd, OwnerPhotoRemove, OwnerVenue, OwnerVenuePhoto,
   OwnerVenueSave, PhotoType, VenueClaimStatus, VenuePublicationStatus,
+  VenuePolicyView, VenuePolicySave,
 } from '@picklyph/domain';
 
 // Pure client for the owner-venues Edge function: type-only domain imports,
@@ -26,7 +27,7 @@ export type VenueTransport = {
 export type VenueRejection =
   | 'invalid_request' | 'invalid_photo' | 'photo_dimensions' | 'photo_too_large' | 'unsupported_photo'
   | 'too_many_courts' | 'active_court_required' | 'account_required' | 'not_owner' | 'venue_unavailable'
-  | 'version_conflict' | 'duplicate_court' | 'too_many_photos' | 'request_reused';
+  | 'version_conflict' | 'duplicate_court' | 'too_many_photos' | 'request_reused' | 'merchant_inactive';
 export type VenueFailure =
   | { kind: 'sign_in' | 'network' | 'unavailable' | 'not_configured'; retryAfterSeconds: number | null }
   | { kind: 'rate_limited'; retryAfterSeconds: number }
@@ -35,7 +36,7 @@ export type VenueOutcome<T> = { ok: true; value: T } | { ok: false; failure: Ven
 
 const REJECTIONS: readonly VenueRejection[] = ['invalid_request', 'invalid_photo', 'photo_dimensions', 'photo_too_large',
   'unsupported_photo', 'too_many_courts', 'active_court_required', 'account_required', 'not_owner', 'venue_unavailable',
-  'version_conflict', 'duplicate_court', 'too_many_photos', 'request_reused'];
+  'version_conflict', 'duplicate_court', 'too_many_photos', 'request_reused', 'merchant_inactive'];
 const unexpected = (): never => { throw new Error('Unexpected owner venue response.'); };
 const text = (value: unknown, max: number): value is string => typeof value === 'string' && value.length > 0 && value.length <= max;
 const id = (value: unknown): string => (typeof value === 'string' && UUID.test(value) ? value.toLowerCase() : unexpected());
@@ -147,6 +148,25 @@ export function loadOwnedVenue(transport: VenueTransport, venueId: string, signa
     (body) => parseOwnerVenue(body.venue));
 }
 
+export function parseVenuePolicy(raw: unknown): VenuePolicyView {
+  const p = record(raw);
+  if ((p.confirmation !== 'instant' && p.confirmation !== 'approval')
+    || (p.payment !== 'arrival' && p.payment !== 'online' && p.payment !== 'both')
+    || typeof p.merchant_active !== 'boolean' || (!p.merchant_active && p.payment !== 'arrival')
+    || typeof p.revision !== 'string' || !/^(0|[1-9][0-9]{0,18})$/.test(p.revision)) return unexpected();
+  return { venue_id: id(p.venue_id), revision: p.revision, confirmation: p.confirmation, payment: p.payment, merchant_active: p.merchant_active };
+}
+
+export function loadVenuePolicy(transport: VenueTransport, venueId: string, signal?: AbortSignal) {
+  return call(transport, `${transport.endpoint}?${new URLSearchParams({ venue_id: venueId, section: 'policies' })}`, { method: 'GET', signal },
+    (body) => { const p = parseVenuePolicy(body.policy); return p.venue_id === venueId.toLowerCase() ? p : unexpected(); });
+}
+
+export function saveVenuePolicy(transport: VenueTransport, command: VenuePolicySave, signal?: AbortSignal) {
+  return call(transport, transport.endpoint, { ...json(command), signal },
+    (body) => { const p = parseVenuePolicy(body.policy); return p.venue_id === command.venue_id.toLowerCase() ? p : unexpected(); });
+}
+
 /** A version conflict returns `rejected: version_conflict`; reload, then reapply the owner's changes. */
 export function saveOwnedVenue(transport: VenueTransport, command: OwnerVenueSave) {
   return call(transport, transport.endpoint, json(command), (body) => parseOwnerVenue(body.venue));
@@ -173,6 +193,7 @@ export function venueFailureMessage(failure: VenueFailure): string {
     case 'unavailable': return 'Couldn’t confirm your changes. Retry shortly, or reload to check the latest listing.';
     case 'rejected':
       switch (failure.reason) {
+        case 'merchant_inactive': return 'Online payment needs verified merchant activation. Choose pay on arrival for now.';
         case 'version_conflict': return 'This listing changed since you opened it. Reload to see the latest, then make your changes again.';
         case 'not_owner': return 'You no longer manage this venue. Contact pickly support if this is a mistake.';
         case 'venue_unavailable': return 'This venue can’t be edited right now because it isn’t published. Contact pickly support.';

@@ -1,4 +1,4 @@
-import type { OwnerPhotoAdd, OwnerSubmission, OwnerSubmissionRequest, OwnerVenueSave } from '@picklyph/domain';
+import type { OwnerPhotoAdd, OwnerSubmission, OwnerSubmissionRequest, OwnerVenueSave, VenuePolicySave } from '@picklyph/domain';
 import { File as DeviceFile } from 'expo-file-system';
 
 import { fetchWithDeadline } from '@/lib/fetchWithDeadline';
@@ -11,6 +11,7 @@ import {
 import type { Pin } from './ownerForm';
 import {
   addVenuePhoto, listOwnedVenues, loadOwnedVenue, removeVenuePhoto, saveOwnedVenue,
+  loadVenuePolicy, saveVenuePolicy,
   type PhotoFile, type VenueTransport,
 } from './venueClient';
 
@@ -99,6 +100,16 @@ export function liveOwnedVenue(venueId: string, signal?: AbortSignal): ReturnTyp
 export function liveSaveVenue(command: OwnerVenueSave): ReturnType<typeof saveOwnedVenue> {
   const live = liveVenueTransport();
   return live ? saveOwnedVenue(live, command) : Promise.resolve(notConfigured);
+}
+
+export function liveVenuePolicy(venueId: string, signal?: AbortSignal): ReturnType<typeof loadVenuePolicy> {
+  const live = liveVenueTransport();
+  return live ? loadVenuePolicy(live, venueId, signal) : Promise.resolve(notConfigured);
+}
+
+export function liveSavePolicy(command: VenuePolicySave, signal?: AbortSignal): ReturnType<typeof saveVenuePolicy> {
+  const live = liveVenueTransport();
+  return live ? saveVenuePolicy(live, command, signal) : Promise.resolve(notConfigured);
 }
 
 export function liveAddVenuePhoto(request: OwnerPhotoAdd, file: PhotoFile): ReturnType<typeof addVenuePhoto> {

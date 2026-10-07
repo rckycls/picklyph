@@ -8,7 +8,7 @@ import { Card } from '@/components/ui/Card';
 import { screenText } from '@/components/ui/Screen';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { liveOwnedVenues } from '@/features/owner/liveOwner';
-import { OwnerGate } from '@/features/owner/OwnerGate';
+import { VerifiedOwnerGate } from '@/features/owner/OwnerMode';
 import { OwnerScreen } from '@/features/owner/OwnerScreen';
 import { venueFailureMessage } from '@/features/owner/venueClient';
 import { summaryStatus } from '@/features/owner/venueDraft';
@@ -18,10 +18,10 @@ import { fonts } from '@/theme/typography';
 type Venues = { status: 'loading' } | { status: 'ready'; items: OwnedVenueSummary[] } | { status: 'error'; message: string };
 
 export default function OwnedVenuesRoute() {
-  return <OwnerGate><OwnedVenuesScreen /></OwnerGate>;
+  return <VerifiedOwnerGate><OwnedVenuesScreen /></VerifiedOwnerGate>;
 }
 
-function OwnedVenuesScreen() {
+export function OwnedVenuesScreen({ includeTop = false }: { includeTop?: boolean }) {
   const [venues, setVenues] = useState<Venues>({ status: 'loading' });
   const load = useCallback(() => {
     let active = true;
@@ -36,7 +36,7 @@ function OwnedVenuesScreen() {
   useFocusEffect(load);
 
   return (
-    <OwnerScreen>
+    <OwnerScreen includeTop={includeTop}>
       <Text style={screenText.body}>Venues pickly has verified you manage. Edit details, courts and photos; players see changes right away.</Text>
       {venues.status === 'loading' && (
         <View style={styles.row} accessibilityLiveRegion="polite">

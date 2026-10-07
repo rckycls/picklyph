@@ -3,7 +3,7 @@ import { Text } from 'react-native';
 
 import { Card } from '@/components/ui/Card';
 import { screenText } from '@/components/ui/Screen';
-import { OwnerGate } from '@/features/owner/OwnerGate';
+import { VerifiedOwnerGate } from '@/features/owner/OwnerMode';
 import { OwnerScreen } from '@/features/owner/OwnerScreen';
 import { VenueEditor } from '@/features/owner/VenueEditor';
 
@@ -13,12 +13,12 @@ export default function EditVenueRoute() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const venueId = typeof id === 'string' && UUID.test(id) ? id.toLowerCase() : null;
   return (
-    <OwnerGate>
+    <VerifiedOwnerGate>
       {venueId ? <VenueEditor key={venueId} venueId={venueId} /> : (
         <OwnerScreen>
           <Card><Text accessibilityRole="alert" style={screenText.body}>This venue link isn’t valid. Open the venue from Your venues.</Text></Card>
         </OwnerScreen>
       )}
-    </OwnerGate>
+    </VerifiedOwnerGate>
   );
 }

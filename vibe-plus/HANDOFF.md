@@ -1,6 +1,6 @@
 # HANDOFF: read this first
 
-**Updated:** 2026-10-07, Asia/Manila. **Plan:** Codex desktop / ChatGPT Plus; keep configured model. W3/W4 complete (7 points each). W5: T13, T14 and T16 complete (5/7); T15 implemented, device checks partly done. W6: T17–T19 complete (6/7). Hosted staging has T05/T08/T11–T13/T15/T17 plus `venue-search` and `owner-submissions`; T18/T19 are local only. Capacity remains 8; no actual usage-window end/limit signal. A few sessions/week, experienced user, no deadline.
+**Updated:** 2026-10-07, Asia/Manila. **Plan:** Codex desktop / ChatGPT Plus; keep configured model. W3/W4 complete (7 points each). W5: T13, T14 and T16 complete (5/7); T15 implemented, device checks partly done. W6: T17–T20 complete (7/7), W7 cards expanded. Hosted staging has T05/T08/T11–T13/T15/T17 plus `venue-search` and `owner-submissions`; T18–T20 are local only. Capacity remains 8; no actual usage-window end/limit signal. A few sessions/week, experienced user, no deadline.
 
 ## Current state
 
@@ -83,6 +83,15 @@
 **For next tasks:** T22 must guard this schedule save and T18 deactivation against active allocations before bookings ship. T23 must snapshot checked totals. Hours never promise availability.
 **Evidence:** `test:schedules:local` → Docker SQL + real Auth/PostgREST permissions/revocation/client RPC denial, concurrent200/409/one audit and served Edge forged-JWT/Redis-outage checks PASS, fixtures/env removed; `test:directory`32 pass; updated `node --test supabase/tests/schedules.test.cjs` → 18 valid parity configurations +17 invalid SQL cases PASS; `test:domain`30, owner10, discovery31, auth16, admin12, real Upstash SDK1 pass; mobile/domain/admin typecheck, mobile/admin/Edge lint, Edge check, admin build, `bundle:ios -- --clear` (1334 modules/3.6MB) exit0. Local migration history includes T19.
 
+## T20 mode/policies handoff
+
+**Built:** Account-scoped Player/Owner context, current-link navigation/foreground checks, Venues tab and per-venue policy editor. Players have no management controls; approved submission history cannot authorize access. Pending checks hide/disable an existing mounted editor to preserve picker/unsaved state; definitive denial removes it. This behavior is code-reviewed, not device-accepted.
+**Files/APIs:** `OwnerMode.tsx`, `modeState.ts`, `VenuePolicyForm.tsx`, `policy.ts`; `owner-venues` GET `section=policies` / POST `save_policy`; service-only `owner_venue_policy_read|save`; migration `20261008000000`; contract/rollout in `docs/owner-venues.md`.
+**Decisions:** Independent bigint-string revisions; instant/arrival defaults; atomic `policy.update` audit. Private merchant state has no API grants/activation endpoint; inactive merchants cannot save online/both and effective reads return arrival.
+**Gotchas:** Local migration only. Hosted T18–T20/function deployment and iPhone mode/picker/navigation/large-text review remain. No dependency/native rebuild. Account Manage opens `/owner`. T18 Edge regression had one transient502, then passed; no denied-write side effects observed.
+**For next tasks:** T24/T27 snapshot effective policies inside booking transactions; T35 checks allowed method/current activation; T36 locks venue then merchant and increments policy revision on activation changes. W7 cards expanded, T21 next.
+**Evidence:** `npm run test:policies:local` → Docker SQL + real Auth/mobile client/handler/PostgREST race (one success, one conflict, one actor audit), synthetic activation/loss/revocation/bypass + served Edge forged-token/outage PASS, fixtures/env removed, exit0; `npm run test:venues:local` → PASS on retry; `npm run test:directory`33, `test:owner`13, `test:domain`30, `test:discovery`31, `test:auth`16, `test:admin`12, `test:functions`1 pass; `npm run typecheck`, `lint`, `admin:typecheck`, `admin:lint`, `functions:check`, `functions:lint`, `bundle:ios` → exit0, iOS1339 modules/3.6MB.
+
 ## Mobile and branding
 
 - Expo57.0.26 / React19.2.3 / RN0.86.3 / Router57.0.24 / TS6.0.3 / Supabase-js2.117.2. Map opens first with live T13 directory results (demo pins removed in T14) and optional foreground location. Bookings guarded by restored auth; inventory, payments and owner UI are later tasks.
@@ -93,7 +102,7 @@
 
 ## Next
 
-1. **T20 next** (owner mode switch and venue policies). Reuse T18's editor/command/guard/audit pattern and locked instant + arrival defaults; online stays disabled until merchant activation. T18/T19 hosted migrations/functions and T18 physical iPhone acceptance remain separate. Read `docs/owner-venues.md` and `docs/schedules.md`; T19 adds schema/resolver/commands, no schedule form. Keep new screens in the root stack with `OwnerGate`, and use `expo-file-system` `File` upload parts.
+1. **T21 next** (transactional allocations and expiration primitives), first full W7 card. Read only its listed context; shared inventory belongs in Supabase transactions. T18–T20 hosted migrations/functions and physical iPhone acceptance remain separate. Future management screens use `VerifiedOwnerGate`; submission/claim screens remain auth-only. Use `expo-file-system` `File` upload parts.
 2. **Device checks still open** on the installed EAS build: T15 address-search results, the submissions list, the duplicate warning and claiming (a published staging test venue now exists); T16 recovery states; T02 navigation/VoiceOver/large text. T14 accepted 2026-10-07.
 3. **Staging:** first admin assigned by operator SQL; one published test venue; the console runs locally against staging (`ADMIN_SUPABASE_SECRET_KEY` in the ignored `apps/admin/.env.local`), not hosted yet. H06 (owner claim/review trial) can run now; the reviewer must differ from the submitter. Decide whether public contact fields belong in a later directory task. H02: production Redis, hosted outage/isolation and per-IP ingress checks remain.
 4. T09 rules are ready for later commands; use server-derived clocks. T46 must review moderator audit permissions and replace unaudited `set_verified_venue_owner` revocation; T47 must define audit UUID and evidence retention.
