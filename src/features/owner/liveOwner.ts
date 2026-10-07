@@ -1,4 +1,5 @@
 import type { OwnerSubmission, OwnerSubmissionRequest } from '@picklyph/domain';
+import { File as DeviceFile } from 'expo-file-system';
 
 import { fetchWithDeadline } from '@/lib/fetchWithDeadline';
 import { getSupabase } from '@/lib/supabase';
@@ -22,9 +23,10 @@ function liveTransport(): OwnerTransport | null {
       accessToken: async () => (await client.auth.getSession()).data.session?.access_token ?? null,
       // Photo uploads on mobile data can take longer than an ordinary request.
       fetch: (input, init) => fetchWithDeadline(input, init, init.method === 'POST' ? 60_000 : 15_000),
-      // React Native's FormData streams this { uri, name, type } file part from disk;
-      // the DOM typings used for type checking only describe Blob parts.
-      evidencePart: (file) => ({ uri: file.uri, name: file.name, type: file.type }) as unknown as Blob,
+      // expo/fetch (the iOS global fetch) rejects React Native's { uri, name, type } parts with
+      // "Unsupported FormDataPart". An expo-file-system File implements Blob and reads its bytes.
+      // The server ignores client names/types and sniffs the bytes itself.
+      evidencePart: (file) => new DeviceFile(file.uri) as unknown as Blob,
     };
   } catch {
     transport = null;
