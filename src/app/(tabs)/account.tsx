@@ -1,36 +1,61 @@
-import { router } from 'expo-router';
-import { Text } from 'react-native';
-import { useState } from 'react';
+import Constants from 'expo-constants';
+import { Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
-import { Screen, screenText } from '@/components/ui/Screen';
-import { StatusBadge } from '@/components/ui/StatusBadge';
+import { MenuGroup, MenuRow } from '@/features/account/Menu';
+import { ProfileHero } from '@/features/account/ProfileHero';
+import { SignedInProfile } from '@/features/account/SignedInProfile';
 import { SignInForm } from '@/features/auth/SignInForm';
 import { useAuth } from '@/features/auth/AuthProvider';
-import { OwnerCard } from '@/features/owner/OwnerCard';
+import { colors } from '@/theme/colors';
+import { fonts } from '@/theme/typography';
 
 export default function AccountScreen() {
   const auth = useAuth();
-  const [signOutError, setSignOutError] = useState<string | null>(null);
+  const session = auth.status === 'ready' ? auth.session : null;
   return (
-    <Screen
-      eyebrow="PLAYERS & COURT OWNERS"
-      title="Welcome to the court."
-      description="Find your next game or give players a place to play. Pickly brings both sides together."
-    >
-      {auth.session && auth.status === 'ready' ? <Card>
-        <StatusBadge label="Signed in" tone="success" />
-        <Text accessibilityRole="header" style={screenText.title}>Welcome back.</Text>
-        <Text style={screenText.body}>{auth.session.user.email ?? 'Your Apple account'}</Text>
-        {signOutError && <Text accessibilityRole="alert" style={screenText.body}>{signOutError}</Text>}
-        <Button label="Sign out of this phone" loading={auth.busy} onPress={() => {
-          setSignOutError(null);
-          void auth.signOut().catch(() => setSignOutError('We couldn’t sign out. Please try again.'));
-        }} />
-        <Button label="Go to Discover" variant="secondary" onPress={() => router.navigate('/(tabs)')} />
-      </Card> : <SignInForm />}
-      <OwnerCard signedIn={Boolean(auth.session) && auth.status === 'ready'} />
-    </Screen>
+    <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
+      <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+          <View style={styles.content}>
+            <View style={styles.header}>
+              <Text accessibilityRole="header" style={styles.title}>Account</Text>
+              <Text style={styles.country}>PH</Text>
+            </View>
+            {session ? <SignedInProfile key={session.user.id} session={session} /> : <GuestProfile restoring={auth.status === 'restoring'} />}
+            <View style={styles.footer} accessible accessibilityLabel={`pickly, version ${Constants.expoConfig?.version ?? 'unknown'}`}>
+              <Image source={require('../../../assets/brand/mark-small.png')} style={styles.mark} resizeMode="contain" />
+              <Text style={styles.footerText}>pickly · v{Constants.expoConfig?.version ?? '–'}</Text>
+            </View>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
+
+function GuestProfile({ restoring }: { restoring: boolean }) {
+  return (
+    <>
+      <ProfileHero name={restoring ? null : 'Guest player'} initials=""
+        detail={restoring ? 'Restoring your sign-in…' : 'You’re browsing courts without an account.'} />
+      <SignInForm />
+      <MenuGroup title="Own or manage a court?">
+        <MenuRow icon="flag" tone="lime" title="Add or claim your venue"
+          subtitle="Sign in with the account you’ll use to manage it. A pickly reviewer checks every submission before anything changes." />
+      </MenuGroup>
+    </>
+  );
+}
+
+const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: colors.background },
+  scroll: { flexGrow: 1, alignItems: 'center' },
+  content: { width: '100%', maxWidth: 560, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 32, gap: 22 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  title: { fontFamily: fonts.extrabold, color: colors.text, fontSize: 34, lineHeight: 40, letterSpacing: -1.2 },
+  country: { fontFamily: fonts.semibold, color: colors.brandGreen, backgroundColor: colors.successBackground, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6, fontSize: 12, letterSpacing: 1.5, overflow: 'hidden' },
+  footer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingTop: 4 },
+  mark: { width: 12, height: 18, tintColor: colors.textSecondary },
+  footerText: { fontFamily: fonts.medium, color: colors.textSecondary, fontSize: 13, lineHeight: 19 },
+});

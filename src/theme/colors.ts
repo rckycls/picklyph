@@ -17,6 +17,8 @@ export const palette = {
   softLime: '#F7FBCF',
   errorRed: '#B42318',
   softRed: '#FFF0EE',
+  haze: '#C5D0E4',
+  whiteVeil: 'rgba(255, 255, 255, 0.14)',
 } as const;
 
 export const colors = {
@@ -28,6 +30,10 @@ export const colors = {
   link: palette.courtBlue,
   primary: palette.courtBlue,
   onPrimary: palette.white,
+  /** 6.4:1 on primary; secondary text on navy surfaces. */
+  onPrimaryMuted: palette.haze,
+  /** Chips, dividers and court lines drawn over primary. */
+  primaryOverlay: palette.whiteVeil,
   accent: palette.ballLime,
   onAccent: palette.deepNavy,
   secondary: palette.courtGreen,

@@ -34,6 +34,7 @@
     "check:dependencies": "expo install --check",
     "bundle:ios": "expo export --platform ios --output-dir dist/ios",
     "test:auth": "node --test src/features/auth/__tests__/*.test.cjs",
+    "test:account": "node --test src/features/account/__tests__/*.test.cjs",
     "test:auth:local": "node supabase/tests/auth-local.cjs",
     "test:authorization:local": "node supabase/tests/authorization-local.cjs",
     "test:domain": "npm test --workspace @picklyph/domain",

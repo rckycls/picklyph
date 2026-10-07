@@ -3,7 +3,6 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import { ActivityIndicator, AppState, StyleSheet, Text, View } from 'react-native';
 
 import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
 import { screenText } from '@/components/ui/Screen';
 import { useAuth } from '@/features/auth/AuthProvider';
 import { colors } from '@/theme/colors';
@@ -57,25 +56,6 @@ export function useOwnerMode() {
   return context;
 }
 
-export function OwnerModeSwitch() {
-  const { session, status } = useAuth();
-  const { count, mode, setMode, error, refresh } = useOwnerMode();
-  if (status !== 'ready' || !session) return null;
-  if (count === null) return <Card>
-    <Text style={screenText.body} accessibilityLiveRegion="polite">{error ? 'Couldn’t check your venue access.' : 'Checking your venue access…'}</Text>
-    {error && <Button label="Retry venue access" variant="secondary" onPress={refresh} />}
-  </Card>;
-  if (!count || count < 1) return null;
-  return <Card>
-    <Text accessibilityRole="header" style={screenText.title}>Your context</Text>
-    <Text style={screenText.body}>{mode === 'owner' ? 'Owner mode: manage your verified venues from the Venues tab.' : 'Player mode: discover courts and follow your bookings.'}</Text>
-    <View style={styles.row}>
-      <Button label="Player mode" variant={mode === 'player' ? 'primary' : 'secondary'} onPress={() => setMode('player')} />
-      <Button label="Owner mode" variant={mode === 'owner' ? 'primary' : 'secondary'} onPress={() => setMode('owner')} />
-    </View>
-  </Card>;
-}
-
 /** Inventory screens need current verified links and owner context. Submission/claim gates stay auth-only. */
 export function VerifiedOwnerGate({ children }: { children: ReactNode }) {
   const { session, status } = useAuth();
@@ -94,7 +74,6 @@ export function VerifiedOwnerGate({ children }: { children: ReactNode }) {
 }
 
 const styles = StyleSheet.create({
-  row: { gap: 8 },
   container: { flex: 1 }, hidden: { display: 'none' },
   loading: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 16, padding: 20, backgroundColor: colors.background },
 });
