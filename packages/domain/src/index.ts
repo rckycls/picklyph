@@ -20,4 +20,6 @@ export type { ClaimReview, OwnershipDecision, OwnershipDecisionResult, Ownership
 export { PHP_CURRENCY, CENTAVOS_PER_PESO, isPhpCentavos, assertPhpCentavos, pesosToCentavos, formatPhpCentavos } from './money';
 export { MANILA_TIME_ZONE, RENTAL_INCREMENT_MINUTES, MINIMUM_RENTAL_MINUTES, BOOKING_HORIZON_DAYS, toUtcIso, toManilaDateTime, fromManilaDateTime, formatManilaDateTime, validateRentalWindow } from './booking';
 export type { Instant, ManilaDateTime, RentalValidation } from './booking';
+export { ScheduleInputError, scheduleDate, readVenueSchedule, resolveVenueSchedule, readScheduleSave, readScheduleQuery } from './schedule';
+export type { RateBand, OpeningWindow, ScheduleException, VenueSchedule, ScheduleInterval, ScheduleView, ScheduleSave } from './schedule';
 export type { Court, CourtStatus, CourtSurface, MapBounds, Venue, VenueClaimStatus, VenueMapPin, VenuePublicationStatus } from './directory';

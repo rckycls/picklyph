@@ -6,6 +6,7 @@ import type { VenueSearch, VenueSearchPage } from './search.ts';
 import type { OwnerDuplicate, OwnerSubmission, OwnerSubmitResult, OwnerVenueInput } from './owner.ts';
 import type { OwnershipDecisionResult, OwnershipQueuePage, OwnershipReview, ReviewRejectionReason } from './review.ts';
 import type { OwnedVenueSummary, OwnerPhotoAddResult, OwnerPhotoRemoveResult, OwnerVenue, OwnerVenueDetails, OwnerVenuePhoto } from './ownerVenues.ts';
+import type { ScheduleView, VenueSchedule } from './schedule.ts';
 
 // Schema-maintained PostgREST contract for the directory, authorization, owner-submission, ownership-review and owner-venue migrations.
 // Only the exposed public schema belongs in mobile code. PostGIS geometry is
@@ -92,6 +93,8 @@ export interface Database {
         Returns: OwnershipDecisionResult;
       };
       owner_venue_list: { Args: { actor_user_id: string }; Returns: OwnedVenueSummary[] };
+      venue_schedule_read: { Args: { actor_user_id: string; target_venue_id: string; start_date: string; days: number }; Returns: ScheduleView };
+      venue_schedule_save: { Args: { actor_user_id: string; target_venue_id: string; expected_revision: string | null; schedule_input: VenueSchedule }; Returns: ScheduleView };
       owner_venue_read: { Args: { actor_user_id: string; target_venue_id: string }; Returns: OwnerVenue };
       owner_venue_save: {
         Args: { actor_user_id: string; target_venue_id: string; expected_updated_at: string; venue_input: OwnerVenueDetails; court_inputs: CourtInput[] };

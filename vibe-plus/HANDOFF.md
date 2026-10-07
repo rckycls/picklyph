@@ -1,6 +1,6 @@
 # HANDOFF: read this first
 
-**Updated:** 2026-10-07, Asia/Manila. **Plan:** Codex desktop / ChatGPT Plus; keep configured model. W3/W4 complete (7 points each). W5: T13, T14 and T16 complete (5/7); T15 implemented, device checks partly done. W6: T17/T18 complete (4/7). Hosted staging has T05/T08/T11–T13/T15/T17 plus `venue-search` and `owner-submissions`; T18 is local only. Capacity remains 8; no actual usage-window end/limit signal. A few sessions/week, experienced user, no deadline.
+**Updated:** 2026-10-07, Asia/Manila. **Plan:** Codex desktop / ChatGPT Plus; keep configured model. W3/W4 complete (7 points each). W5: T13, T14 and T16 complete (5/7); T15 implemented, device checks partly done. W6: T17–T19 complete (6/7). Hosted staging has T05/T08/T11–T13/T15/T17 plus `venue-search` and `owner-submissions`; T18/T19 are local only. Capacity remains 8; no actual usage-window end/limit signal. A few sessions/week, experienced user, no deadline.
 
 ## Current state
 
@@ -74,6 +74,15 @@
 **Rollout:** Local migration applied; hosted T18/function deployment and iPhone checks pending. Missing photo-table errors alone yield an empty gallery during rollout. No native dependency/rebuild added. Restart Metro for new routes: its old watcher regenerated polluted type paths; regenerated clean declarations before passing typecheck. Compatibility check now recommends four upstream Expo patches; pins preserved.
 **Evidence:** `test:venues:local` → Docker SQL + real Auth/Storage/RPC saves/photo-cap races, retry, public photos, bypass/revocation/suspension/audit + actual Edge forged-token/outage checks PASS, fixtures/photos/audit/temp env removed (two runs). `test:directory` 27, `test:owner` 10, `test:domain` 24, `test:discovery` 31, `test:auth` 16, `test:admin` 12, `test:functions` 1 passed; mobile/domain/admin typecheck, mobile/Edge lint and Edge check exit 0; iOS export 1333 modules/3.5 MB. `check:dependencies` exit 1: expected newer patch versions only (expo/constants/linking/router).
 
+## T19 schedules handoff
+
+**Built:** Versioned venue-wide hours, integer-centavo rate bands and dated exceptions; service-only owner/admin save/read, guarded `owner-schedules`, SQL/TypeScript Manila-to-UTC resolvers. Same-day/overnight, week boundaries, rate coverage and exception spill validated. No UI/allocations/price snapshots.
+**Files/APIs:** `docs/schedules.md`, `packages/domain/src/schedule.ts`, migration `20261007210000`, `supabase/functions/owner-schedules/`; `venue_schedule_read|save`, private `resolve_venue_schedule`. Local migration applied; hosted rollout separate.
+**Decisions:** Sunday=0; 30-minute boundaries; exceptions replace entire civil dates, suppressing prior-day spill. Empty rules close; unconfigured is null. Rates cover each window exactly; safe nonnegative centavos. Revisions are independent decimal strings; uncertain saves require read/reconcile.
+**Gotchas:** Owners require current approved/verified links; admins may prepare drafts, neither edits suspended venues. Shared T18 read/edit guards; outage writes fail closed. Private tables/helpers have no API grants; reads/writes lock coherent snapshots, saves audit atomically. JSON capped256KiB; 120 exceptions, 4 windows/day, 16 bands/window; 1–31 resolved dates in2000–2099. Explicit `.ts` runtime imports enabled for shared Deno/Node helpers. Metro export needed `--clear`; clean route declarations regenerated.
+**For next tasks:** T22 must guard this schedule save and T18 deactivation against active allocations before bookings ship. T23 must snapshot checked totals. Hours never promise availability.
+**Evidence:** `test:schedules:local` → Docker SQL + real Auth/PostgREST permissions/revocation/client RPC denial, concurrent200/409/one audit and served Edge forged-JWT/Redis-outage checks PASS, fixtures/env removed; `test:directory`32 pass; updated `node --test supabase/tests/schedules.test.cjs` → 18 valid parity configurations +17 invalid SQL cases PASS; `test:domain`30, owner10, discovery31, auth16, admin12, real Upstash SDK1 pass; mobile/domain/admin typecheck, mobile/admin/Edge lint, Edge check, admin build, `bundle:ios -- --clear` (1334 modules/3.6MB) exit0. Local migration history includes T19.
+
 ## Mobile and branding
 
 - Expo57.0.26 / React19.2.3 / RN0.86.3 / Router57.0.24 / TS6.0.3 / Supabase-js2.117.2. Map opens first with live T13 directory results (demo pins removed in T14) and optional foreground location. Bookings guarded by restored auth; inventory, payments and owner UI are later tasks.
@@ -84,7 +93,7 @@
 
 ## Next
 
-1. **T19 next** (opening hours, rates and dated exceptions). Reuse T18's owner-command locking/guard/audit pattern and T09 Manila/money helpers; details in `docs/owner-venues.md`. T18 hosted migration/function deployment and physical iPhone editing/photo acceptance remain separate; existing T15 native modules suffice. Keep new screens in the root stack with `OwnerGate`, and use `expo-file-system` `File` upload parts.
+1. **T20 next** (owner mode switch and venue policies). Reuse T18's editor/command/guard/audit pattern and locked instant + arrival defaults; online stays disabled until merchant activation. T18/T19 hosted migrations/functions and T18 physical iPhone acceptance remain separate. Read `docs/owner-venues.md` and `docs/schedules.md`; T19 adds schema/resolver/commands, no schedule form. Keep new screens in the root stack with `OwnerGate`, and use `expo-file-system` `File` upload parts.
 2. **Device checks still open** on the installed EAS build: T15 address-search results, the submissions list, the duplicate warning and claiming (a published staging test venue now exists); T16 recovery states; T02 navigation/VoiceOver/large text. T14 accepted 2026-10-07.
 3. **Staging:** first admin assigned by operator SQL; one published test venue; the console runs locally against staging (`ADMIN_SUPABASE_SECRET_KEY` in the ignored `apps/admin/.env.local`), not hosted yet. H06 (owner claim/review trial) can run now; the reviewer must differ from the submitter. Decide whether public contact fields belong in a later directory task. H02: production Redis, hosted outage/isolation and per-IP ingress checks remain.
 4. T09 rules are ready for later commands; use server-derived clocks. T46 must review moderator audit permissions and replace unaudited `set_verified_venue_owner` revocation; T47 must define audit UUID and evidence retention.

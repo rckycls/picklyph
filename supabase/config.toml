@@ -54,3 +54,8 @@ import_map = "./functions/deno.json"
 # Verified owners only; every bearer token is verified in code with getUser.
 verify_jwt = false
 import_map = "./functions/deno.json"
+
+[functions.owner-schedules]
+# Owners/admins only; every bearer is independently verified with getUser.
+verify_jwt = false
+import_map = "./functions/deno.json"
