@@ -157,6 +157,12 @@
 
 **Rollout:** EAS development iPhone build **FINISHED**, installable artifact confirmed, using existing remote certificate/profile and development env: https://expo.dev/accounts/rckycls/projects/picklyph/builds/5bbcd770-e262-449c-bac5-334bbf1d182c. The installed old binary lacks the new native modules: install the new build before reviewing through Metro. Physical iPhone geometry/motion, small screen/Dynamic Type/VoiceOver and real rental confirmation checks remain pending; hosted rental rollout remains separate. Edge slide-ins/persistent companion/admin placements are later scope. T26 remains next in the original roadmap; this is not a window-end or capacity recalibration.
 
+## Page header consistency handoff (outside the plan)
+
+**Built:** Shared `PageHeader` and page gutters across Discover, guest/signed-in Bookings, Account and the Venues tab. All use the same blue `Philippines` badge, aligned with the brand wordmark or page title. The brand tagline sits below the row; rows wrap for limited space. Top-level content shares 20px horizontal gutters, 12px top inset and 560px maximum width. Owner stack pages retain their native back headers.
+
+**Evidence/rollout:** `npm run typecheck`, `lint`, `bundle:ios` (1862 modules/5MB) and diff whitespace check pass. Regenerated ignored Expo route declarations after the known Windows watcher pollution. No dependency or backend changes; reload Metro, no additional native build. Physical iPhone alignment and large-text review remain pending. T26 remains next.
+
 ## Mobile and branding
 
 - Expo57.0.26 / React19.2.3 / RN0.86.3 / Router57.0.24 / TS6.0.3 / Supabase-js2.117.2. Map opens first with live T13 directory results (demo pins removed in T14) and optional foreground location. Bookings guarded by restored auth; arrival rentals/history now implemented locally in T25. Online payment and owner booking operations remain later tasks.

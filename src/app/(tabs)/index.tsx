@@ -4,8 +4,7 @@ import { Linking, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/ui/Button';
-import { BrandLockup } from '@/components/ui/BrandLockup';
-import { StatusBadge } from '@/components/ui/StatusBadge';
+import { PageHeader, pageLayout } from '@/components/ui/PageHeader';
 import CourtMap from '@/features/discovery/CourtMap';
 import { FilterBar, type DiscoveryView } from '@/features/discovery/FilterBar';
 import type { MapRegion } from '@/features/discovery/mapTypes';
@@ -101,28 +100,27 @@ function DiscoverScreen() {
 
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
-      <View style={styles.header}>
-        <View style={styles.brandRow}>
-          <BrandLockup tagline />
-          <StatusBadge label="Philippines" tone="neutral" />
+      <View style={styles.headerSurface}>
+        <View style={[pageLayout.content, styles.header]}>
+          <PageHeader />
+          <View style={styles.actions}>
+            <Button
+              label={settingsNeeded ? 'Open settings' : 'Use my location'}
+              variant="accent"
+              style={styles.action}
+              disabled={!mapReady}
+              loading={location.status === 'requesting'}
+              accessibilityHint={mapReady ? 'Location is optional. You can explore without sharing it.' : 'Available when the Google map is ready.'}
+              onPress={() => {
+                setSettingsError(false);
+                if (settingsNeeded) void Linking.openSettings().catch(() => setSettingsError(true));
+                else void request();
+              }}
+            />
+            <Button label="View Philippines" variant="secondary" style={styles.action} disabled={!mapReady} onPress={showPhilippines} />
+          </View>
+          <Text accessibilityLiveRegion="polite" style={styles.note}>{message}</Text>
         </View>
-        <View style={styles.actions}>
-          <Button
-            label={settingsNeeded ? 'Open settings' : 'Use my location'}
-            variant="accent"
-            style={styles.action}
-            disabled={!mapReady}
-            loading={location.status === 'requesting'}
-            accessibilityHint={mapReady ? 'Location is optional. You can explore without sharing it.' : 'Available when the Google map is ready.'}
-            onPress={() => {
-              setSettingsError(false);
-              if (settingsNeeded) void Linking.openSettings().catch(() => setSettingsError(true));
-              else void request();
-            }}
-          />
-          <Button label="View Philippines" variant="secondary" style={styles.action} disabled={!mapReady} onPress={showPhilippines} />
-        </View>
-        <Text accessibilityLiveRegion="polite" style={styles.note}>{message}</Text>
       </View>
       <FilterBar view={view} onViewChange={changeView} filters={filters} onFiltersChange={changeFilters} />
       <View style={styles.map}>
@@ -155,8 +153,8 @@ function DiscoverScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
-  header: { padding: 16, gap: 12, backgroundColor: colors.surface },
-  brandRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+  headerSurface: { backgroundColor: colors.surface },
+  header: { alignSelf: 'center', paddingBottom: 16, gap: 12 },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   action: { flex: 1, flexBasis: 140, paddingHorizontal: 10 },
   note: { fontFamily: fonts.medium, color: colors.textSecondary, fontSize: 13, lineHeight: 20 },

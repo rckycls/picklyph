@@ -5,6 +5,7 @@ import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { screenText } from '@/components/ui/Screen';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { liveOwnedVenues } from '@/features/owner/liveOwner';
@@ -37,6 +38,7 @@ export function OwnedVenuesScreen({ includeTop = false }: { includeTop?: boolean
 
   return (
     <OwnerScreen includeTop={includeTop}>
+      {includeTop && <PageHeader title="Venues" />}
       <Text style={screenText.body}>Venues pickly has verified you manage. Run each court’s calendar, set hours and closures, and edit details, courts and photos.</Text>
       {venues.status === 'loading' && (
         <View style={styles.row} accessibilityLiveRegion="polite">

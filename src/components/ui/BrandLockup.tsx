@@ -3,15 +3,17 @@ import { Image, StyleSheet, Text, View } from 'react-native';
 import { colors } from '@/theme/colors';
 import { fonts } from '@/theme/typography';
 
+export const BRAND_TAGLINE = 'Find a court. Run a court.';
+
 export function BrandLockup({ inverse = false, tagline = false }: { inverse?: boolean; tagline?: boolean }) {
   return (
-    <View style={styles.container} accessible accessibilityRole="header" accessibilityLabel={tagline ? 'Pickly. Find a court. Run a court.' : 'Pickly'}>
+    <View style={styles.container} accessible accessibilityRole="header" accessibilityLabel={tagline ? `Pickly. ${BRAND_TAGLINE}` : 'Pickly'}>
       <View style={styles.lockup}>
         <Image source={inverse ? require('../../../assets/brand/mark-white.png') : require('../../../assets/brand/mark.png')}
           style={styles.mark} resizeMode="contain" accessible={false} />
         <Text style={[styles.wordmark, inverse && styles.inverse]}>pickly</Text>
       </View>
-      {tagline && <Text style={[styles.tagline, inverse && styles.inverse]}>Find a court. Run a court.</Text>}
+      {tagline && <Text style={[styles.tagline, inverse && styles.inverse]}>{BRAND_TAGLINE}</Text>}
     </View>
   );
 }
