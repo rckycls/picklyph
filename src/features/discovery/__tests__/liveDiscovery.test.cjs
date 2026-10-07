@@ -2,9 +2,9 @@ const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { readVenueSearch } = require('../../../../packages/domain/src/search.ts');
 const { NO_FILTERS, filterKey, parseSearchPage, searchKey, searchParams, searchVenues } = require('../searchClient.ts');
-const { PHILIPPINES_REGION, regionToBounds, sameBounds, venueRegion } = require('../region.ts');
+const { PHILIPPINES_REGION, regionToBounds, sameBounds, selectedVenueRegion, venueRegion } = require('../region.ts');
 const { MAX_LOADED_VENUES, initialResults, resultsReducer } = require('../resultsState.ts');
-const { courtSummary, directionsLinks, failureMessage, listingNotice, markerDescription, resultsSummary } = require('../listing.ts');
+const { NOT_BOOKABLE_CAPTION, courtCount, courtSummary, directionsLinks, failureMessage, listingNotice, markerDescription, resultsSummary } = require('../listing.ts');
 
 const id = (n) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const venue = (n, extra = {}) => ({
@@ -186,4 +186,16 @@ test('every listing state offers contact/directions copy and never booking', () 
   assert.equal(new URL(links.google).hostname, 'www.google.com');
   assert.equal(courtSummary({ surface: 'hard', is_indoor: false, is_covered: true }), 'Outdoor · Covered · Hard surface');
   assert.equal(courtSummary({ surface: null, is_indoor: true, is_covered: true }), 'Indoor');
+});
+
+test('the venue card always says not bookable/contact the venue and keeps the selected pin above it', () => {
+  assert.match(NOT_BOOKABLE_CAPTION, /Not bookable/);
+  assert.match(NOT_BOOKABLE_CAPTION, /Contact the venue directly/);
+  assert.equal(courtCount(1), '1 court'); assert.equal(courtCount(3), '3 courts');
+  const pin = { latitude: 14.6, longitude: 121 };
+  const region = selectedVenueRegion(pin);
+  assert.equal(region.longitude, 121);
+  assert.equal(region.latitudeDelta, venueRegion(pin).latitudeDelta);
+  // The pin sits north of centre, inside the visible map: between centre and the top edge.
+  assert.ok(pin.latitude > region.latitude && pin.latitude < region.latitude + region.latitudeDelta / 2);
 });

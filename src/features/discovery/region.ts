@@ -35,6 +35,15 @@ export function sameBounds(a: MapBounds, b: MapBounds): boolean {
   return a.south === b.south && a.west === b.west && a.north === b.north && a.east === b.east;
 }
 
+/**
+ * Like venueRegion, but with the camera centre moved south so the selected pin sits in the
+ * upper part of the map, clear of the venue card floating over the bottom.
+ */
+export function selectedVenueRegion(venue: { latitude: number; longitude: number }): MapRegion {
+  const region = venueRegion(venue);
+  return { ...region, latitude: region.latitude - region.latitudeDelta * 0.22 };
+}
+
 export function venueRegion(venue: { latitude: number; longitude: number }): MapRegion {
   return { latitude: venue.latitude, longitude: venue.longitude, latitudeDelta: 0.04, longitudeDelta: 0.04 };
 }

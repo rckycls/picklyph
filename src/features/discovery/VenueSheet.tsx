@@ -1,31 +1,34 @@
 import type { VenueSearchItem } from '@picklyph/domain';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Linking, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Button } from '@/components/ui/Button';
-import { screenText } from '@/components/ui/Screen';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { useAuth } from '@/features/auth/AuthProvider';
 import { colors } from '@/theme/colors';
 import { fonts } from '@/theme/typography';
 
 import { loadLiveVenueDetail } from './liveDirectory';
-import { courtSummary, directionsLinks, listingNotice } from './listing';
+import { NOT_BOOKABLE_CAPTION, courtCount, courtSummary, directionsLinks, listingNotice } from './listing';
 import type { VenueDetail } from './venueDetail';
 
 type DetailState = { status: 'loading' } | { status: 'ready'; venue: VenueDetail } | { status: 'missing' } | { status: 'error' };
 
-/** Search results are a snapshot; details and directions always use the current public record. */
+/**
+ * Floating venue card over the bottom of the map or list. Compact by default (name, address,
+ * status, directions); courts and listing details expand on request. Search results are a
+ * snapshot, so details and directions always use the current public record.
+ */
 export function VenueSheet({ venue, onClose, onMissing }: { venue: VenueSearchItem; onClose: () => void; onMissing: (id: string) => void }) {
-  const { height } = useWindowDimensions();
   const [detail, setDetail] = useState<DetailState>({ status: 'loading' });
   const [attempt, setAttempt] = useState(0);
   const [linkError, setLinkError] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const auth = useAuth();
   const signedIn = auth.status === 'ready' && Boolean(auth.session);
 
-  // The screen keys this sheet by venue ID, so each venue starts from a fresh loading state.
+  // The screen keys this card by venue ID, so each venue starts from a fresh loading state.
   useEffect(() => {
     const abort = new AbortController();
     loadLiveVenueDetail(venue.id, abort.signal).then((record) => {
@@ -37,104 +40,156 @@ export function VenueSheet({ venue, onClose, onMissing }: { venue: VenueSearchIt
   }, [venue.id, attempt, onMissing]);
 
   const current = detail.status === 'ready' ? detail.venue : null;
-  const notice = listingNotice(current?.claim_status ?? venue.claim_status);
+  const place = current ?? venue;
+  const missing = detail.status === 'missing';
+  const notice = listingNotice(place.claim_status);
   const open = (url: string) => {
     setLinkError(false);
     void Linking.openURL(url).catch(() => setLinkError(true));
   };
 
   return (
-    <View style={[styles.sheet, { maxHeight: height * 0.4 }]}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.badges}>
-          {detail.status === 'missing'
-            ? <StatusBadge label="No longer listed" tone="error" />
-            : <StatusBadge label={notice.badge} tone={notice.tone} />}
-          <StatusBadge label="Not bookable in pickly" tone="neutral" />
-        </View>
-        <Text accessibilityRole="header" style={screenText.title}>{current?.name ?? venue.name}</Text>
-        {detail.status === 'missing' ? (
-          <Text accessibilityLiveRegion="polite" style={screenText.body}>
-            This venue is no longer in the approved directory. It has been removed from your results.
+    <View style={styles.shadow}>
+      <View style={styles.card}>
+        <ScrollView style={styles.scroll} contentContainerStyle={styles.content} bounces={false}>
+          <View style={styles.header}>
+            <View style={styles.heading}>
+              <Text accessibilityRole="header" numberOfLines={2} style={styles.name}>{place.name}</Text>
+              {!missing && (
+                <Text numberOfLines={2} style={styles.address}>{place.address_line}, {place.city}, {place.province}</Text>
+              )}
+            </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Close venue details"
+              hitSlop={6}
+              onPress={onClose}
+              style={({ pressed }) => [styles.close, pressed && styles.closePressed]}
+            >
+              <Text style={styles.closeGlyph} accessible={false}>✕</Text>
+            </Pressable>
+          </View>
+
+          <View style={styles.chips}>
+            {missing
+              ? <StatusBadge label="No longer listed" tone="error" />
+              : <>
+                <StatusBadge label={notice.badge} tone={notice.tone} />
+                <StatusBadge label={courtCount(current ? current.courts.length : venue.active_court_count)} tone="neutral" />
+              </>}
+          </View>
+          <Text accessibilityLiveRegion="polite" style={styles.caption}>
+            {missing ? 'This venue is no longer in the approved directory. It has been removed from your results.' : NOT_BOOKABLE_CAPTION}
           </Text>
-        ) : (
-          <>
-            <Text style={screenText.body}>
-              {(current ?? venue).address_line}, {(current ?? venue).city}, {(current ?? venue).province}
-            </Text>
-            <Text style={screenText.body}>{notice.text}</Text>
-          </>
-        )}
-        {detail.status === 'loading' && (
-          <View style={styles.row} accessibilityLiveRegion="polite">
-            <ActivityIndicator color={colors.primary} accessible={false} />
-            <Text style={screenText.body}>Loading current venue details…</Text>
-          </View>
-        )}
-        {detail.status === 'error' && (
-          <View style={styles.group}>
-            <Text accessibilityLiveRegion="polite" style={screenText.body}>
-              Couldn’t load the current venue details. Directions are available once they load.
-            </Text>
-            <Button label="Retry details" variant="secondary" onPress={() => {
-              setDetail({ status: 'loading' });
-              setAttempt((value) => value + 1);
-            }} />
-          </View>
-        )}
-        {current && (
-          <>
-            <View style={styles.group}>
-              <Text style={screenText.label}>Active courts</Text>
-              {current.courts.length === 0
-                ? <Text style={screenText.body}>No active courts are listed for this venue.</Text>
-                : current.courts.map((court) => (
-                  <Text key={court.id} style={styles.court}>
-                    <Text style={styles.courtName}>{court.name}</Text> · {courtSummary(court)}
-                  </Text>
-                ))}
+
+          {detail.status === 'loading' && (
+            <View style={styles.row} accessibilityLiveRegion="polite">
+              <ActivityIndicator color={colors.primary} accessible={false} />
+              <Text style={styles.caption}>Loading current details…</Text>
             </View>
-            <View style={styles.actions}>
-              <Button
-                label="Directions in Apple Maps"
-                style={styles.action}
-                accessibilityHint="Opens Apple Maps with this venue as the destination."
-                onPress={() => open(directionsLinks(current.latitude, current.longitude).apple)}
-              />
-              <Button
-                label="Directions in Google Maps"
-                variant="accent"
-                style={styles.action}
-                accessibilityHint="Opens Google Maps with this venue as the destination."
-                onPress={() => open(directionsLinks(current.latitude, current.longitude).google)}
-              />
+          )}
+          {detail.status === 'error' && (
+            <View style={styles.row}>
+              <Text accessibilityLiveRegion="polite" style={[styles.caption, styles.grow]}>Couldn’t load the current details.</Text>
+              <Button label="Retry" variant="secondary" style={styles.retry} onPress={() => {
+                setDetail({ status: 'loading' });
+                setAttempt((value) => value + 1);
+              }} />
             </View>
-            {linkError && <Text accessibilityLiveRegion="polite" style={styles.error}>Couldn’t open Maps on this device.</Text>}
-            {current.claim_status !== 'verified' && (
-              <Button
-                label={signedIn ? 'Own this venue? Claim it' : 'Own this venue? Sign in to claim it'}
-                variant="secondary"
-                accessibilityHint="A pickly reviewer checks your proof before anything changes."
-                onPress={() => (signedIn ? router.push({ pathname: '/owner/claim/[id]', params: { id: current.id } }) : router.navigate('/account'))}
-              />
-            )}
-          </>
-        )}
-        <Button label="Close details" variant="secondary" onPress={onClose} />
-      </ScrollView>
+          )}
+
+          {current && (
+            <>
+              <View style={styles.actions}>
+                <Button
+                  label="Apple Maps"
+                  accessibilityLabel="Directions in Apple Maps"
+                  accessibilityHint="Opens Apple Maps with this venue as the destination."
+                  style={styles.action}
+                  onPress={() => open(directionsLinks(current.latitude, current.longitude).apple)}
+                />
+                <Button
+                  label="Google Maps"
+                  variant="accent"
+                  accessibilityLabel="Directions in Google Maps"
+                  accessibilityHint="Opens Google Maps with this venue as the destination."
+                  style={styles.action}
+                  onPress={() => open(directionsLinks(current.latitude, current.longitude).google)}
+                />
+              </View>
+              {linkError && <Text accessibilityLiveRegion="polite" style={styles.error}>Couldn’t open Maps on this device.</Text>}
+
+              <View style={styles.footer}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityState={{ expanded }}
+                  accessibilityLabel={expanded ? 'Hide courts and listing details' : 'Show courts and listing details'}
+                  onPress={() => setExpanded((value) => !value)}
+                  style={({ pressed }) => [styles.link, pressed && styles.linkPressed]}
+                >
+                  <Text style={styles.linkText}>{expanded ? 'Hide courts' : 'Show courts'} {expanded ? '▴' : '▾'}</Text>
+                </Pressable>
+                {current.claim_status !== 'verified' && (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityHint="A pickly reviewer checks your proof before anything changes."
+                    onPress={() => (signedIn ? router.push({ pathname: '/owner/claim/[id]', params: { id: current.id } }) : router.navigate('/account'))}
+                    style={({ pressed }) => [styles.link, pressed && styles.linkPressed]}
+                  >
+                    <Text style={styles.linkText}>{signedIn ? 'Claim this venue' : 'Sign in to claim'}</Text>
+                  </Pressable>
+                )}
+              </View>
+
+              {expanded && (
+                <View style={styles.details}>
+                  {current.courts.length === 0
+                    ? <Text style={styles.caption}>No active courts are listed for this venue.</Text>
+                    : current.courts.map((court) => (
+                      <Text key={court.id} style={styles.court}>
+                        <Text style={styles.courtName}>{court.name}</Text> · {courtSummary(court)}
+                      </Text>
+                    ))}
+                  <Text style={styles.caption}>{notice.text}</Text>
+                </View>
+              )}
+            </>
+          )}
+        </ScrollView>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  sheet: { backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border },
-  content: { padding: 20, gap: 12 },
-  badges: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  // Outer view casts the shadow; the inner one clips the rounded corners (iOS drops shadows on clipped views).
+  shadow: {
+    position: 'absolute', left: 12, right: 12, bottom: 12, maxHeight: '88%', borderRadius: 20,
+    shadowColor: '#101820', shadowOpacity: 0.18, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 8,
+  },
+  card: { flexShrink: 1, borderRadius: 20, overflow: 'hidden', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+  scroll: { flexGrow: 0 },
+  content: { padding: 16, gap: 10 },
+  header: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  heading: { flex: 1, gap: 2 },
+  name: { fontFamily: fonts.extrabold, color: colors.text, fontSize: 20, lineHeight: 26, letterSpacing: -0.3 },
+  address: { fontFamily: fonts.medium, color: colors.textSecondary, fontSize: 14, lineHeight: 20 },
+  close: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.selectedBackground, marginTop: -2, marginRight: -4 },
+  closePressed: { opacity: 0.7 },
+  closeGlyph: { fontFamily: fonts.semibold, color: colors.text, fontSize: 15, lineHeight: 18 },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  caption: { fontFamily: fonts.medium, color: colors.textSecondary, fontSize: 13, lineHeight: 19 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  group: { gap: 8 },
-  court: { fontFamily: fonts.medium, color: colors.textSecondary, fontSize: 15, lineHeight: 22 },
+  grow: { flex: 1 },
+  retry: { minHeight: 40, paddingHorizontal: 16 },
+  actions: { flexDirection: 'row', gap: 8 },
+  action: { flex: 1, paddingHorizontal: 8 },
+  error: { fontFamily: fonts.medium, color: colors.error, fontSize: 13, lineHeight: 19 },
+  footer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginHorizontal: -8, marginBottom: -6 },
+  link: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 8, borderRadius: 10 },
+  linkPressed: { backgroundColor: colors.selectedBackground },
+  linkText: { fontFamily: fonts.semibold, color: colors.link, fontSize: 14, lineHeight: 20 },
+  details: { gap: 6, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 10 },
+  court: { fontFamily: fonts.medium, color: colors.textSecondary, fontSize: 14, lineHeight: 20 },
   courtName: { fontFamily: fonts.semibold, color: colors.text },
-  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  action: { flexGrow: 1, flexBasis: 200 },
-  error: { fontFamily: fonts.medium, color: colors.error, fontSize: 14, lineHeight: 21 },
 });

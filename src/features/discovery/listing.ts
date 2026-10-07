@@ -17,6 +17,9 @@ export function listingNotice(claim: VenueClaimStatus): Notice {
   }
 }
 
+/** One line every venue card shows: nothing here is bookable yet. */
+export const NOT_BOOKABLE_CAPTION = 'Not bookable in pickly yet. Contact the venue directly before you go.';
+
 export function markerDescription(claim: VenueClaimStatus): string {
   return `${listingNotice(claim).badge}. Not bookable in pickly.`;
 }

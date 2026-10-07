@@ -10,7 +10,7 @@ import CourtMap from '@/features/discovery/CourtMap';
 import { FilterBar, type DiscoveryView } from '@/features/discovery/FilterBar';
 import type { MapRegion } from '@/features/discovery/mapTypes';
 import { filtersActive, locationMessage, wideningActions } from '@/features/discovery/recovery';
-import { PHILIPPINES_REGION, regionToBounds, sameBounds, venueRegion } from '@/features/discovery/region';
+import { PHILIPPINES_REGION, regionToBounds, sameBounds, selectedVenueRegion } from '@/features/discovery/region';
 import { NO_FILTERS, type DiscoveryFilters } from '@/features/discovery/searchClient';
 import { useDeviceLocation } from '@/features/discovery/useDeviceLocation';
 import { useVenueSearch } from '@/features/discovery/useVenueSearch';
@@ -63,11 +63,11 @@ export default function DiscoverScreen() {
   // List selection keeps the list stable; the map recenters on the selection when it is shown.
   const selectVenue = (venue: VenueSearchItem) => {
     setSelected(venue);
-    if (view === 'map') setFocusRegion(venueRegion(venue));
+    if (view === 'map') setFocusRegion(selectedVenueRegion(venue));
   };
   const changeView = (next: DiscoveryView) => {
     setView(next);
-    if (next === 'map' && selected && selected.id !== missingId) setFocusRegion(venueRegion(selected));
+    if (next === 'map' && selected && selected.id !== missingId) setFocusRegion(selectedVenueRegion(selected));
   };
   // Changed filters can exclude the selected venue, so selection restarts with the new results.
   const changeFilters = (next: DiscoveryFilters) => {
@@ -141,9 +141,9 @@ export default function DiscoverScreen() {
             <VenueList {...status} selectedId={selected?.id} onSelect={selectVenue} />
           </View>
         )}
+        {selected && <VenueSheet key={selected.id} venue={selected} onClose={() => setSelected(null)} onMissing={handleMissing} />}
       </View>
-      {selected ? <VenueSheet key={selected.id} venue={selected} onClose={() => setSelected(null)} onMissing={handleMissing} />
-        : view === 'map' && <ResultsBar {...status} onShowList={() => changeView('list')} />}
+      {!selected && view === 'map' && <ResultsBar {...status} onShowList={() => changeView('list')} />}
     </SafeAreaView>
   );
 }
