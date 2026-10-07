@@ -55,7 +55,9 @@ Physical iPhone acceptance remains: after staging deployment and Metro restart, 
 
 ## Owner mode and policies (T20)
 
-Mode starts in Player context on each account identity/cold restore. `OwnerModeProvider` calls the self-only `my_account_access()` on navigation and every AppState change; controls stay unavailable while access is unknown or failed. Requests carry identity/generation guards, and changing accounts discards pending callbacks and prior mode. Revocation/suspension removes mode on the next check. Account shows a checking/error/retry state. During foreground checks an already authorized editor stays mounted with its content hidden and interactions/accessibility disabled, preserving unsaved changes and photo-picker results. The chosen Venues tab remains present while checking; definitive denial removes it.
+Mode starts in Player context on each account identity/cold restore. `OwnerModeProvider` calls the self-only `my_account_access()` on navigation and every AppState change; controls stay unavailable while access is unknown or failed. Requests carry identity/generation guards, and changing accounts discards pending callbacks and prior mode. Revocation/suspension removes the venue on the next check. Account shows a checking/error/retry state. During foreground checks an already authorized editor stays mounted with its content hidden and interactions/accessibility disabled, preserving unsaved changes and photo-picker results. The chosen Venues tab remains present while checking.
+
+Since 2026-10-08 **every signed-in account** can choose Owner mode once access has been checked, venue or not: it is where owners add or claim a venue. A failed check still falls back to Player. In Owner mode with no venue, the Venues tab shows how to add or claim one; venue editor, hours and calendar routes still need a managed venue (`VerifiedOwnerGate`). Player mode hides adding, claiming and submissions entirely.
 
 `GET /functions/v1/owner-venues?venue_id=<uuid>&section=policies` returns `{policy:{venue_id,revision,confirmation,payment,merchant_active}}`. `POST` JSON accepts exactly:
 

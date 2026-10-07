@@ -22,8 +22,11 @@ test('owner mode clears revoked/error eligibility and ignores stale identity/gen
   const oldGeneration=state.generation;state=checkingMode(state);assert.equal(state.count,null);
   assert.equal(checkedMode(state,'other',state.generation,5),state);
   assert.equal(checkedMode(state,'owner',oldGeneration,5),state);
-  state=checkedMode(state,'owner',state.generation,0);assert.equal(state.mode,'player');
-  assert.equal(chooseMode(state,'owner').mode,'player');
+  // Owner mode is open to any checked account, venue or not (it is where owners add or claim one).
+  state=checkedMode(state,'owner',state.generation,0);assert.equal(state.mode,'owner');
+  assert.equal(chooseMode(chooseMode(state,'player'),'owner').mode,'owner');
+  assert.equal(checkingMode(state).mode,'owner','a pending check keeps the chosen mode');
+  assert.equal(chooseMode({...initialMode('fresh'),count:null},'owner').mode,'player','never before access is known');
   state=checkedMode(checkingMode(state),'owner',state.generation+1,null);assert.equal(state.mode,'player');assert.equal(state.error,true);
   const next=initialMode('next-account');assert.equal(next.mode,'player');assert.equal(next.count,null);
 });

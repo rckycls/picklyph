@@ -8,10 +8,10 @@ import { fonts } from '@/theme/typography';
 type Mode = 'player' | 'owner';
 const options: readonly { mode: Mode; label: string; caption: string }[] = [
   { mode: 'player', label: 'Player', caption: 'Discover courts and follow your bookings.' },
-  { mode: 'owner', label: 'Owner', caption: 'Manage your verified venues from the Venues tab.' },
+  { mode: 'owner', label: 'Owner', caption: 'Add or claim your venue, and manage it from the Venues tab.' },
 ];
 
-/** Owners pick which side of pickly they're on. Switching is held while access is re-checked. */
+/** Every signed-in account picks which side of pickly it's on. Switching is held while access is re-checked. */
 export function ModeSwitch() {
   const { count, mode, setMode } = useOwnerMode();
   const checking = count === null;

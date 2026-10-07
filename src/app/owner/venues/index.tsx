@@ -55,8 +55,10 @@ export function OwnedVenuesScreen({ includeTop = false }: { includeTop?: boolean
       {venues.status === 'ready' && venues.items.length === 0 && (
         <Card>
           <Text style={screenText.body}>
-            You don’t manage a venue yet. Claim a listing from Discover, or add your venue from Account. pickly reviews every request.
+            You don’t manage a venue yet. Add your venue, or open your listing on Discover and tap Claim. pickly reviews every request.
           </Text>
+          <Button label="Add your venue" onPress={() => router.push('/owner/submit')} />
+          <Button label="Find your listing on Discover" variant="secondary" onPress={() => router.navigate('/(tabs)')} />
         </Card>
       )}
       {venues.status === 'ready' && venues.items.map((venue) => {

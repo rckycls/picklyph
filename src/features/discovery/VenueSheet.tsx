@@ -6,6 +6,7 @@ import { ActivityIndicator, Image, Linking, Pressable, ScrollView, StyleSheet, T
 import { Button } from '@/components/ui/Button';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { useAuth } from '@/features/auth/AuthProvider';
+import { useOwnerMode } from '@/features/owner/OwnerMode';
 import { venuePhotoUrl } from '@/lib/venuePhotos';
 import { colors } from '@/theme/colors';
 import { fonts } from '@/theme/typography';
@@ -28,6 +29,9 @@ export function VenueSheet({ venue, onClose, onMissing }: { venue: VenueSearchIt
   const [expanded, setExpanded] = useState(false);
   const auth = useAuth();
   const signedIn = auth.status === 'ready' && Boolean(auth.session);
+  const { mode } = useOwnerMode();
+  // Claiming is an owner action: only signed-in accounts in Owner mode see it.
+  const canClaim = signedIn && mode === 'owner';
 
   // The screen keys this card by venue ID, so each venue starts from a fresh loading state.
   useEffect(() => {
@@ -134,14 +138,14 @@ export function VenueSheet({ venue, onClose, onMissing }: { venue: VenueSearchIt
                 >
                   <Text style={styles.linkText}>{expanded ? 'Hide courts' : 'Show courts'} {expanded ? '▴' : '▾'}</Text>
                 </Pressable>
-                {current.claim_status !== 'verified' && (
+                {canClaim && current.claim_status !== 'verified' && (
                   <Pressable
                     accessibilityRole="button"
                     accessibilityHint="A pickly reviewer checks your proof before anything changes."
-                    onPress={() => (signedIn ? router.push({ pathname: '/owner/claim/[id]', params: { id: current.id } }) : router.navigate('/account'))}
+                    onPress={() => router.push({ pathname: '/owner/claim/[id]', params: { id: current.id } })}
                     style={({ pressed }) => [styles.link, pressed && styles.linkPressed]}
                   >
-                    <Text style={styles.linkText}>{signedIn ? 'Claim this venue' : 'Sign in to claim'}</Text>
+                    <Text style={styles.linkText}>Claim this venue</Text>
                   </Pressable>
                 )}
               </View>

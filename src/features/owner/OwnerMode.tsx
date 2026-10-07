@@ -57,10 +57,10 @@ export function useOwnerMode() {
 }
 
 /**
- * Inventory screens need a venue the account manages now (a verified link, or its own draft under
- * review) and owner context. Submission/claim gates stay auth-only.
+ * Inventory screens need owner context and a venue the account manages now (a verified link, or its
+ * own draft under review). `allowEmpty` lets the Venues tab show owners how to add their first venue.
  */
-export function VerifiedOwnerGate({ children }: { children: ReactNode }) {
+export function VerifiedOwnerGate({ children, allowEmpty = false }: { children: ReactNode; allowEmpty?: boolean }) {
   const { session, status } = useAuth();
   const { count, mode, error, refresh } = useOwnerMode();
   const checking = status === 'restoring' || (session && count === null && !error);
@@ -72,7 +72,7 @@ export function VerifiedOwnerGate({ children }: { children: ReactNode }) {
   if (session && error) return <View style={styles.loading}>
     <Text style={screenText.body}>Couldn’t confirm your venue access.</Text><Button label="Try again" onPress={refresh} />
   </View>;
-  if (!session || !count || mode !== 'owner') return <Redirect href="/account" />;
+  if (!session || (!count && !allowEmpty) || mode !== 'owner') return <Redirect href="/account" />;
   return <View style={styles.container}><View style={styles.container}>{children}</View></View>;
 }
 

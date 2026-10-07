@@ -4,15 +4,18 @@ Signed-in owners can **claim** an approved listing or **add their own venue** wi
 
 ## Mobile flow
 
-- **Account → Add your venue** (`/owner/submit`), in three steps:
+Adding and claiming are **Owner mode** actions (since 2026-10-08): every signed-in account has the Player/Owner switch on Account, and Player mode shows no add/claim entry, Discover claim link or submissions list. Owner mode is a UI context, not a permission; the server still verifies every token and pickly reviews every proof.
+
+- **Account (Owner mode) → Add your venue** (`/owner/submit`), in three steps:
   1. Locate: address search (server-side Google geocoding), **Use my location**, or tap the map, then drag the pin onto the courts.
   2. Nearby: approved listings within 150 m, or with a similar name within 2 km, appear with **Claim this listing**. **My venue isn't listed here** acknowledges them.
   3. Details: name, address, city, province, court count (1–40), optional note (500 characters) and proof photo.
-  4. Done: **Set up your venue** switches to Owner mode and opens the draft in the venue editor (details, courts, photos, policies), with hours and the court calendar under **Venues**.
-- **Discover → venue details → Own this venue? Claim it** (`/owner/claim/[id]`) for unclaimed or under-review listings. Signed-out players are sent to Account.
-- **Account → Your submissions** lists the user's own claims and venues with their review status.
+  4. Done: **Set up your venue** opens the draft in the venue editor (details, courts, photos, policies), with hours and the court calendar under **Venues**.
+- **Discover (Owner mode) → venue details → Claim this venue** (`/owner/claim/[id]`) for unclaimed or under-review listings. Guests and Player mode don't see the link.
+- **Account (Owner mode) → Your submissions** lists the user's own claims and venues with their review status.
+- The welcome screen's **I own a court** opens Account in Owner mode (after sign-in, if needed).
 
-Owner routes sit directly in the root stack (so the first one opened from a tab keeps the native back button) and each is wrapped in `OwnerGate`, which redirects signed-out users to Account. The system photo picker (`expo-image-picker` 57.0.20) needs no photo-library permission prompt and requests HEIC as JPEG. Camera and microphone permissions are disabled. **This is a new native module: device review needs a new EAS development build.**
+Owner routes sit directly in the root stack (so the first one opened from a tab keeps the native back button) and each is wrapped in `OwnerGate`, which redirects signed-out users and Player mode to Account. The system photo picker (`expo-image-picker` 57.0.20) needs no photo-library permission prompt and requests HEIC as JPEG. Camera and microphone permissions are disabled. **This is a new native module: device review needs a new EAS development build.**
 
 ## Endpoint: `/functions/v1/owner-submissions`
 

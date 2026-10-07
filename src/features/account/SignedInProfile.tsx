@@ -1,6 +1,6 @@
 import type { Session } from '@supabase/supabase-js';
 import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -20,12 +20,22 @@ import { ProfileHero, type HeroChip, type HeroStat } from './ProfileHero';
 
 const badgeTones = { pending: 'lime', success: 'green', error: 'red' } as const;
 
-/** Key this by user id so names, counts and submissions never carry across accounts. */
-export function SignedInProfile({ session }: { session: Session }) {
+/**
+ * Key this by user id so names, counts and submissions never carry across accounts. Adding, claiming
+ * and submissions live in Owner mode only; `startInOwnerMode` comes from the welcome screen's owner choice.
+ */
+export function SignedInProfile({ session, startInOwnerMode = false }: { session: Session; startInOwnerMode?: boolean }) {
   const auth = useAuth();
   const user = session.user;
-  const { count, mode, error: accessError, refresh } = useOwnerMode();
-  const { submissions, reload } = useMySubmissions(user.id);
+  const { count, mode, error: accessError, refresh, setMode } = useOwnerMode();
+  const ownerMode = mode === 'owner';
+  const { submissions, reload } = useMySubmissions(ownerMode ? user.id : null);
+  const startedOwner = useRef(false);
+  useEffect(() => {
+    if (!startInOwnerMode || startedOwner.current || count === null) return;
+    startedOwner.current = true;
+    setMode('owner');
+  }, [startInOwnerMode, count, setMode]);
   const [displayName, setDisplayName] = useState<{ loaded: boolean; value: string | null }>({ loaded: false, value: null });
   const [editing, setEditing] = useState(false);
   const [signOutError, setSignOutError] = useState<string | null>(null);
@@ -48,8 +58,8 @@ export function SignedInProfile({ session }: { session: Session }) {
     ...(joined ? [{ label: `Joined ${joined}`, tone: 'veil' } as const] : []),
   ];
   const submitted = submissions.status === 'ready' ? submissions.items : null;
-  // Players with nothing to count get a clean identity card instead of a row of zeros.
-  const stats: HeroStat[] = owner || (submitted && submitted.length > 0) ? [
+  // Owner stats only in Owner mode; players get a clean identity card instead of a row of zeros.
+  const stats: HeroStat[] = ownerMode && (owner || (submitted && submitted.length > 0)) ? [
     { label: venues === 1 ? 'Venue' : 'Venues', value: venues === null ? '—' : String(venues) },
     { label: 'Submitted', value: submitted ? String(submitted.length) : '—' },
     { label: 'In review', value: submitted ? String(submitted.filter((item) => item.status === 'pending').length) : '—' },
@@ -72,33 +82,37 @@ export function SignedInProfile({ session }: { session: Session }) {
         } : undefined}
       />
 
-      {owner && <ModeSwitch />}
-
-      <MenuGroup title={owner ? 'Your venues' : 'Own or manage a court?'}>
-        {owner && mode === 'owner' && (
-          <MenuRow icon="venue" title={venues > 1 ? `Manage your ${venues} venues` : 'Manage your venue'}
-            subtitle="Hours, photos, policies and calendar" onPress={() => router.push('/owner')} />
-        )}
-        {accessError && (
+      <ModeSwitch />
+      {accessError && (
+        <MenuGroup>
           <MenuRow icon="retry" tone="lime" title="Couldn’t check your venue access" subtitle="Tap to try again" onPress={refresh} />
-        )}
-        <MenuRow icon="plus" tone="green" title="Add your venue" subtitle="Set up your courts; it goes live once pickly approves"
-          onPress={() => router.push('/owner/submit')} />
-        <MenuRow icon="flag" tone="lime" title="Claim your listing" subtitle="Open your venue on Discover, then tap Claim"
-          onPress={() => router.navigate('/(tabs)')} />
-      </MenuGroup>
+        </MenuGroup>
+      )}
 
-      {submissions.status === 'loading' && (
+      {ownerMode && (
+        <MenuGroup title="Your venues">
+          {owner && (
+            <MenuRow icon="venue" title={venues > 1 ? `Manage your ${venues} venues` : 'Manage your venue'}
+              subtitle="Hours, photos, policies and calendar" onPress={() => router.push('/owner')} />
+          )}
+          <MenuRow icon="plus" tone="green" title="Add your venue" subtitle="Set up your courts; it goes live once pickly approves"
+            onPress={() => router.push('/owner/submit')} />
+          <MenuRow icon="flag" tone="lime" title="Claim your listing" subtitle="Open your venue on Discover, then tap Claim"
+            onPress={() => router.navigate('/(tabs)')} />
+        </MenuGroup>
+      )}
+
+      {ownerMode && submissions.status === 'loading' && (
         <MenuGroup title="Your submissions">
           <MenuRow icon="venue" title="Loading your submissions…" loading />
         </MenuGroup>
       )}
-      {submissions.status === 'error' && (
+      {ownerMode && submissions.status === 'error' && (
         <MenuGroup title="Your submissions">
           <MenuRow icon="retry" tone="red" title={submissions.message} subtitle="Tap to try again" onPress={reload} />
         </MenuGroup>
       )}
-      {submissions.status === 'ready' && (
+      {ownerMode && submissions.status === 'ready' && submissions.items.length > 0 && (
         <MenuGroup title="Your submissions">
           {submissions.items.map((submission) => {
             const badge = submissionBadge(submission);

@@ -25,10 +25,12 @@ export default function AccountScreen() {
             {welcome === 'owner' && <View style={styles.ownerIntroduction}>
               <Text accessibilityRole="header" style={styles.ownerTitle}>Let’s get your court on Pickly.</Text>
               <Text style={styles.ownerDescription}>{session
-                ? 'Add your venue below, or find your existing listing on Discover to claim it.'
-                : 'Sign in below, then add your venue or claim your existing listing on Discover.'} A Pickly reviewer checks your proof before players can see or book it.</Text>
+                ? 'You’re in Owner mode. Add your venue below, or find your existing listing on Discover to claim it.'
+                : 'Sign in below. Then, in Owner mode, add your venue or claim your existing listing on Discover.'} A Pickly reviewer checks your proof before players can see or book it.</Text>
             </View>}
-            {session ? <SignedInProfile key={session.user.id} session={session} /> : <GuestProfile restoring={auth.status === 'restoring'} />}
+            {session
+              ? <SignedInProfile key={session.user.id} session={session} startInOwnerMode={welcome === 'owner'} />
+              : <GuestProfile restoring={auth.status === 'restoring'} />}
             <View style={styles.footer} accessible accessibilityLabel={`pickly, version ${Constants.expoConfig?.version ?? 'unknown'}`}>
               <Image source={require('../../../assets/brand/mark-small.png')} style={styles.mark} resizeMode="contain" />
               <Text style={styles.footerText}>pickly · v{Constants.expoConfig?.version ?? '–'}</Text>
@@ -47,8 +49,8 @@ function GuestProfile({ restoring }: { restoring: boolean }) {
         detail={restoring ? 'Restoring your sign-in…' : 'You’re browsing courts without an account.'} />
       <SignInForm />
       <MenuGroup title="Own or manage a court?">
-        <MenuRow icon="flag" tone="lime" title="Add or claim your venue"
-          subtitle="Sign in with the account you’ll use to manage it. A pickly reviewer checks every submission before anything changes." />
+        <MenuRow icon="flag" tone="lime" title="Sign in, then switch to Owner"
+          subtitle="Use the account you’ll manage your venue with. Owner mode is where you add or claim it; a pickly reviewer checks every request." />
       </MenuGroup>
     </>
   );

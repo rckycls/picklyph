@@ -123,10 +123,9 @@ function SubmitVenueScreen() {
               : 'A pickly reviewer will check the location and your proof. Nothing appears on the map until it’s approved.'}
           </Text>
           {draftId && (
-            <Button label="Set up your venue" loading={owner.count === null && !owner.error} disabled={!owner.count}
-              onPress={() => { owner.setMode('owner'); router.replace({ pathname: '/owner/venues/[id]', params: { id: draftId } }); }} />
+            <Button label="Set up your venue" loading={owner.count === null} disabled={!owner.count}
+              onPress={() => router.replace({ pathname: '/owner/venues/[id]', params: { id: draftId } })} />
           )}
-          {draftId && owner.error && <Button label="Check venue access again" variant="secondary" onPress={owner.refresh} />}
           <Button label="View your submissions" variant={draftId ? 'secondary' : 'primary'} onPress={() => router.navigate('/account')} />
         </Card>
       </OwnerScreen>
