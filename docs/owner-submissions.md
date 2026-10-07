@@ -1,6 +1,6 @@
 # Owner pin submissions and ownership claims (T15)
 
-Signed-in owners can **claim** an approved listing or **submit a missing venue** with a map pin. Both need one private proof photo. A submission is only a record for review: it never publishes a listing, changes the public `claim_status`, links an owner, or grants a role. Review and approval are T17. Sign-in uses the same account as players; there is no owner signup.
+Signed-in owners can **claim** an approved listing or **submit a missing venue** with a map pin. Both need one private proof photo. A submission is only a record for review: it never publishes a listing, changes the public `claim_status`, links an owner, or grants a role. Review and approval are in the console ([ownership review](ownership-review.md)). Sign-in uses the same account as players; there is no owner signup.
 
 ## Mobile flow
 
@@ -31,7 +31,7 @@ Both limits reject with retryable 503 when Redis fails or times out, **before** 
 
 The body is read with a hard cap (5 MiB + 64 KiB) before parsing. The file must be 1 byte–5 MiB. Its **leading bytes** must be JPEG or PNG; client names and types are ignored. The server uploads it to the private `owner-evidence` bucket as `<verified user id>/<random uuid>.jpg|png`, then calls the database command. If the command does not create a record (retry, duplicate warning, rejection, outage), that upload is deleted. Cleanup failures are logged as `evidence_cleanup_failed`, and the private object remains.
 
-The bucket is private (5 MiB, `image/jpeg`/`image/png`) and has **no `storage.objects` policies**. Players, including the uploader, cannot upload, list, download or sign evidence URLs. Only the trusted server reads it; T17 must serve reviewers short-lived server-signed access. Photos are stored as uploaded, so metadata such as capture location may remain; T47 privacy/retention should decide on stripping and deletion. Any future storage policy must stay scoped to its own bucket.
+The bucket is private (5 MiB, `image/jpeg`/`image/png`) and has **no `storage.objects` policies**. Players, including the uploader, cannot upload, list, download or sign evidence URLs. Only the trusted server reads it; The console streams it to verified reviewers through its own server route ([ownership review](ownership-review.md)); no signed URL reaches a browser. Photos are stored as uploaded, so metadata such as capture location may remain; T47 privacy/retention should decide on stripping and deletion. Any future storage policy must stay scoped to its own bucket.
 
 ## Database (`20261007120000_owner_submissions.sql`)
 
@@ -61,4 +61,4 @@ Staging status (2026-10-07): migration applied, `GOOGLE_MAPS_SERVER_API_KEY` set
 - `npm run test:domain`: shared readers.
 - `npm run test:owner:local`, with the local Docker stack running and migrations applied, runs three stages. First, `owner.sql` on real Postgres/Storage. Second, the **actual served function** without Redis: 401/forged-JWT 401, then lookups and submissions 503 with no storage or database change. Third, the real handler with local Auth/Storage/RPC, driven through the mobile client: evidence privacy (download, list, sign and upload all denied), direct RPC denial (42501), retries, duplicate warning/ack, competing claim, 415, self-only list, unchanged public listing, one audit row per created command. It removes only its own users, venue, evidence, audit rows and temp env file. It doesn't run against hosted data and covers no live Redis or Google calls.
 
-H06 (pilot owners trialling evidence and review) stays open until T17 review exists.
+H06 (pilot owners trialling evidence and review) can now run on staging; see [ownership review](ownership-review.md).

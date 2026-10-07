@@ -56,8 +56,8 @@ existing venue; moderators can review ownership but get no automatic owner
 management scope. Moderators/admins still use server operations for evidence.
 
 T15 adds private evidence uploads and audited claim/missing-venue submissions
-([owner submissions](owner-submissions.md)); evidence review and ownership
-assignment are T17. This migration does not approve evidence, upload files,
+([owner submissions](owner-submissions.md)); T17 adds audited evidence review and
+ownership approval ([ownership review](ownership-review.md)). This migration does not approve evidence, upload files,
 publish directory records, edit court inventory or implement bookings. T10 adds the admin interface; T11
 adds actor-checked directory curation without changing ownership/claim status.
 See [directory curation](directory-curation.md) for those transaction boundaries.

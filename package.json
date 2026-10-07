@@ -37,7 +37,8 @@
     "admin:typecheck": "npm run typecheck --workspace @picklyph/admin",
     "admin:lint": "npm run lint --workspace @picklyph/admin",
     "test:admin": "npm test --workspace @picklyph/admin",
-    "test:admin:local": "node apps/admin/tests/local.cjs"
+    "test:admin:local": "node apps/admin/tests/local.cjs",
+    "test:review:local": "node apps/admin/tests/review-local.cjs"
   },
   "dependencies": {
     "@expo-google-fonts/bricolage-grotesque": "0.4.1",
