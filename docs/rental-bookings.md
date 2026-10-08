@@ -43,7 +43,7 @@ POST accepts exactly `{kind: accept|decline|cancel|expire, booking_id: <uuid>}`.
 
 Commands lock venue→owner link (when needed)→court→allocation→booking and recheck authorization. Admin/moderator roles alone confer no owner access. Matching repeated actions return `existing` without duplicate events; incompatible transitions return `409 invalid_transition`. Late acceptance returns an expired booking when detected, or `409 allocation_ended` if expiry crosses the renewal boundary; neither revives inventory.
 
-Reads project elapsed pending holds as expired using the DB clock without mutation. New acquisitions expire elapsed allocations on their court before conflict checking. Correctness does not depend on cron. Lifecycle commands persist expiry/events; T32 scheduled cleanup is separate.
+Reads project elapsed pending holds as expired using the DB clock without mutation. New acquisitions expire elapsed allocations on their court before conflict checking. Correctness does not depend on cron. Lifecycle commands persist expiry/events; the T32 [scheduled hold sweep](allocations.md#scheduled-hold-sweep-t32) also records elapsed holds (null-actor `expire`), after which commands return `409 invalid_transition` as after any earlier expiry.
 
 | GET query | Response |
 | --- | --- |
@@ -65,7 +65,7 @@ Errors: malformed input `400`; missing/forged identity `401`; wrong player/owner
 
 `npm run test:bookings` covers embedded PostgreSQL lifecycle/permissions/rollback and handler/guard behavior. `npm run test:bookings:local` runs the same SQL on Docker, then real local Auth/handler/PostgREST and served Edge regressions, including the T26 cases below. It removes its own fixtures/accounts/events/temp credentials and stops its own child server. Contracts/regressions use `test:domain`, `test:directory`, `typecheck`, `lint`, `functions:check` and `functions:lint`.
 
-Hosted rollout needs T18–T24 migrations in order and `rental-bookings` deployment with its explicit import map, existing server Supabase secret names and configured Upstash guard; see `vibe-plus/HANDOFF.md` for current staging rollout. No new dependencies/native rebuild. T25 provides mobile review/history UI below; T26 provides race regressions; T31 adds outside rentals and attendance/arrival-payment records ([owner front desk](booking-operations.md)); T32 owns cleanup; T34–T36 own online checkout. No payment execution/refund/push/outbox/venue cancellation is implemented. Events/snapshots cascade on allocation/venue deletion; T47 must define retention before deletion ships.
+Hosted rollout needs T18–T24 migrations in order and `rental-bookings` deployment with its explicit import map, existing server Supabase secret names and configured Upstash guard; see `vibe-plus/HANDOFF.md` for current staging rollout. No new dependencies/native rebuild. T25 provides mobile review/history UI below; T26 provides race regressions; T31 adds outside rentals and attendance/arrival-payment records ([owner front desk](booking-operations.md)); T32 adds the scheduled hold sweep; T34–T36 own online checkout. No payment execution/refund/push/outbox/venue cancellation is implemented. Events/snapshots cascade on allocation/venue deletion; T47 must define retention before deletion ships.
 
 ## Race and recovery regressions (T26)
 
