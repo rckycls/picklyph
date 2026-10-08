@@ -1,6 +1,6 @@
 # Owner open-play sessions (T27)
 
-Verified owners schedule open play from **Venues → Open-play sessions**. Sessions reserve one or more named courts using the same inventory as rentals and owner blocks. Creation is all-or-nothing. Public session discovery/group booking arrives in T28/T30; T27 does not sell participant spots or execute payments.
+Verified owners schedule open play from **Venues → Open-play sessions**. Sessions reserve one or more named courts using the same inventory as rentals and owner blocks. Creation is all-or-nothing. T28 adds the group booking API ([session-bookings.md](session-bookings.md)); the player UI arrives in T30. T27 itself does not sell participant spots or execute payments.
 
 ## Owner workflow and contracts
 
@@ -28,9 +28,9 @@ Retry compares canonical court ordering, normalized instants (the create functio
 
 The mobile creation journal persists the exact normalized request **before** dispatch in device-only SecureStore under backend/account identity. Network/auth/429/503/malformed-success replies retain the request across restart and sign-in. Another creation is blocked until recovery resolves it. There is no automatic submission. Foreground/focus reads revalidate access; old replies cannot populate a different account's keyed screen. Cancellation retries use the same session ID. Sign-out keeps an uncertain creation; T47 account deletion must clear `.session-attempt` alongside rental recovery. Web fallback is memory only.
 
-## For T28/T29/T31
+## For T29/T31
 
-Participant/walk-in mutations must lock venue → session and maintain one authoritative capacity. T27's `reserved_spots` is zero; T28 must atomically account for pending/payment holds and confirmed participants, expire elapsed holds on access rather than rely on cron, and update the counter/booking records together. Snapshot each group's immutable session price/policy; current schedules do not reprice it. Read/cancel T27 wrappers reveal no participant names. Extend occupied-session cancellation only alongside audited participant release/refund handling. Court allocations remain firm for the entire session independent of the number of spots sold.
+T28 implements participant inventory: `reserved_spots` counts live pending and confirmed groups, changes only under the venue → session lock, and elapsed holds are released on access (including before this empty-session cancellation check). Owner reads report the effective count. T29 walk-ins must reuse that lock order and counter, and may need to relax T28's one-live-group-per-player index for owner-entered groups. Each group snapshots the immutable session price/policy; current schedules do not reprice it. Read/cancel T27 wrappers reveal no participant names. Extend occupied-session cancellation only alongside audited participant release/refund handling. Court allocations remain firm for the entire session independent of the number of spots sold.
 
 ## Verification and rollout
 

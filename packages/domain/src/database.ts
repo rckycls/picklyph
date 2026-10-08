@@ -9,6 +9,7 @@ import type { OwnedVenueSummary, OwnerPhotoAddResult, OwnerPhotoRemoveResult, Ow
 import type { ScheduleView, VenueSchedule } from './schedule.ts';
 import type { VenuePolicy, VenuePolicyView } from './policy.ts';
 import type { SessionCreate, SessionResult, SessionPage } from './session.ts';
+import type { SessionBooking, SessionBookingPage, SessionBookingResult, SessionOffer, SessionOfferPage } from './sessionBooking.ts';
 import type { AllocationRange, AllocationResult } from './allocation.ts';
 import type { CalendarView, CourtHours, CourtHoursView } from './calendar.ts';
 import type { RentalBooking, RentalBookingPage, RentalBookingResult, RentalQuote, RentalQuoteVersion } from './rentalBooking.ts';
@@ -68,6 +69,10 @@ export interface Database {
       owner_session_create: { Args: { actor_user_id: string; session_input: SessionCreate }; Returns: SessionResult };
       owner_session_cancel: { Args: { actor_user_id: string; target_session_id: string }; Returns: SessionResult };
       owner_session_read: { Args: { actor_user_id: string; target_venue_id: string; after_id?: string | null }; Returns: SessionPage };
+      session_booking_request: { Args: { actor_user_id: string; booking_input: { session_id: string; request_id: string; participants: string[]; expected_total_centavos: number } }; Returns: SessionBookingResult };
+      session_booking_change: { Args: { actor_user_id: string; target_booking_id: string; command: string }; Returns: SessionBookingResult };
+      session_booking_read: { Args: { actor_user_id: string; section: string; target_id?: string | null; after_id?: string | null };
+        Returns: SessionOfferPage | { at: string; session: SessionOffer } | { booking: SessionBooking } | SessionBookingPage };
       rental_booking_quote: { Args: { actor_user_id: string; target_court_id: string; starts: string; ends: string }; Returns: RentalQuote };
       rental_booking_request: { Args: { actor_user_id: string; target_court_id: string; request_id: string; starts: string; ends: string; expected_quote: RentalQuoteVersion }; Returns: RentalBookingResult };
       rental_booking_change: { Args: { actor_user_id: string; target_booking_id: string; command: string }; Returns: RentalBookingResult };

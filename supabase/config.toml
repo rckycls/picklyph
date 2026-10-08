@@ -69,3 +69,8 @@ import_map = "./functions/deno.json"
 # Current verified owners only; creation fails closed and cancellation survives Redis outages.
 verify_jwt = false
 import_map = "./functions/deno.json"
+
+[functions.session-bookings]
+# Signed-in players and current owners; requests/acceptance fail closed, release/read survive Redis outages.
+verify_jwt = false
+import_map = "./functions/deno.json"
