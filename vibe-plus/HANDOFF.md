@@ -148,12 +148,14 @@
 
 ## T27 session scheduling handoff
 
+**Git checkpoint:** T27 committed as `73c69f7` (`T27: add owner open-play session scheduling`) and pushed to `origin/main` on 2026-10-08. Working tree and remote were verified clean/synced after the push. T28 is next; it has not started.
+
 **Built:** Verified-owner open-play scheduling, multi-court shared firm allocations, immutable price/capacity/group/effective-policy snapshots, bounded owner history and retry-safe empty cancellation. Owner UI supports overnight Manila times, court choices, PHP/person, group limits and durable backend/account creation recovery. No participant booking/payment implementation.
 **Files/APIs:** `20261008210000_open_play_sessions.sql`; `owner-sessions` GET/POST; `owner_session_create|cancel|read`; domain `session.ts`; owner `SessionScheduler`, `sessionClient`, `sessionDraft`, `sessionAttempt`, `sessionLive`; `/owner/sessions/[id]`; runbook `docs/open-play-sessions.md`.
 **Decisions:** Venue→owner link→sorted courts→merchant locks; all-court allocation/audit rollback. Session owns request identity; original status/snapshot survives edits/cancellation. Creation requires enforced hold guard; cancellation/read survive Redis failure. Capacity1–200, group default4, safe total bound. Occupied/started sessions cannot cancel here.
 **Gotchas:** Migration local only; hosted function/migration and iPhone/VoiceOver review pending. Repaired local dependencies with unchanged manifest/lockfile; running Next server keeps its retired compiler directory locked (ignored). Retention cascades require T47 policy; account deletion clears `.session-attempt`.
 **For T28:** Lock venue→session; maintain `reserved_spots` transactionally with held/confirmed group inventory and elapsed-hold recovery. Reuse snapshots; court allocations stay firm. T31 adds participant cancellation/refunds. W9 cards expanded.
-**Evidence:** `test:sessions`3, `test:owner`22, `test:domain`46, `test:directory`46, `test:rental:mobile`21 pass; `test:sessions:local` PASS twice including final timezone/closed-court/start tests, Auth/PostgREST observed races, recovery and served Edge, fixtures/env removed and existing IDs preserved; mobile/domain/admin typecheck, lint, functions check/lint exit0; `bundle:ios`1873 modules/5.1MB exit0, session screen present/server-setting-value matches0; local dry-run up to date.
+**Evidence:** `test:sessions`3, `test:owner`22, `test:domain`46, `test:directory`46, `test:rental:mobile`21 pass; `test:sessions:local` PASS twice; final run covers timezone/closed-court/start tests, Auth/PostgREST observed races, recovery and served Edge, fixtures/env removed and existing IDs preserved; mobile/domain/admin typecheck, lint, functions check/lint exit0; `bundle:ios`1873 modules/5.1MB exit0, session screen present/server-setting-value matches0; local dry-run up to date.
 
 ## Account profile redesign handoff (outside the plan)
 
@@ -221,6 +223,7 @@
 
 ## Git and gotchas
 
+- **Latest checkpoint:** T26 `7f391db` and T27 `73c69f7` are pushed to `origin/main` (2026-10-08). T27 includes the completed W9 task card and implementation handoff. The source manifests and npm lockfile are unchanged by the local dependency repair. Hosted rollout and physical-device acceptance remain pending as listed above.
 - Main remote https://github.com/rckycls/picklyph.git. T10 (c148676) and staging deployment notes (2b1dfd5) pushed before T11. T11 (6e55220), T12 (4c06c06) and T13 (fe2a0c7) pushed 2026-10-07; T14 (32e9682) pushed 2026-10-07; T15 (a7e1bad) and T16 (8832ef9) pushed 2026-10-07; T17 (4e9eaf1), T18 (30fc02a), T19 (a482a6a) and T20 (0d1846f) pushed 2026-10-07; T21 (14fee03) and T22 (5c21f33) pushed 2026-10-07; Account redesign (b43e8d4) pushed 2026-10-07. Admin env/build/cache output ignored, placeholder `.env.example` committed, test credentials stay in memory or short-lived ignored/system-temp local-test env files removed during cleanup. Typecheck runs `next typegen` first so generated route types exist on a fresh clone; Next updates `next-env.d.ts` during build.
 - Preserve private evidence and approved-only directory reads. Supabase owns transactional allocation/booking authority; Upstash is only rate limiting, no Redis inventory locks/QStash.
 - **Never use `instanceof Response` in mobile code.** On iOS, Expo SDK 57 installs `expo/fetch`, whose `FetchResponse` implements but does not extend React Native's global `Response`. The T15 owner client did this, so every owner lookup/submit failed silently on device (Node tests use real `Response`); fixed with a tagged result plus a regression test that wraps responses. T17 also lets approved venue submissions return their listing `venue_id`; the client parser now accepts that.
