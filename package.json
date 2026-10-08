@@ -60,7 +60,9 @@
     "test:operations": "node --test supabase/tests/booking-operations.test.cjs",
     "test:operations:local": "node supabase/tests/booking-operations-local.cjs",
     "test:expiry": "node --test supabase/tests/hold-expiry.test.cjs",
-    "test:expiry:local": "node supabase/tests/hold-expiry-local.cjs"
+    "test:expiry:local": "node supabase/tests/hold-expiry-local.cjs",
+    "test:boundaries": "node --test supabase/tests/booking-boundaries.test.cjs",
+    "test:boundaries:local": "node supabase/tests/booking-boundaries-local.cjs"
   },
   "dependencies": {
     "@expo-google-fonts/bricolage-grotesque": "0.4.1",

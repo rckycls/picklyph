@@ -146,3 +146,49 @@ deletion; T47 must establish retention before account/directory deletion ships.
 checks both lock orders for schedule/policy races, six concurrent retries and
 surrounding-command rollback, and removes its own fixtures/accounts. Migration
 applied locally only; hosted rollout remains separate.
+
+## Arrival cancellation, no-show and refund-cutoff boundaries (T33)
+
+Every boundary below is read from the server clock and the booking's own locked
+record. Venue policy, merchant or rate edits made after booking change nothing.
+Start/end are the booking's snapshot (and session) times.
+
+| Instant | Player cancellation | Owner no-show, arrival payment |
+| --- | --- | --- |
+| start − 1 ms | open (confirmed or pending) | `not_started` |
+| start, start + 1 ms | `invalid_transition` | recorded at that instant |
+
+- There is no gap and no overlap: cancellation closes (`starts_at<=now`) at the
+  same instant the front desk opens (`starts_at>now` refuses). Check-in and
+  completion share that front-desk check. An owner's cancellation of an owner
+  entry is also refused at the start. Owners remove walk-ins until the session
+  **end** (end − 1 ms yes, end no).
+- An approval hold is capped at the start, so a pending booking cancelled at
+  start − 1 ms is `cancelled`; at the start the command answers `expired` and
+  releases the hold once, at its `expires_at`.
+- An arrival payment must equal the snapshot `total_centavos`, never the venue's
+  current rates (`amount_mismatch`). A paid booking cannot become a no-show.
+- **24-hour cutoff.** Arrival cancellation stays open on both sides of it. The
+  rule T40 must implement: a player cancellation is refund-eligible when its
+  stored instant (the cancelled booking's `updated_at`) is at or before snapshot
+  `starts_at` minus the snapshot cutoff (`policy.player_refund_cutoff_hours` for
+  rentals, `refund_cutoff_hours` for groups, both 24). Cutoff − 1 ms and exactly
+  24 hours are eligible; + 1 ms is not. Arrival bookings collect nothing, and a
+  cancelled or expired booking can never take a payment record, so no arrival
+  refund is ever owed; the rule matters for online payments (T40/T42).
+
+**How the suite pins instants.** `supabase/tests/booking-boundaries.sql` is
+rollback-only. Inside its transaction it redefines every `public`/`private`
+function that reads `clock_timestamp()` (25 today) to read a frozen test clock,
+then walks rentals, owner entries, player groups and walk-ins through the table
+above after two later policy edits and two rate edits. It checks replies,
+snapshots, events, released inventory and spot counters. The rollback restores
+the real definitions. `booking-boundaries-mutations.cjs` moves each boundary by
+one instant (cancel or no-show at the start, a hold elapsing at the start,
+uncapped holds); the suite must fail on every mutation. Real-clock races stay in
+the T24–T32 suites.
+
+**Verify:** `npm run test:boundaries` (PGlite: suite plus 7 mutations) and
+`npm run test:boundaries:local` (the same on local Docker PostgreSQL; checks
+that function definitions and existing IDs are unchanged afterwards). Tests and
+docs only: no migration, endpoint or app change.
