@@ -52,6 +52,9 @@ export default function RootLayout() {
             <Stack.Screen name="welcome" options={{ gestureEnabled: false, animation: 'none' }} />
             <Stack.Screen name="rental/venue/[id]" options={ownerHeader('Reserve a court')} />
             <Stack.Screen name="rental/booking/[id]" options={ownerHeader('Rental booking')} />
+            <Stack.Screen name="play/venue/[id]" options={ownerHeader('Open play')} />
+            <Stack.Screen name="play/session/[id]" options={ownerHeader('Join open play')} />
+            <Stack.Screen name="play/booking/[id]" options={ownerHeader('Open-play group')} />
             <Stack.Screen name="preferences" options={ownerHeader('Preferences')} />
             <Stack.Screen name="owner/submit" options={ownerHeader('Add your venue')} />
             <Stack.Screen name="owner/claim/[id]" options={ownerHeader('Claim a listing')} />

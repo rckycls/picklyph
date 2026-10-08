@@ -11,8 +11,9 @@ const REASONS = ['invalid_request', 'invalid_input', 'invalid_time', 'minimum_du
   'slot_alignment', 'player_required', 'not_player', 'not_owner', 'booking_not_found', 'court_unavailable', 'venue_unavailable',
   'start_not_future', 'outside_horizon', 'outside_hours', 'allocation_conflict', 'request_reused', 'stale_quote',
   'arrival_unavailable', 'invalid_transition', 'allocation_ended', 'price_overflow'] as const;
-export type RentalFailure = HttpFailure<typeof REASONS[number]>;
-export type RentalOutcome<T> = HttpOutcome<T, typeof REASONS[number]>;
+export type RentalReason = typeof REASONS[number];
+export type RentalFailure = HttpFailure<RentalReason>;
+export type RentalOutcome<T> = HttpOutcome<T, RentalReason>;
 const fail = (): never => { throw new Error('Unexpected rental response'); };
 const obj = (v: unknown): Record<string, unknown> => v && typeof v === 'object' && !Array.isArray(v) ? v as Record<string, unknown> : fail();
 const id = (v: unknown): string => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v) ? v.toLowerCase() : fail();

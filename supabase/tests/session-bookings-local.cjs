@@ -169,6 +169,43 @@ async function main(){
     sql(`insert into private.venue_owners(user_id,venue_id) values('${users[0]}','${venue}');`);
     assert.equal(reserved(tight),1);assert.equal(reserved(tightPlayers),4);invariant();
     console.log('PASS: observed lock waits serialize walk-in fill vs later group, walk-in removal vs rebooking, group fill vs later walk-in and revocation vs walk-in.');
+    // T30: the actual mobile open-play parsers/journal against verified Auth + real PostgreSQL, with one lost committed reply.
+    const play=require('../../src/features/openPlay/__tests__/helpers.cjs');const playStore=play.memory();let losePlayReply=true;
+    const playTransport={endpoint:'https://groups.local',apiKey:config.ANON_KEY,accessToken:async()=>tokens[6],fetch:async(url,init)=>{
+      const response=await handler(new Request(url,init));
+      if(init.method==='POST'&&JSON.parse(init.body).kind==='request'&&losePlayReply){losePlayReply=false;throw new Error('Lost reply after commit');}
+      return {ok:response.ok,status:response.status,headers:response.headers,json:()=>response.json()};
+    }};
+    policy('approval');const playSession=await createSession(1260,1380,6,3,courts[0]);policy('instant');
+    const offers=await play.client.loadOffers(playTransport,venue,null);assert.equal(offers.ok,true,'Mobile session page parser');
+    const capacityOf=id=>Number(sql(`select capacity from private.open_play_sessions where id='${id}'`));
+    for(const id of [open,playSession,repeated])assert.equal(offers.value.sessions.find(s=>s.id===id).available_spots,capacityOf(id)-reserved(id),'Spots match the server counter');
+    const playOffer=await play.client.loadOffer(playTransport,playSession);assert.equal(playOffer.ok,true);
+    assert.equal(playOffer.value.session.snapshot.policy.confirmation,'approval');assert.equal(play.model.offerState(playOffer.value.session,playOffer.value.at),'open');
+    const preview=play.model.groupPreview(playOffer.value.session,playOffer.value.at,[' Mobile A ','','Mobile B']);assert.equal(preview.ok,true);assert.equal(preview.total_centavos,50000);
+    const playCommand=play.model.groupRequest(playOffer.value.session,preview.names,randomUUID());
+    const playJournal=play.createGroupJournal(playStore,'local.player');
+    assert.equal((await playJournal.run(playCommand,c=>play.client.requestGroup(playTransport,c))).failure.kind,'network');
+    const restoredPlay=play.createGroupJournal(playStore,'local.player');assert.deepEqual(play.plain(await restoredPlay.read()),play.plain(playCommand));
+    const recoveredGroup=await restoredPlay.run(await restoredPlay.read(),c=>play.client.requestGroup(playTransport,c));
+    assert.equal(recoveredGroup.ok,true);assert.equal(recoveredGroup.value.outcome,'existing');assert.equal(await restoredPlay.read(),null);
+    const group=recoveredGroup.value.booking;assert.equal(group.status,'pending');assert.ok(group.expires_at);
+    const stored=JSON.parse(sql(`select jsonb_build_object('n',(select count(*) from private.session_bookings where request_id='${playCommand.request_id}'),'row',to_jsonb(b))
+      from private.session_bookings b where b.id='${group.id}'`));
+    assert.equal(stored.n,1);assert.deepEqual(stored.row.participants,['Mobile A','Mobile B']);assert.equal(stored.row.spots,2);assert.equal(stored.row.status,'pending');
+    assert.equal(stored.row.snapshot.total_centavos,group.snapshot.total_centavos);assert.equal(stored.row.snapshot.price_centavos,25000);
+    assert.equal(stored.row.snapshot.policy.confirmation,group.snapshot.policy.confirmation);assert.equal(Date.parse(stored.row.expires_at),Date.parse(group.expires_at));
+    assert.equal(reserved(playSession),2);assert.deepEqual(events(group.id),{request:1});
+    const again=await play.client.requestGroup(playTransport,play.model.groupRequest(playOffer.value.session,['Mobile C'],randomUUID()));
+    assert.equal(again.failure.reason,'already_booked');
+    const mobileGroups=await play.client.loadGroupHistory(playTransport,null);assert.equal(mobileGroups.ok,true,'Mobile history parser');
+    assert.ok(mobileGroups.value.bookings.some(b=>b.id===group.id));assert.ok(mobileGroups.value.bookings.every(b=>b.source==='player'));
+    const shown=await play.client.loadGroupBooking(playTransport,group.id);assert.deepEqual(play.plain(shown.value.snapshot),play.plain(group.snapshot));
+    const cancelledGroup=await play.client.cancelGroup(playTransport,group.id);assert.equal(cancelledGroup.ok,true);assert.equal(cancelledGroup.value.booking.status,'cancelled');
+    const cancelledAgain=await play.client.cancelGroup(playTransport,group.id);assert.equal(cancelledAgain.value.outcome,'existing');
+    assert.deepEqual(play.plain(cancelledAgain.value.booking.snapshot),play.plain(group.snapshot));assert.deepEqual(events(group.id),{request:1,cancel:1});
+    assert.equal(reserved(playSession),0);assert.equal((await play.client.loadOffer(playTransport,playSession)).value.session.available_spots,6);invariant();
+    console.log('PASS: T30 actual mobile session/offer/history/detail parsers match server spots, names, totals, policy and hold; lost-reply recovery records one group; second key already_booked; two cancellations release once with unchanged snapshot.');
     // Serve the actual pinned Deno Edge runtime, with Redis deliberately absent.
     const envPath=path.join(temp,'functions.env');fs.writeFileSync(envPath,`DISCOVERY_SUPABASE_URL=http://kong:8000\nDISCOVERY_SUPABASE_PUBLISHABLE_KEY=${config.ANON_KEY}\nDISCOVERY_SUPABASE_SECRET_KEY=${config.SERVICE_ROLE_KEY}\nPICKLY_ENV=local\n`);
     // A killed Windows `functions serve` leaves its container running; until serve replaces it, Kong

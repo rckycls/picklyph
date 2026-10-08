@@ -1,4 +1,4 @@
-import { fromManilaDateTime, readRentalCommand, toManilaDateTime, type RentalBooking, type RentalBookingPage, type RentalQuote, type RentalRequest } from '@picklyph/domain';
+import { fromManilaDateTime, readRentalCommand, toManilaDateTime, type RentalBooking, type RentalQuote, type RentalRequest } from '@picklyph/domain';
 import type { RentalFailure } from './client';
 
 export function rentalWindow(courtId: string, date: string, time: string, duration: string) {
@@ -25,7 +25,7 @@ export const bookingStatus = (b: RentalBooking): { label: string; tone: 'success
     case 'cancelled': return { label: 'Cancelled', tone: 'neutral', text: 'This booking is cancelled and no longer reserves the court.' };
   }
 };
-export function mergeHistory(existing: RentalBooking[], page: RentalBookingPage, after: string | null): RentalBooking[] {
+export function mergeHistory<B extends { id: string; created_at: string }>(existing: B[], page: { bookings: B[] }, after: string | null): B[] {
   const rows = after ? [...existing, ...page.bookings] : page.bookings;
   return [...new Map(rows.map((b) => [b.id, b])).values()].sort((a, b) => b.created_at.localeCompare(a.created_at) || b.id.localeCompare(a.id));
 }

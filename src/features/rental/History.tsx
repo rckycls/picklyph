@@ -5,7 +5,7 @@ import { AppState, Text, View } from 'react-native';
 import { PicklyMascot } from '@/components/mascot/PicklyMascot';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
-import { Screen, screenText } from '@/components/ui/Screen';
+import { screenText } from '@/components/ui/Screen';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { loadHistory, type RentalFailure } from './client';
 import { bookingStatus, createGeneration, mergeHistory } from './model';
@@ -13,6 +13,7 @@ import { Recovery, useAttempt } from './Recovery';
 import { RentalError } from './ui';
 import { useRetryWait } from './useRetryWait';
 
+/** Body of the Bookings tab's rental view. */
 export function RentalHistory({ actor }: { actor: string }) {
   const recovery = useAttempt(actor);
   const [rows, setRows] = useState<RentalBooking[]>([]); const [cursor, setCursor] = useState<string | null>(null);
@@ -39,7 +40,7 @@ export function RentalHistory({ actor }: { actor: string }) {
     const listener = AppState.addEventListener('change', (state) => { if (state === 'active') refresh(); });
     return () => { abort.current?.abort(); generation.next(); lock.current = false; listener.remove(); };
   }, [page, revision, generation, refresh]));
-  return <Screen eyebrow="MORE TIME ON COURT" title="Your court time." description="Current rental status and saved booking details. All times are in Manila.">
+  return <>
     <Recovery recovery={recovery} />
     <Button label={wait ? `Refresh in ${wait}s` : busy ? 'Checking bookings…' : 'Refresh bookings'} variant="secondary" loading={busy} disabled={wait > 0} onPress={refresh} />
     {failure && <RentalError failure={failure} />}
@@ -57,6 +58,5 @@ export function RentalHistory({ actor }: { actor: string }) {
     {cursor && <Button label={rows.length >= 200 ? 'Refresh to check new bookings' : 'Load more bookings'} variant="secondary" disabled={busy || wait > 0}
       onPress={() => { if (rows.length >= 200) refresh(); else void page(cursor); }} />}
     {rows.length > 0 && <Text style={screenText.body}>Showing {rows.length} loaded bookings, newest first. Refresh starts from page one to find new reservations.</Text>}
-    <Button label="Discover courts" variant="accent" onPress={() => router.navigate('/(tabs)')} />
-  </Screen>;
+  </>;
 }

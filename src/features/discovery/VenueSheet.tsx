@@ -109,6 +109,10 @@ export function VenueSheet({ venue, onClose, onMissing }: { venue: VenueSearchIt
               {current.claim_status === 'verified' && current.courts.length > 0 && <Button
                 label={signedIn ? 'Choose a court & time' : 'Sign in to reserve a court'} variant="accent"
                 onPress={() => router.push({ pathname: '/rental/venue/[id]', params: { id: current.id } })} />}
+              {current.claim_status === 'verified' && current.courts.length > 0 && <Button
+                label={signedIn ? 'Join open play' : 'Sign in to join open play'} variant="secondary"
+                accessibilityHint="Shows this venue's upcoming open-play sessions."
+                onPress={() => router.push({ pathname: '/play/venue/[id]', params: { id: current.id } })} />}
               <View style={styles.actions}>
                 <Button
                   label="Apple Maps"

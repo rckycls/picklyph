@@ -1,18 +1,21 @@
 import type { RentalBooking } from '@picklyph/domain';
 
+/** Rental and open-play group records share these statuses; their IDs are distinct UUIDs. */
+export type CelebratedBooking = Pick<RentalBooking, 'id' | 'status'>;
+
 /** Ephemeral presentation only. Booking authority always comes from fresh server responses. */
 export function createCelebrations() {
   const requested = new Set<string>();
   const celebrated = new Set<string>();
   const observed = new Map<string, RentalBooking['status']>();
-  const key = (actor: string, booking: RentalBooking) => `${actor}:${booking.id}`;
+  const key = (actor: string, booking: CelebratedBooking) => `${actor}:${booking.id}`;
   return {
-    requested(actor: string, booking: RentalBooking) {
+    requested(actor: string, booking: CelebratedBooking) {
       const id = key(actor, booking);
       if (booking.status === 'confirmed' || booking.status === 'pending') requested.add(id);
       if (booking.status === 'pending') observed.set(id, 'pending');
     },
-    observe(actor: string, booking: RentalBooking, fresh: boolean) {
+    observe(actor: string, booking: CelebratedBooking, fresh: boolean) {
       if (!fresh) return false;
       const id = key(actor, booking);
       const previous = observed.get(id);

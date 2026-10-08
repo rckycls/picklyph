@@ -1,11 +1,10 @@
-import type { RentalBooking } from '@picklyph/domain';
 import { useIsFocused } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { AppState, View } from 'react-native';
 import { PicklyMascot } from '@/components/mascot/PicklyMascot';
-import { rentalCelebrations } from './celebration';
+import { rentalCelebrations, type CelebratedBooking } from './celebration';
 
-export function BookingMascot({ actor, booking, fresh }: { actor: string; booking: RentalBooking; fresh: boolean }) {
+export function BookingMascot({ actor, booking, fresh }: { actor: string; booking: CelebratedBooking; fresh: boolean }) {
   const focused = useIsFocused();
   const [foreground, setForeground] = useState(AppState.currentState === 'active');
   const [celebrating, setCelebrating] = useState(false);

@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import type { RentalFailure } from './client';
+import type { HttpFailure } from '../owner/venueClient';
 
 /** Local time only schedules retry controls; it never decides booking/hold status. */
-export function useRetryWait(failure: RentalFailure | null): number {
-  const [tick, setTick] = useState<{ failure: RentalFailure | null; seconds: number }>({ failure: null, seconds: 0 });
+export function useRetryWait(failure: HttpFailure<string> | null): number {
+  const [tick, setTick] = useState<{ failure: HttpFailure<string> | null; seconds: number }>({ failure: null, seconds: 0 });
   useEffect(() => {
     if (!failure?.retryAfterSeconds) return;
     const until = Date.now() + failure.retryAfterSeconds * 1000;

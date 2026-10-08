@@ -1,12 +1,13 @@
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 import { AppState } from 'react-native';
-import type { RentalFailure, RentalOutcome } from './client';
+import type { HttpFailure, HttpOutcome } from '../owner/venueClient';
+import type { RentalReason } from './client';
 
 /** Focus/foreground reads invalidate earlier pages/results. Errors retain details, but never authorize an action. */
-export function useRentalRead<T>(read: (signal: AbortSignal) => Promise<RentalOutcome<T>>, refreshSeconds?: number) {
+export function useRentalRead<T, R extends string = RentalReason>(read: (signal: AbortSignal) => Promise<HttpOutcome<T, R>>, refreshSeconds?: number) {
   const [value, setValue] = useState<T | null>(null);
-  const [failure, setFailure] = useState<RentalFailure | null>(null);
+  const [failure, setFailure] = useState<HttpFailure<R> | null>(null);
   const [busy, setBusy] = useState(true);
   const [revision, setRevision] = useState(0);
   const generation = useRef(0);
