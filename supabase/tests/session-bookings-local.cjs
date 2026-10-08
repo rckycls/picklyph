@@ -17,6 +17,8 @@ async function main(){
   const beforeInventory=inventory();
   run([...args,'-o','/dev/null'],fs.readFileSync(path.join(__dirname,'session-bookings.sql'),'utf8'));
   console.log('PASS: Docker group-booking SQL permissions, names/limits, capacity, holds/expiry, retries, access, suspension and event rollback.');
+  run([...args,'-o','/dev/null'],fs.readFileSync(path.join(__dirname,'session-walk-ins.sql'),'utf8'));
+  console.log('PASS: Docker walk-in SQL owner-only access, names/limits, shared capacity, retries, removal, reads, suspension/revocation and event rollback.');
   const cli=path.resolve('node_modules/@supabase/cli-windows-x64/bin/supabase.exe');const config=JSON.parse(execFileSync(cli,['status','-o','json'],{stdio:['ignore','pipe','pipe'],timeout:20000}));
   const api=new URL(config.API_URL);assert.ok(api.protocol==='http:'&&['localhost','127.0.0.1'].includes(api.hostname)&&api.port==='54321','Loopback required');
   const options={auth:{persistSession:false,autoRefreshToken:false},global:{fetch:(input,init)=>fetch(input,{...init,signal:AbortSignal.timeout(20000)})}};
@@ -47,6 +49,8 @@ async function main(){
     '{"confirmation":"${confirmation}","payment":"arrival"}');`);
   const names=n=>Array.from({length:n},(_,i)=>`Player ${i+1}`);
   const body=(session,n,request=randomUUID())=>({kind:'request',session_id:session,request_id:request,participants:names(n),expected_total_centavos:25000*n});
+  const walkIn=(session,n,request=randomUUID())=>({...body(session,n,request),kind:'walk_in'});
+  const walkSql=(actor,b)=>`select public.session_walk_in('${users[actor]}',${literal({session_id:b.session_id,request_id:b.request_id,participants:b.participants,expected_total_centavos:b.expected_total_centavos})});`;
   const reqSql=(player,b)=>`select public.session_booking_request('${users[player]}',${literal({session_id:b.session_id,request_id:b.request_id,participants:b.participants,expected_total_centavos:b.expected_total_centavos})});`;
   const changeSql=(actor,booking,command)=>`select public.session_booking_change('${users[actor]}','${booking}','${command}');`;
   const reserved=session=>Number(sql(`select reserved_spots from private.open_play_sessions where id='${session}'`));
@@ -134,6 +138,37 @@ async function main(){
     assert.ok(requests.bookings.every(b=>b.status==='pending'&&b.participants.length===2));
     console.log('PASS: accept/cancel and revocation/accept in both lock orders; elapsed four-spot hold reads expired, resells to exactly two groups and records one expiry.');
     for(const c of [anon,clients[1]])assert.equal((await c.rpc('session_booking_request',{actor_user_id:users[1],booking_input:original})).error?.code,'42501');
+    // T29: owner walk-ins and player groups race for one locked spot counter.
+    policy('instant');const mixed=await createSession(600,720,8,4,courts[1]);
+    const mixedReplies=await Promise.all([...Array.from({length:6},()=>post(0,walkIn(mixed,2))),...[1,2,3,4,5,6].map(p=>post(p,body(mixed,2)))]);
+    const mixedBodies=await Promise.all(mixedReplies.map(r=>r.json()));
+    assert.equal(mixedReplies.filter(r=>r.status===200).length,4);
+    assert.ok(mixedReplies.every((r,i)=>r.status===200||(r.status===409&&mixedBodies[i].error==='session_full')));
+    assert.equal(reserved(mixed),8);invariant();
+    const walkWins=mixedBodies.filter(r=>r.booking?.source==='walk_in').length;
+    const repeated=await createSession(780,840,8,4,courts[1]);const walkBody=walkIn(repeated,3);
+    const walkRetries=await Promise.all(Array.from({length:6},()=>post(0,walkBody)));assert.ok(walkRetries.every(r=>r.status===200));
+    const walkReplies=await Promise.all(walkRetries.map(r=>r.json()));
+    assert.deepEqual(walkReplies.map(r=>r.outcome).sort(),['created',...Array(5).fill('existing')]);
+    assert.equal(new Set(walkReplies.map(r=>r.booking.id)).size,1);assert.deepEqual(events(walkReplies[0].booking.id),{walk_in:1});
+    assert.equal((await (await post(0,{...walkBody,kind:'request'})).json()).error,'request_reused');
+    assert.equal((await post(0,walkIn(repeated,4))).status,200);assert.equal((await post(0,body(repeated,1))).status,200);
+    assert.equal(reserved(repeated),8);assert.equal((await (await post(1,walkIn(repeated,1))).json()).error,'not_owner');
+    assert.equal((await get(1,`section=walk_ins&session_id=${repeated}`)).status,403);
+    const roster=await (await get(0,`section=walk_ins&session_id=${repeated}`)).json();
+    assert.equal(roster.bookings.length,2);assert.ok(roster.bookings.every(b=>b.source==='walk_in'&&b.status==='confirmed'));
+    const ownHistory=await (await get(0,'section=history')).json();assert.deepEqual(ownHistory.bookings.map(b=>b.source),['player']);invariant();
+    console.log(`PASS: real API six walk-ins and six player groups (two spots each) fill eight spots with four winners (${walkWins} walk-ins); six walk-in retries record one booking/event; keys never cross kinds; players cannot add or read walk-ins.`);
+    const tight=await createSession(900,960,4,4,courts[1]);
+    competitor=await heldRace(walkSql(0,walkIn(tight,4)),reqSql(1,body(tight,1)));assert.notEqual(competitor.code,0);assert.match(competitor.err,/Session full/);
+    const filledWalk=JSON.parse(sql(`select public.session_booking_read('${users[0]}','walk_ins','${tight}')`)).bookings[0];
+    competitor=await heldRace(changeSql(0,filledWalk.id,'cancel'),reqSql(1,body(tight,1)));assert.equal(competitor.code,0);assert.equal(JSON.parse(competitor.out).outcome,'created');
+    const tightPlayers=await createSession(1020,1080,4,4,courts[1]);
+    competitor=await heldRace(reqSql(2,body(tightPlayers,4)),walkSql(0,walkIn(tightPlayers,1)));assert.notEqual(competitor.code,0);assert.match(competitor.err,/Session full/);
+    competitor=await heldRace(revoke,walkSql(0,walkIn(tight,1)));assert.notEqual(competitor.code,0);assert.match(competitor.err,/Owner required/);
+    sql(`insert into private.venue_owners(user_id,venue_id) values('${users[0]}','${venue}');`);
+    assert.equal(reserved(tight),1);assert.equal(reserved(tightPlayers),4);invariant();
+    console.log('PASS: observed lock waits serialize walk-in fill vs later group, walk-in removal vs rebooking, group fill vs later walk-in and revocation vs walk-in.');
     // Serve the actual pinned Deno Edge runtime, with Redis deliberately absent.
     const envPath=path.join(temp,'functions.env');fs.writeFileSync(envPath,`DISCOVERY_SUPABASE_URL=http://kong:8000\nDISCOVERY_SUPABASE_PUBLISHABLE_KEY=${config.ANON_KEY}\nDISCOVERY_SUPABASE_SECRET_KEY=${config.SERVICE_ROLE_KEY}\nPICKLY_ENV=local\n`);
     // A killed Windows `functions serve` leaves its container running; until serve replaces it, Kong
@@ -160,6 +195,14 @@ async function main(){
     const mine=replies[0].booking.id;const released=await Promise.all(Array.from({length:4},()=>invoke(tokens[1],'',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({kind:'cancel',booking_id:mine})})));
     assert.ok(released.every(r=>r.status===200));assert.deepEqual(events(mine),{request:1,cancel:1});assert.equal(reserved(retried),1);invariant();
     console.log('PASS: actual served Edge forged JWT401, Redis-outage request/accept503 with no write, history200, decline200 and four cancellation retries releasing once.');
+    const walkBefore=sql(`select count(*) from private.session_bookings`);
+    const walkStopped=await invoke(tokens[0],'',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(walkIn(tight,1))});
+    assert.equal(walkStopped.status,503);assert.equal(walkStopped.headers.get('retry-after'),'5');assert.equal(sql(`select count(*) from private.session_bookings`),walkBefore);
+    assert.equal((await invoke(tokens[0],`?section=walk_ins&session_id=${repeated}`)).status,200);
+    const walkId=walkReplies[0].booking.id;
+    const removed=await Promise.all(Array.from({length:4},()=>invoke(tokens[0],'',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({kind:'cancel',booking_id:walkId})})));
+    assert.ok(removed.every(r=>r.status===200));assert.deepEqual(events(walkId),{walk_in:1,cancel:1});assert.equal(reserved(repeated),5);invariant();
+    console.log('PASS: actual served Edge Redis-outage walk-in503 with no write, walk-in roster200 and four removal retries releasing once.');
   }finally{
     if(child&&child.exitCode===null)child.kill();for(const worker of workers)worker.kill();let clean=true;const steps=[];
     if(created)steps.push(()=>sql(`delete from public.venues where id='${venue}';`));

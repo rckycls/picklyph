@@ -4,7 +4,7 @@ export const SESSION_BOOKING_STATUS: Record<string, number> = {
   invalid_input: 400, player_required: 403, not_player: 403, not_owner: 403,
   booking_not_found: 404, session_not_found: 404, venue_unavailable: 404,
   request_reused: 409, stale_quote: 409, arrival_unavailable: 409, invalid_transition: 409, session_cancelled: 409,
-  session_started: 409, session_full: 409, group_limit_exceeded: 409, already_booked: 409,
+  session_started: 409, session_ended: 409, session_full: 409, group_limit_exceeded: 409, already_booked: 409,
 };
 export class SessionBookingRejected extends Error {
   constructor(readonly reason: string) { super(reason); }
@@ -49,7 +49,9 @@ export function createSessionBookingHandler(deps: Dependencies) {
       }
     } catch { return respond(400, { error: 'invalid_request' }); }
     // Bounded parsing selects a release bucket without preventing decline/cancellation in outages.
-    const action = query ? 'owner-read' : command?.kind === 'request' ? 'hold-create' : command?.kind === 'accept' ? 'owner-edit' : 'cancel';
+    // Walk-ins consume spot inventory, so like acceptance they need an enforced owner allowance.
+    const action = query ? 'owner-read' : command?.kind === 'request' ? 'hold-create'
+      : command?.kind === 'accept' || command?.kind === 'walk_in' ? 'owner-edit' : 'cancel';
     let decision: RateDecision;
     try { decision = await deps.limit(action, { kind: 'user', id: actor }); }
     catch {

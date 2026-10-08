@@ -21,7 +21,7 @@ test('open-play sessions: atomic shared inventory, immutable policy, retries, ac
       cross join (values ('anon'),('authenticated'),('service_role')) r(name)
       where n.nspname in ('public','private') and p.proname like '%session%' and has_function_privilege(r.name,p.oid,'execute') order by 1,2`)).rows;
     assert.deepEqual(grants,['owner_session_cancel','owner_session_create','owner_session_read','session_booking_change','session_booking_read',
-      'session_booking_request'].map(proname=>({proname,name:'service_role'})));
+      'session_booking_request','session_walk_in'].map(proname=>({proname,name:'service_role'})));
     const tables=(await db.query(`select c.relname,c.relrowsecurity,exists(select 1 from (values ('anon'),('authenticated'),('service_role')) r(name)
       where has_table_privilege(r.name,c.oid,'select,insert,update,delete')) api_access from pg_class c join pg_namespace n on n.oid=c.relnamespace
       where n.nspname='private' and c.relname in ('open_play_sessions','session_courts') order by 1`)).rows;

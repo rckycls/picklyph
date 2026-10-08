@@ -5,6 +5,9 @@ const request=()=>({kind:'request',session_id:id.toUpperCase(),request_id:id,par
 test('group requests trim ordered names, normalize IDs and reject caller authority, duplicates and unsafe totals',()=>{
   assert.deepEqual(readSessionBookingCommand(request()),{kind:'request',session_id:id,request_id:id,participants:['Ana','Ben'],expected_total_centavos:50000});
   for(const kind of ['accept','decline','cancel']) assert.deepEqual(readSessionBookingCommand({kind,booking_id:id}),{kind,booking_id:id});
+  assert.deepEqual(readSessionBookingCommand({...request(),kind:'walk_in'}),{kind:'walk_in',session_id:id,request_id:id,participants:['Ana','Ben'],expected_total_centavos:50000});
+  for(const delta of [{source:'walk_in'},{venue_id:id},{participants:['Ana','ANA']},{expected_total_centavos:-1}])
+    assert.throws(()=>readSessionBookingCommand({...request(),kind:'walk_in',...delta}));
   assert.equal(readParticipantNames(['Ñino 李',`${'a'.repeat(60)}`]).length,2);
   assert.equal(readParticipantNames(Array.from({length:200},(_,i)=>`P${i}`)).length,200);
   for(const delta of [{actor_user_id:id},{policy:{}},{price_centavos:25000},{spots:2},{participants:[]},{participants:['Ana','ana']},
@@ -24,6 +27,7 @@ test('session booking reads are bounded to offers, one session, own history, own
   assert.deepEqual(query('section=history'),{section:'history',after_id:null});
   assert.deepEqual(query(`section=session&session_id=${id}`),{section:'session',session_id:id});
   assert.deepEqual(query(`section=booking&booking_id=${id}`),{section:'booking',booking_id:id});
+  assert.deepEqual(query(`section=walk_ins&session_id=${id.toUpperCase()}&after_id=${id}`),{section:'walk_ins',session_id:id,after_id:id});
   for(const text of ['section=history&actor_user_id='+id,'section=history&section=history','section=sessions',`section=session&session_id=${id}&after_id=${id}`,
-    `section=booking&booking_id=${id}&venue_id=${id}`,'section=history&after_id=','section=roster&session_id='+id,'']) assert.throws(()=>query(text));
+    `section=booking&booking_id=${id}&venue_id=${id}`,'section=history&after_id=','section=roster&session_id='+id,'section=walk_ins',`section=walk_ins&venue_id=${id}`,'']) assert.throws(()=>query(text));
 });

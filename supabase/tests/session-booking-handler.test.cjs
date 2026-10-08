@@ -21,19 +21,24 @@ test('group booking HTTP derives the verified actor, selects buckets and rejects
   for(const kind of ['accept','decline','cancel']) assert.equal((await handler(post({kind,booking_id:id}))).status,200);
   assert.equal((await handler(post({kind:'expire',booking_id:id}))).status,400);
   assert.equal((await handler(get(`section=sessions&venue_id=${id}`))).status,200);
-  assert.deepEqual(seen,['hold-create','owner-edit','cancel','cancel','owner-read']);
+  assert.equal((await handler(post({...body,kind:'walk_in'}))).status,200);
+  for(const extra of ['actor_user_id','source','status']) assert.equal((await handler(post({...body,kind:'walk_in',[extra]:id}))).status,400);
+  assert.equal((await handler(get(`section=walk_ins&session_id=${id}`))).status,200);
+  assert.deepEqual(seen,['hold-create','owner-edit','cancel','cancel','owner-read','owner-edit','owner-read']);
   assert.equal((await handler(new Request('https://groups.local',{method:'PUT',headers:{authorization:'Bearer valid'}}))).status,405);
 });
 test('Redis failure, SDK fail-open timeout and deadline block new groups/acceptance; decline, cancel and reads continue',async()=>{
   let calls=0;const deps=base();deps.command=async()=>{calls++;return {};};
   for(const backend of [async()=>{throw new Error('Outage');},async()=>({success:true,reason:'timeout'}),()=>new Promise(()=>{})]){
     deps.limit=createRateGuard({backend,identifier:async()=>id,timeoutMs:5});const handler=createSessionBookingHandler(deps);
-    assert.equal((await handler(post())).status,503);assert.equal((await handler(post({kind:'accept',booking_id:id}))).status,503);assert.equal(calls,0);
+    assert.equal((await handler(post())).status,503);assert.equal((await handler(post({kind:'accept',booking_id:id}))).status,503);
+    assert.equal((await handler(post({...body,kind:'walk_in'}))).status,503);assert.equal(calls,0);
     for(const kind of ['cancel','decline']) assert.equal((await handler(post({kind,booking_id:id}))).status,200);
     assert.equal((await handler(get('section=history'))).status,200);calls=0;
   }
   deps.limit=async()=>({allowed:true,state:'degraded',status:200,headers:{}});
-  assert.equal((await createSessionBookingHandler(deps)(post())).status,503);assert.equal(calls,0);
+  assert.equal((await createSessionBookingHandler(deps)(post())).status,503);
+  assert.equal((await createSessionBookingHandler(deps)(post({...body,kind:'walk_in'}))).status,503);assert.equal(calls,0);
   deps.limit=async()=>{throw new Error('Unexpected limiter failure');};
   assert.equal((await createSessionBookingHandler(deps)(post({kind:'cancel',booking_id:id}))).status,200);
   deps.limit=async()=>({allowed:false,status:429,state:'enforced',headers:{'Retry-After':'17'}});
@@ -51,7 +56,7 @@ test('group booking HTTP bounds a full named group, maps refusals and sanitizes 
   for(const tail of ['section=history&limit=999','section=history&section=history','section=booking&booking_id=nope','section=sessions','section=roster&session_id='+id])
     assert.equal((await handler(get(tail))).status,400);
   for(const [reason,status] of [['session_full',409],['group_limit_exceeded',409],['already_booked',409],['stale_quote',409],['session_cancelled',409],
-    ['session_started',409],['arrival_unavailable',409],['request_reused',409],['not_player',403],['not_owner',403],['player_required',403],
+    ['session_started',409],['session_ended',409],['arrival_unavailable',409],['request_reused',409],['not_player',403],['not_owner',403],['player_required',403],
     ['booking_not_found',404],['session_not_found',404],['venue_unavailable',404],['invalid_input',400]]){
     deps.command=async()=>{throw new SessionBookingRejected(reason);};assert.equal((await createSessionBookingHandler(deps)(post())).status,status);
   }
@@ -64,11 +69,16 @@ test('Supabase deps send only the derived actor and normalized body; unknown dat
   const deps=createSupabaseSessionBookingDeps(()=>({auth:{getUser:async()=>({data:{user:{id}},error:null})}}),server);
   await deps.command(id,domain.readSessionBookingCommand({...body,participants:[' Ana ','Ben']}));
   await deps.command(id,{kind:'cancel',booking_id:id});
+  await deps.command(id,domain.readSessionBookingCommand({...body,kind:'walk_in'}));
   await deps.read(id,{section:'sessions',venue_id:id,after_id:null});await deps.read(id,{section:'history',after_id:id});
+  await deps.read(id,{section:'walk_ins',session_id:id,after_id:id});await deps.read(id,{section:'booking',booking_id:id});
   assert.deepEqual(JSON.parse(JSON.stringify(calls)),[['session_booking_request',{actor_user_id:id,booking_input:{session_id:id,request_id:id,participants:['Ana','Ben'],expected_total_centavos:50000}}],
     ['session_booking_change',{actor_user_id:id,target_booking_id:id,command:'cancel'}],
+    ['session_walk_in',{actor_user_id:id,walk_in_input:{session_id:id,request_id:id,participants:['Ana','Ben'],expected_total_centavos:50000}}],
     ['session_booking_read',{actor_user_id:id,section:'sessions',target_id:id,after_id:null}],
-    ['session_booking_read',{actor_user_id:id,section:'history',target_id:null,after_id:id}]]);
+    ['session_booking_read',{actor_user_id:id,section:'history',target_id:null,after_id:id}],
+    ['session_booking_read',{actor_user_id:id,section:'walk_ins',target_id:id,after_id:id}],
+    ['session_booking_read',{actor_user_id:id,section:'booking',target_id:id,after_id:null}]]);
   reply.data=null;reply.error={code:'23514',hint:'session_full'};
   await assert.rejects(deps.command(id,{kind:'cancel',booking_id:id}),e=>e instanceof SessionBookingRejected&&e.reason==='session_full');
   reply.error={code:'XX000',hint:'secret detail'};await assert.rejects(deps.command(id,{kind:'cancel',booking_id:id}),e=>!(e instanceof SessionBookingRejected));

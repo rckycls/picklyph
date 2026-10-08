@@ -3,7 +3,7 @@ const fs=require('node:fs');
 const path=require('node:path');
 const {test}=require('node:test');
 const {storageStub}=require('./platform.cjs');
-test('group bookings: locked spot capacity, names/limits, holds without cron, retries, access and event rollback',async()=>{
+async function database(){
   const {PGlite}=await import('@electric-sql/pglite');
   const {postgis}=await import('@electric-sql/pglite-postgis');
   const {pg_trgm}=await import('@electric-sql/pglite/contrib/pg_trgm');
@@ -16,15 +16,28 @@ test('group bookings: locked spot capacity, names/limits, holds without cron, re
       create function auth.uid() returns uuid language sql stable as $$ select (nullif(current_setting('request.jwt.claims',true),'')::jsonb->>'sub')::uuid; $$;${storageStub}`);
     for(const file of fs.readdirSync(path.join(__dirname,'../migrations')).filter(f=>f.endsWith('.sql')).sort())
       await db.exec(fs.readFileSync(path.join(__dirname,'../migrations',file),'utf8'));
+    return db;
+  }catch(error){await db.close();throw error;}
+}
+test('group bookings: locked spot capacity, names/limits, holds without cron, retries, access and event rollback',async()=>{
+  const db=await database();
+  try {
     await db.exec(fs.readFileSync(path.join(__dirname,'session-bookings.sql'),'utf8'));
     const grants=(await db.query(`select p.proname,r.name from pg_proc p join pg_namespace n on n.oid=p.pronamespace
       cross join (values ('anon'),('authenticated'),('service_role')) r(name)
       where n.nspname in ('public','private') and p.proname like 'session%' and has_function_privilege(r.name,p.oid,'execute') order by 1,2`)).rows;
-    assert.deepEqual(grants,['session_booking_change','session_booking_read','session_booking_request'].map(proname=>({proname,name:'service_role'})));
+    assert.deepEqual(grants,['session_booking_change','session_booking_read','session_booking_request','session_walk_in'].map(proname=>({proname,name:'service_role'})));
     const tables=(await db.query(`select c.relname,c.relrowsecurity,exists(select 1 from (values ('anon'),('authenticated'),('service_role')) r(name)
       where has_table_privilege(r.name,c.oid,'select,insert,update,delete')) api_access from pg_class c join pg_namespace n on n.oid=c.relnamespace
       where n.nspname='private' and c.relname in ('session_bookings','session_booking_events') order by 1`)).rows;
     assert.deepEqual(tables,['session_booking_events','session_bookings'].map(relname=>({relname,relrowsecurity:true,api_access:false})));
+    assert.equal((await db.query('select count(*)::integer n from private.session_bookings')).rows[0].n,0);
+  }finally{await db.close();}
+});
+test('walk-ins: owner-only confirmed arrival groups share locked capacity, retries, removal, reads and rollback',async()=>{
+  const db=await database();
+  try {
+    await db.exec(fs.readFileSync(path.join(__dirname,'session-walk-ins.sql'),'utf8'));
     assert.equal((await db.query('select count(*)::integer n from private.session_bookings')).rows[0].n,0);
   }finally{await db.close();}
 });

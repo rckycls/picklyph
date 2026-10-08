@@ -1,6 +1,6 @@
 # Owner open-play sessions (T27)
 
-Verified owners schedule open play from **Venues → Open-play sessions**. Sessions reserve one or more named courts using the same inventory as rentals and owner blocks. Creation is all-or-nothing. T28 adds the group booking API ([session-bookings.md](session-bookings.md)); the player UI arrives in T30. T27 itself does not sell participant spots or execute payments.
+Verified owners schedule open play from **Venues → Open-play sessions**. Sessions reserve one or more named courts using the same inventory as rentals and owner blocks. Creation is all-or-nothing. T28 adds the group booking API ([session-bookings.md](session-bookings.md)) and T29 lets owners add walk-ins from each session card; the player UI arrives in T30. T27 itself does not sell participant spots or execute payments.
 
 ## Owner workflow and contracts
 
@@ -28,9 +28,13 @@ Retry compares canonical court ordering, normalized instants (the create functio
 
 The mobile creation journal persists the exact normalized request **before** dispatch in device-only SecureStore under backend/account identity. Network/auth/429/503/malformed-success replies retain the request across restart and sign-in. Another creation is blocked until recovery resolves it. There is no automatic submission. Foreground/focus reads revalidate access; old replies cannot populate a different account's keyed screen. Cancellation retries use the same session ID. Sign-out keeps an uncertain creation; T47 account deletion must clear `.session-attempt` alongside rental recovery. Web fallback is memory only.
 
-## For T29/T31
+## Walk-ins (T29)
 
-T28 implements participant inventory: `reserved_spots` counts live pending and confirmed groups, changes only under the venue → session lock, and elapsed holds are released on access (including before this empty-session cancellation check). Owner reads report the effective count. T29 walk-ins must reuse that lock order and counter, and may need to relax T28's one-live-group-per-player index for owner-entered groups. Each group snapshots the immutable session price/policy; current schedules do not reprice it. Read/cancel T27 wrappers reveal no participant names. Extend occupied-session cancellation only alongside audited participant release/refund handling. Court allocations remain firm for the entire session independent of the number of spots sold.
+Each scheduled session that has not ended shows its spots taken and a **Walk-ins** panel: one name per line, a live count/total preview against the group limit and open spots, the list of current walk-ins and a confirmed **Remove walk-in** action. The add request (key and names) is saved in device-only storage under backend/account identity **before** dispatch, exactly like session creation. An uncertain reply keeps a top-level "Check your saved walk-in" card that retries the original unchanged and blocks further walk-ins until it resolves. T47 account deletion must clear `.walk-in-attempt` alongside `.session-attempt`. Walk-ins block the empty-session cancellation below until they are removed. Physical iPhone checks remain for the panel: name entry and preview, add/remove confirmation, restart recovery after an uncertain add, large text and VoiceOver.
+
+## For T31
+
+T28 implements participant inventory: `reserved_spots` counts live pending and confirmed groups (player bookings and T29 walk-ins), changes only under the venue → session lock, and elapsed holds are released on access (including before this empty-session cancellation check). Owner reads report the effective count. Each group snapshots the immutable session price/policy; current schedules do not reprice it. Read/cancel T27 wrappers reveal no participant names. Extend occupied-session cancellation only alongside audited participant release/refund handling. Court allocations remain firm for the entire session independent of the number of spots sold.
 
 ## Verification and rollout
 

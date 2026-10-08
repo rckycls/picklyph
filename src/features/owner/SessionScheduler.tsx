@@ -1,5 +1,5 @@
 import { DEFAULT_GROUP_LIMIT, formatManilaDateTime, formatPhpCentavos,
-  type OwnerVenue, type SessionCreate, type SessionPage } from '@picklyph/domain';
+  type OwnerVenue, type SessionCreate, type SessionPage, type SessionWalkIn } from '@picklyph/domain';
 import { randomUUID } from 'expo-crypto';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -16,7 +16,9 @@ import { OwnerScreen } from './OwnerScreen';
 import { cancelSession, createSession, listSessions, sessionFailureMessage } from './sessionClient';
 import { sessionServices } from './sessionLive';
 import { sessionDraft } from './sessionDraft';
+import { SessionWalkIns } from './SessionWalkIns';
 import { venueFailureMessage } from './venueClient';
+import { addWalkIn, removeWalkIn, walkInFailureMessage } from './walkInClient';
 
 export function SessionScheduler({ venueId, actor }: { venueId: string; actor: string }) {
   const services = useMemo(() => { try { return sessionServices(actor); } catch { return null; } }, [actor]);
@@ -25,6 +27,7 @@ export function SessionScheduler({ venueId, actor }: { venueId: string; actor: s
   const [loading, setLoading] = useState(false); const [busy, setBusy] = useState(false); const [message, setMessage] = useState<string | null>(null);
   const [retryAt, setRetryAt] = useState(0); const [now, setNow] = useState(() => Date.now());
   const [confirmCancel, setConfirmCancel] = useState<string | null>(null);
+  const [walkInPending, setWalkInPending] = useState<SessionWalkIn | null>(null); const [walkInsFor, setWalkInsFor] = useState<string | null>(null);
   const [title, setTitle] = useState('Open play'); const [capacity, setCapacity] = useState('12'); const [group, setGroup] = useState(String(DEFAULT_GROUP_LIMIT));
   const [price, setPrice] = useState('250'); const [selected, setSelected] = useState<string[]>([]);
   const [date, setDate] = useState(() => addDays(manilaDate(Date.now()), 1)); const [start, setStart] = useState(1080); const [end, setEnd] = useState(1200);
@@ -38,9 +41,10 @@ export function SessionScheduler({ venueId, actor }: { venueId: string; actor: s
     if (!services || working.current) return;
     request.current?.abort(); const abort = new AbortController(); request.current = abort;
     setFresh(false); setLoading(true);
-    void Promise.all([liveOwnedVenue(venueId, abort.signal), listSessions(services.transport, venueId, after, abort.signal), services.journal.read()]).then(([v, s, saved]) => {
+    void Promise.all([liveOwnedVenue(venueId, abort.signal), listSessions(services.transport, venueId, after, abort.signal), services.journal.read(),
+      services.walkIns.journal.read()]).then(([v, s, saved, savedWalkIn]) => {
       if (abort.signal.aborted || !alive.current) return;
-      setLoading(false); setPending(saved); setRecoveryReady(true);
+      setLoading(false); setPending(saved); setWalkInPending(savedWalkIn); setRecoveryReady(true);
       if (!v.ok) { setVenue(null); setMessage(venueFailureMessage(v.failure)); return; }
       setVenue(v.value);
       if (!s.ok) { setMessage(sessionFailureMessage(s.failure)); return; }
@@ -82,7 +86,37 @@ export function SessionScheduler({ venueId, actor }: { venueId: string; actor: s
       if (!outcome.ok) { setRetryAt(Date.now() + (outcome.failure.retryAfterSeconds ?? 0) * 1000); setNow(Date.now()); }
     } finally { working.current = false; if (alive.current) { setBusy(false); setConfirmCancel(null); load(); } }
   };
+  // Walk-ins use the same durable journal pattern: the original key and names are saved before dispatch and retried unchanged.
+  const sendWalkIn = async (input: SessionWalkIn | null): Promise<boolean> => {
+    const command = input ?? walkInPending;
+    if (!services || !command || working.current || wait || !recoveryReady || !fresh) return false;
+    working.current = true; setBusy(true); setMessage(null); setWalkInPending(command);
+    try {
+      const outcome = await services.walkIns.journal.run(command, original => addWalkIn(services.walkIns.transport, original));
+      if (!alive.current) return false;
+      if (outcome.ok) {
+        const b = outcome.value.booking; setWalkInPending(null);
+        setMessage(b.status === 'cancelled' ? 'This walk-in was already added and later removed.'
+          : `Walk-in added: ${b.spots} ${b.spots === 1 ? 'person' : 'people'} · ${formatPhpCentavos(b.snapshot.total_centavos)} due on arrival.`);
+        return true;
+      }
+      setMessage(walkInFailureMessage(outcome.failure)); setRetryAt(Date.now() + (outcome.failure.retryAfterSeconds ?? 0) * 1000); setNow(Date.now());
+      setWalkInPending(await services.walkIns.journal.read()); return false;
+    } catch { if (alive.current) setMessage('Couldn’t confirm this walk-in. Keep the original names and retry.'); return false; }
+    finally { working.current = false; if (alive.current) { setBusy(false); load(); } }
+  };
+  const removeWalk = async (bookingId: string) => {
+    if (!services || working.current || wait || !fresh) return;
+    working.current = true; setBusy(true); setMessage(null);
+    try {
+      const outcome = await removeWalkIn(services.walkIns.transport, bookingId);
+      if (!alive.current) return;
+      setMessage(outcome.ok ? 'Walk-in removed. Its spots are open again.' : walkInFailureMessage(outcome.failure));
+      if (!outcome.ok) { setRetryAt(Date.now() + (outcome.failure.retryAfterSeconds ?? 0) * 1000); setNow(Date.now()); }
+    } finally { working.current = false; if (alive.current) { setBusy(false); load(); } }
+  };
   const canCreate = venue?.publication_status === 'approved' && venue.claim_status === 'verified';
+  const walkInPendingSession = walkInPending && page?.sessions.find(s => s.id === walkInPending.session_id);
   return <OwnerScreen>
     <Card>
       <Text accessibilityRole="header" style={screenText.title}>{venue?.name ?? 'Open-play sessions'}</Text>
@@ -96,6 +130,13 @@ export function SessionScheduler({ venueId, actor }: { venueId: string; actor: s
       <Text style={screenText.body}>{pending.title} · {formatManilaDateTime(pending.starts_at)} · {formatPhpCentavos(pending.price_centavos)} per person</Text>
       {pending.venue_id !== venueId && <Text style={screenText.body}>This saved request is for another venue. Retry it here before creating another session.</Text>}
       <Button label={wait ? `Retry in ${wait}s` : 'Retry original session'} loading={busy} disabled={busy || loading || !!wait || !fresh} onPress={() => void send()} />
+    </Card>}
+    {walkInPending && <Card>
+      <Text accessibilityRole="header" style={screenText.title}>Check your saved walk-in</Text>
+      <Text style={screenText.body}>{walkInPending.participants.join(', ')} · {formatPhpCentavos(walkInPending.expected_total_centavos)}
+        {walkInPendingSession ? ` · ${walkInPendingSession.snapshot.title}, ${formatManilaDateTime(walkInPendingSession.snapshot.starts_at)}` : ''}</Text>
+      <Text style={screenText.body}>Retry the original names to confirm whether they were added. Other walk-ins wait until this is resolved.</Text>
+      <Button label={wait ? `Retry in ${wait}s` : 'Retry original walk-in'} loading={busy} disabled={busy || loading || !!wait || !fresh} onPress={() => void sendWalkIn(null)} />
     </Card>}
     {venue && !canCreate && <Card><Text style={screenText.body}>Session scheduling needs a published venue with verified ownership.</Text></Card>}
     {canCreate && !pending && <Card>
@@ -116,13 +157,20 @@ export function SessionScheduler({ venueId, actor }: { venueId: string; actor: s
       <Button label={wait ? `Create in ${wait}s` : 'Create session'} loading={busy} disabled={disabled || !recoveryReady || loading || !fresh || !!wait} onPress={() => void send()} />
     </Card>}
     {page && <>
-      <Text style={screenText.body}>{page.sessions.length} sessions loaded{!fresh ? ' · Reload to confirm current status' : ''}. Participant booking opens in a later update.</Text>
+      <Text style={screenText.body}>{page.sessions.length} sessions loaded{!fresh ? ' · Reload to confirm current status' : ''}. Add walk-ins to a session here; player booking opens in a later update.</Text>
       {[...page.sessions].sort((a, b) => Date.parse(b.snapshot.starts_at) - Date.parse(a.snapshot.starts_at)).map(s => <Card key={s.id}>
         <Text accessibilityRole="header" style={screenText.title}>{s.snapshot.title}</Text>
         <Text style={screenText.body}>{formatManilaDateTime(s.snapshot.starts_at)} → {formatManilaDateTime(s.snapshot.ends_at)}</Text>
         <Text style={screenText.body}>{s.status === 'cancelled' ? 'Cancelled' : 'Scheduled'} · {s.snapshot.court_ids.length} courts · Capacity {s.snapshot.capacity} · Group limit {s.snapshot.group_limit}</Text>
         <Text style={screenText.body}>Courts: {s.snapshot.court_ids.map(id => venue?.courts.find(c => c.id === id)?.name ?? id).join(', ')}</Text>
         <Text style={screenText.body}>{formatPhpCentavos(s.snapshot.price_centavos)} per person · {s.snapshot.policy.confirmation === 'approval' ? 'Owner approval' : 'Instant confirmation'} · {s.snapshot.policy.payment === 'arrival' ? 'Pay on arrival' : s.snapshot.policy.payment === 'online' ? 'Online payment' : 'Online or arrival'}</Text>
+        <Text style={screenText.body}>Spots taken: {s.reserved_spots} of {s.snapshot.capacity}</Text>
+        {canCreate && s.status === 'scheduled' && Date.parse(s.snapshot.ends_at) > Date.parse(page.at) && <>
+          <Button label={walkInsFor === s.id ? 'Hide walk-ins' : 'Walk-ins'} variant="secondary" disabled={!fresh && walkInsFor !== s.id}
+            onPress={() => setWalkInsFor(current => current === s.id ? null : s.id)} />
+          {walkInsFor === s.id && services && <SessionWalkIns session={s} transport={services.walkIns.transport} refreshKey={page.at}
+            disabled={busy || loading || !fresh || !!wait || walkInPending !== null} onAdd={command => sendWalkIn(command)} onRemove={removeWalk} />}
+        </>}
         {s.status === 'scheduled' && s.reserved_spots === 0 && Date.parse(s.snapshot.starts_at) > Date.parse(page.at) && <>
           {confirmCancel === s.id ? <>
             <Text style={screenText.body}>Cancel this session and release every assigned court?</Text>

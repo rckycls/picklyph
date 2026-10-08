@@ -8,7 +8,7 @@ export type { Database } from './database';
 export { MAX_SESSION_CAPACITY, DEFAULT_GROUP_LIMIT, SessionInputError, readSessionCreate, readSessionCommand, readSessionQuery } from './session';
 export type { SessionCreate, SessionSnapshot, OpenPlaySession, SessionResult, SessionPage, SessionCommand, SessionQuery } from './session';
 export { MAX_PARTICIPANT_NAME, MAX_SESSION_BOOKING_BYTES, SessionBookingInputError, readParticipantNames, sessionGroupTotal, readSessionBookingCommand, readSessionBookingQuery } from './sessionBooking';
-export type { SessionOffer, SessionOfferPage, SessionBookingSnapshot, SessionBooking, SessionBookingResult, SessionBookingPage, SessionBookingRequest, SessionBookingChange, SessionBookingCommand, SessionBookingQuery } from './sessionBooking';
+export type { SessionOffer, SessionOfferPage, SessionBookingSnapshot, SessionBooking, SessionBookingResult, SessionBookingPage, SessionBookingRequest, SessionWalkIn, SessionBookingChange, SessionBookingCommand, SessionBookingQuery } from './sessionBooking';
 export { readPolicySave } from './policy';
 export type { VenuePolicy, VenuePolicyView, VenuePolicySave } from './policy';
 export { MAX_SEARCH_PAGE, SearchInputError, readVenueSearch } from './search';

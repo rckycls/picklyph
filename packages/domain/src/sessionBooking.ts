@@ -16,20 +16,23 @@ export type SessionBookingSnapshot = {
   approval_hold_minutes: 120; payment_hold_minutes: 15; refund_cutoff_hours: 24;
 };
 export type SessionBooking = {
-  id: string; session_id: string; status: 'pending' | 'confirmed' | 'declined' | 'cancelled' | 'expired';
+  id: string; session_id: string; source: 'player' | 'walk_in'; status: 'pending' | 'confirmed' | 'declined' | 'cancelled' | 'expired';
   payment_method: 'arrival'; payment_status: 'unpaid'; participants: string[]; spots: number;
   expires_at: string | null; created_at: string; updated_at: string; snapshot: SessionBookingSnapshot;
 };
 export type SessionBookingResult = { outcome: 'created' | 'existing' | 'changed' | 'expired'; booking: SessionBooking };
 export type SessionBookingPage = { bookings: SessionBooking[]; next_cursor: string | null };
 export type SessionBookingRequest = { kind: 'request'; session_id: string; request_id: string; participants: string[]; expected_total_centavos: number };
+/** Owner-entered arrival group (T29): same body as a player request, confirmed on entry. */
+export type SessionWalkIn = Omit<SessionBookingRequest, 'kind'> & { kind: 'walk_in' };
 export type SessionBookingChange = { kind: 'accept' | 'decline' | 'cancel'; booking_id: string };
-export type SessionBookingCommand = SessionBookingRequest | SessionBookingChange;
+export type SessionBookingCommand = SessionBookingRequest | SessionWalkIn | SessionBookingChange;
 export type SessionBookingQuery = { section: 'sessions'; venue_id: string; after_id: string | null }
   | { section: 'session'; session_id: string }
   | { section: 'booking'; booking_id: string }
   | { section: 'history'; after_id: string | null }
-  | { section: 'requests'; venue_id: string; after_id: string | null };
+  | { section: 'requests'; venue_id: string; after_id: string | null }
+  | { section: 'walk_ins'; session_id: string; after_id: string | null };
 
 export class SessionBookingInputError extends Error {
   constructor() { super('Check the group names and session.'); this.name = 'SessionBookingInputError'; }
@@ -65,7 +68,7 @@ export function sessionGroupTotal(priceCentavos: number, spots: number): number 
 export function readSessionBookingCommand(raw: unknown): SessionBookingCommand {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new SessionBookingInputError();
   const kind = (raw as Record<string, unknown>).kind;
-  if (kind === 'request') {
+  if (kind === 'request' || kind === 'walk_in') {
     const r = fields(raw, 'expected_total_centavos,kind,participants,request_id,session_id');
     if (typeof r.expected_total_centavos !== 'number' || !Number.isSafeInteger(r.expected_total_centavos) || r.expected_total_centavos < 0)
       throw new SessionBookingInputError();
@@ -89,6 +92,10 @@ export function readSessionBookingQuery(params: URLSearchParams): SessionBooking
   if (section === 'sessions' || section === 'requests') {
     const after_id = after('section,venue_id');
     return { section, venue_id: uuid(r.venue_id), after_id };
+  }
+  if (section === 'walk_ins') {
+    const after_id = after('section,session_id');
+    return { section, session_id: uuid(r.session_id), after_id };
   }
   if (r.section === 'history') return { section: 'history', after_id: after('section') };
   if (r.section === 'session') return { section: 'session', session_id: uuid(fields(r, 'section,session_id').session_id) };

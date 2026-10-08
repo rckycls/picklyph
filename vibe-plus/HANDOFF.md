@@ -1,6 +1,6 @@
 # HANDOFF: read this first
 
-**Updated:** 2026-10-08, Asia/Manila. **Plan:** Codex desktop / ChatGPT Plus; keep configured model. W3/W4 complete (7 points each). W5: T13, T14 and T16 complete (5/7); T15 implemented, device checks partly done. W6: T17–T20 complete (7/7). W7: T21–T23 complete (7/7). W8: T24–T26 complete (7/7). W9: T27–T28 complete (6/7), T29 next. Outside the plan: Account tab redesigned as a profile page (b43e8d4); owners now add their own venue as a reviewed draft instead of submitting a missing venue; profile details/preferences committed and pushed as `5629ae8` (see below). **Hosted staging migrations are up to date through `20261008150000` (T05–T24 plus owner-created venues; dry run confirmed 2026-10-08).** Staging Edge Functions are only `venue-search` and `owner-submissions`: `owner-venues`, `owner-schedules`, `rental-bookings`, `owner-sessions` and `session-bookings` are not deployed yet. Capacity remains 8; no actual usage-window end/limit signal. A few sessions/week, experienced user, no deadline.
+**Updated:** 2026-10-08, Asia/Manila. **Plan:** Codex desktop / ChatGPT Plus; keep configured model. W3/W4 complete (7 points each). W5: T13, T14 and T16 complete (5/7); T15 implemented, device checks partly done. W6: T17–T20 complete (7/7). W7: T21–T23 complete (7/7). W8: T24–T26 complete (7/7). W9: T27–T29 complete (7/7); expand W10 cards, then T30. Outside the plan: Account tab redesigned as a profile page (b43e8d4); owners now add their own venue as a reviewed draft instead of submitting a missing venue; profile details/preferences committed and pushed as `5629ae8` (see below). **Hosted staging migrations are up to date through `20261008150000` (T05–T24 plus owner-created venues; dry run confirmed 2026-10-08).** Staging Edge Functions are only `venue-search` and `owner-submissions`: `owner-venues`, `owner-schedules`, `rental-bookings`, `owner-sessions` and `session-bookings` (now including T29 walk-ins) are not deployed yet. Capacity remains 8; no actual usage-window end/limit signal. A few sessions/week, experienced user, no deadline.
 
 ## Current state
 
@@ -159,7 +159,7 @@
 
 ## T28 group booking handoff
 
-**Git checkpoint:** committed locally as `T28: add atomic open-play group bookings`; not pushed. T29 is next and has not started.
+**Git checkpoint:** committed locally as `T28: add atomic open-play group bookings` (`d729311`); not pushed. T29 followed.
 
 **Built:** Guarded `session-bookings` API: named arrival groups reserve spots in T27 sessions; owners accept/decline; players cancel; offers/detail/history/owner-request reads. No player UI, walk-ins or payments.
 **Files/APIs:** `20261009000000_session_bookings.sql`; `session_booking_request|change|read` (service-only); `private.session_expire_holds`; domain `sessionBooking.ts`; `supabase/functions/session-bookings/`; runbook `docs/session-bookings.md`.
@@ -167,6 +167,17 @@
 **Gotchas:** Local migration only. Killed Windows `functions serve` leaves its edge container running; the T28 harness waits for a fresh one (T26/T27 harnesses do not). Tests elapse holds by briefly disabling the booking guard trigger as postgres.
 **For T29:** reuse the lock order/counter; owner walk-ins may need a source column and a relaxed one-live index.
 **Evidence:** `test:session-bookings`5, `test:domain`48, `test:directory`51, `test:sessions`3, `test:bookings`4, `test:owner`22, `test:rental:mobile`21 pass; five migration mutations caught; `test:session-bookings:local` PASS repeatedly after the fresh-container fix; `test:sessions:local` PASS; typecheck, lint, admin typecheck, functions check/lint, `git diff --check` exit0; `bundle:ios` 1874 modules/5.1MB; local migration list shows 20261009000000 applied.
+
+## T29 walk-in handoff
+
+**Git checkpoint:** committed locally as `T29: add owner session walk-ins`; not pushed. W9 is complete; W10 cards (T30–T33) still need expanding.
+
+**Built:** Current owners add named arrival walk-ins to a session (confirmed on entry, unpaid) and remove them until it ends. Owner session cards show spots taken and a walk-in panel with durable original-request recovery.
+**Files/APIs:** `20261009030000_session_walk_ins.sql`; service-only `session_walk_in`; `session-bookings` POST `{kind:"walk_in",session_id,request_id,participants,expected_total_centavos}` and GET `section=walk_ins&session_id`; bookings now carry `source`; domain `SessionWalkIn`; mobile `walkInClient.ts`, `SessionWalkIns.tsx`; `supabase/tests/session-walk-ins.sql`.
+**Decisions:** Same venue→session lock and `reserved_spots` counter. Group limit applies per walk-in, with any number of walk-ins. Walk-ins are allowed until `ends_at` and under any payment policy, because they pay in person. The one-live index and `already_booked` are player-only. Walk-ins share the retry key space and their canonical input includes the kind. Retries and reads require current ownership; any current owner may remove. Guard: fail-closed `owner-edit`.
+**Gotchas:** Local migration only. Live walk-ins block T27 empty cancellation. T47 must clear `.walk-in-attempt`. The iOS bundle contains supabase-js's `sb_secret_` prefix check, which is not a key.
+**For next tasks:** T30 parses `source`; T31 check-in/arrival payments must include walk-ins.
+**Evidence:** `test:session-bookings`6, `test:domain`48, `test:directory`52, `test:sessions`3, `test:bookings`4, `test:owner`26, `test:rental:mobile`21 pass; seven migration mutations caught; `test:session-bookings:local` PASS (Docker SQL, mixed race 4/12 winners, six retries one booking/event, both lock orders, served Edge outage walk-in503/removal retries once); `test:sessions:local` PASS; typecheck, lint, admin typecheck, functions check/lint, `git diff --check` exit0; `bundle:ios` 1876 modules/5.1MB; local migration list shows 20261009030000.
 
 ## Account profile redesign handoff (outside the plan)
 
@@ -226,7 +237,7 @@
 
 ## Next
 
-1. **T29 next** (owner-entered session walk-ins). Read T27/T28 handoffs and `docs/session-bookings.md`; walk-ins share `reserved_spots` under venue→session locks. Staging still needs owner/schedule/rental/session/session-booking functions, profile migration and T27/T28 migrations deployed; physical iPhone acceptance (T22 calendar/hours, T25 rental recovery, T27 sessions and H07 races) remains separate. Management screens use `VerifiedOwnerGate`; submission/claim screens remain auth-only.
+1. **W10 next:** expand cards T30–T33 (W9 wrap-up logged), then **T30** (player session discovery and group reservation UI). Read T27–T29 handoffs and `docs/session-bookings.md`; bookings carry `source`, and the walk-in journal `.walk-in-attempt` sits beside `.session-attempt`. Staging still needs owner/schedule/rental/session/session-booking functions, profile migration and T27–T29 migrations deployed; physical iPhone acceptance (T22 calendar/hours, T25 rental recovery, T27 sessions, T29 walk-in panel and H07 races) remains separate. Management screens use `VerifiedOwnerGate`; submission/claim screens remain auth-only.
 2. **Device checks still open** on the installed EAS build: T15 address-search results, the submissions list, the duplicate warning and claiming (a published staging test venue now exists); T16 recovery states; T02 navigation/VoiceOver/large text; the redesigned Account page (hero, Player/Owner switch, display-name save against staging). T14 accepted 2026-10-07.
 3. **Staging:** first admin assigned by operator SQL; one published test venue; the console runs locally against staging (`ADMIN_SUPABASE_SECRET_KEY` in the ignored `apps/admin/.env.local`), not hosted yet. H06 (owner claim/review trial) can run now; the reviewer must differ from the submitter. Decide whether public contact fields belong in a later directory task. H02: production Redis, hosted outage/isolation and per-IP ingress checks remain.
 4. T09 rules are ready for later commands; use server-derived clocks. T46 must review moderator audit permissions and replace unaudited `set_verified_venue_owner` revocation; T47 must define audit UUID and evidence retention.
@@ -234,7 +245,7 @@
 
 ## Git and gotchas
 
-- **Latest checkpoint:** T28 committed locally, not pushed. T26 `7f391db` and T27 `73c69f7` are pushed to `origin/main` (2026-10-08). T27 includes the completed W9 task card and implementation handoff. The source manifests and npm lockfile are unchanged by the local dependency repair. Hosted rollout and physical-device acceptance remain pending as listed above.
+- **Latest checkpoint:** T28 (`d729311`) and T29 committed locally, not pushed. T26 `7f391db` and T27 `73c69f7` are pushed to `origin/main` (2026-10-08). T27 includes the completed W9 task card and implementation handoff. The source manifests and npm lockfile are unchanged by the local dependency repair. Hosted rollout and physical-device acceptance remain pending as listed above.
 - Main remote https://github.com/rckycls/picklyph.git. T10 (c148676) and staging deployment notes (2b1dfd5) pushed before T11. T11 (6e55220), T12 (4c06c06) and T13 (fe2a0c7) pushed 2026-10-07; T14 (32e9682) pushed 2026-10-07; T15 (a7e1bad) and T16 (8832ef9) pushed 2026-10-07; T17 (4e9eaf1), T18 (30fc02a), T19 (a482a6a) and T20 (0d1846f) pushed 2026-10-07; T21 (14fee03) and T22 (5c21f33) pushed 2026-10-07; Account redesign (b43e8d4) pushed 2026-10-07. Admin env/build/cache output ignored, placeholder `.env.example` committed, test credentials stay in memory or short-lived ignored/system-temp local-test env files removed during cleanup. Typecheck runs `next typegen` first so generated route types exist on a fresh clone; Next updates `next-env.d.ts` during build.
 - Preserve private evidence and approved-only directory reads. Supabase owns transactional allocation/booking authority; Upstash is only rate limiting, no Redis inventory locks/QStash.
 - **Never use `instanceof Response` in mobile code.** On iOS, Expo SDK 57 installs `expo/fetch`, whose `FetchResponse` implements but does not extend React Native's global `Response`. The T15 owner client did this, so every owner lookup/submit failed silently on device (Node tests use real `Response`); fixed with a tagged result plus a regression test that wraps responses. T17 also lets approved venue submissions return their listing `venue_id`; the client parser now accepts that.

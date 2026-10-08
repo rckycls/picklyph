@@ -18,17 +18,23 @@ export function createSupabaseSessionBookingDeps(verifier: () => SupabaseClient<
     },
     read: async (actor: string, query: SessionBookingQuery) => {
       const target = query.section === 'sessions' || query.section === 'requests' ? query.venue_id
-        : query.section === 'session' ? query.session_id : query.section === 'booking' ? query.booking_id : null;
-      const after = query.section === 'sessions' || query.section === 'requests' || query.section === 'history' ? query.after_id : null;
+        : query.section === 'session' || query.section === 'walk_ins' ? query.session_id : query.section === 'booking' ? query.booking_id : null;
+      const after = query.section === 'session' || query.section === 'booking' ? null : query.after_id;
       const { data, error } = await server().rpc('session_booking_read', { actor_user_id: actor, section: query.section, target_id: target, after_id: after });
       if (error || !data) return rejected(error);
       return data;
     },
     command: async (actor: string, command: SessionBookingCommand) => {
-      const { data, error } = command.kind === 'request'
-        ? await server().rpc('session_booking_request', { actor_user_id: actor, booking_input: { session_id: command.session_id,
-          request_id: command.request_id, participants: command.participants, expected_total_centavos: command.expected_total_centavos } })
-        : await server().rpc('session_booking_change', { actor_user_id: actor, target_booking_id: command.booking_id, command: command.kind });
+      if (command.kind === 'request' || command.kind === 'walk_in') {
+        const input = { session_id: command.session_id, request_id: command.request_id, participants: command.participants,
+          expected_total_centavos: command.expected_total_centavos };
+        const { data, error } = command.kind === 'request'
+          ? await server().rpc('session_booking_request', { actor_user_id: actor, booking_input: input })
+          : await server().rpc('session_walk_in', { actor_user_id: actor, walk_in_input: input });
+        if (error || !data) return rejected(error);
+        return data;
+      }
+      const { data, error } = await server().rpc('session_booking_change', { actor_user_id: actor, target_booking_id: command.booking_id, command: command.kind });
       if (error || !data) return rejected(error);
       return data;
     },
