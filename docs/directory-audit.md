@@ -51,6 +51,8 @@ Revoked admins lose access on the next call. Unknown venue filters return empty.
 Pass the decimal-string cursor back unchanged; never use a JavaScript number.
 Identity IDs may have gaps after rollback and reflect allocation order, not
 transaction commit order. This is a bounded review endpoint, not a change feed.
+T46 moderation suspensions and reinstatements also append `directory.suspend` / `directory.publish`
+with the moderator as actor; the reason lives in the separate moderation audit ([moderation](moderation.md)).
 There is no new audit browser page in T12; shared RPC contracts support later
 moderation/admin tools through their own verified server guards.
 

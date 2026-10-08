@@ -5,6 +5,7 @@ import type { DirectoryAuditPage } from './audit.ts';
 import type { VenueSearch, VenueSearchPage } from './search.ts';
 import type { OwnerDuplicate, OwnerSubmission, OwnerSubmitResult, OwnerVenueInput } from './owner.ts';
 import type { OwnershipDecisionResult, OwnershipQueuePage, OwnershipReview, ReviewRejectionReason } from './review.ts';
+import type { ModerationQueuePage, ModerationResult, ModerationVenue, ReportReason, RevocationReason, VenueReportRequest, VenueReportResult } from './moderation.ts';
 import type { OwnedVenueSummary, OwnerPhotoAddResult, OwnerPhotoRemoveResult, OwnerVenue, OwnerVenueDetails, OwnerVenuePhoto } from './ownerVenues.ts';
 import type { ScheduleView, VenueSchedule } from './schedule.ts';
 import type { VenuePolicy, VenuePolicyView } from './policy.ts';
@@ -145,9 +146,20 @@ export interface Database {
         Args: { actor_user_id: string; target_user_id: string; assigned_role: PrivilegedRole; enabled: boolean };
         Returns: undefined;
       };
-      set_verified_venue_owner: {
-        Args: { actor_user_id: string; target_venue_id: string; owner_user_id: string; enabled: boolean };
-        Returns: undefined;
+      // T46 moderation: reports from verified players; queue/read/decide/revoke for current admins/moderators.
+      venue_report_submit: { Args: { actor_user_id: string; report_input: VenueReportRequest }; Returns: VenueReportResult };
+      moderation_queue: {
+        Args: { actor_user_id: string; after_created_at?: string | null; after_id?: string | null };
+        Returns: ModerationQueuePage;
+      };
+      moderation_venue_read: { Args: { actor_user_id: string; target_venue_id: string }; Returns: ModerationVenue };
+      moderation_decide: {
+        Args: { actor_user_id: string; target_venue_id: string; decision: string; reason: ReportReason | null; report_ids: string[] };
+        Returns: ModerationResult;
+      };
+      ownership_revoke: {
+        Args: { actor_user_id: string; target_venue_id: string; owner_user_id: string; reason: RevocationReason };
+        Returns: ModerationResult;
       };
       authorize_venue_management: {
         Args: { actor_user_id: string; target_venue_id: string };

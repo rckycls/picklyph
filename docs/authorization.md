@@ -33,7 +33,7 @@ The following RPCs are executable only with server infrastructure credentials:
 | Function | Application authorization |
 | --- | --- |
 | `set_account_role(actor_user_id, target_user_id, assigned_role, enabled)` | Actor must have a current admin assignment. Moderator cannot elevate roles. |
-| `set_verified_venue_owner(actor_user_id, target_venue_id, owner_user_id, enabled)` | Actor must be admin/moderator. Adding a link requires the venue to already be verified. |
+| ~~`set_verified_venue_owner`~~ | Dropped by T46: owner links come only from the audited [ownership review](ownership-review.md) or trusted operator SQL; removal is the audited `ownership_revoke` ([moderation](moderation.md)). |
 | `authorize_venue_management(actor_user_id, target_venue_id)` | Actor must be an admin or the verified owner of that approved venue. Missing venues and unauthorized actors are denied. |
 
 **The server must verify the user's token and derive `actor_user_id` from that

@@ -65,17 +65,17 @@ select authorization_test.expect_error($q$insert into private.account_roles(user
 select authorization_test.expect_error($q$delete from private.account_roles$q$, '42501');
 select authorization_test.expect_error($q$insert into private.venue_owners(venue_id,user_id) values('20000000-0000-4000-8000-000000000001','10000000-0000-4000-8000-000000000003')$q$, '42501');
 
-select public.set_verified_venue_owner('10000000-0000-4000-8000-000000000001','20000000-0000-4000-8000-000000000001','10000000-0000-4000-8000-000000000004',true);
-select public.set_verified_venue_owner('10000000-0000-4000-8000-000000000001','20000000-0000-4000-8000-000000000001','10000000-0000-4000-8000-000000000004',true);
-select public.set_verified_venue_owner('10000000-0000-4000-8000-000000000002','20000000-0000-4000-8000-000000000002','10000000-0000-4000-8000-000000000005',true);
-select public.set_verified_venue_owner('10000000-0000-4000-8000-000000000001','20000000-0000-4000-8000-000000000004','10000000-0000-4000-8000-000000000004',true);
-select public.set_verified_venue_owner('10000000-0000-4000-8000-000000000001','20000000-0000-4000-8000-000000000005','10000000-0000-4000-8000-000000000004',true);
-select authorization_test.assert_that((select count(*) = 4 from private.venue_owners), 'owners can have multiple verified venue links without duplicate retries');
-select authorization_test.expect_error($q$select public.set_verified_venue_owner('10000000-0000-4000-8000-000000000004','20000000-0000-4000-8000-000000000002','10000000-0000-4000-8000-000000000004',true)$q$, '42501');
-select authorization_test.expect_error($q$select public.set_verified_venue_owner('10000000-0000-4000-8000-000000000001','20000000-0000-4000-8000-000000000003','10000000-0000-4000-8000-000000000004',true)$q$, '42501');
-select authorization_test.expect_error($q$select public.set_verified_venue_owner('10000000-0000-4000-8000-000000000001','20000000-0000-4000-8000-000000000006','10000000-0000-4000-8000-000000000004',true)$q$, '42501');
-select authorization_test.expect_error($q$select public.set_verified_venue_owner('10000000-0000-4000-8000-000000000001','20000000-0000-4000-8000-000000000098','10000000-0000-4000-8000-000000000004',true)$q$, '22023');
-select authorization_test.expect_error($q$select public.set_verified_venue_owner('10000000-0000-4000-8000-000000000001','20000000-0000-4000-8000-000000000001',null,true)$q$, '22023');
+-- T46 dropped T08's unaudited direct owner RPC: links come only from the audited T17
+-- review or trusted operator SQL, so no admin/moderator call can link an owner directly.
+select authorization_test.expect_error($q$select public.set_verified_venue_owner('10000000-0000-4000-8000-000000000002','20000000-0000-4000-8000-000000000002','10000000-0000-4000-8000-000000000005',true)$q$, '42883');
+reset role;
+insert into private.venue_owners(venue_id,user_id,verified_by) values
+  ('20000000-0000-4000-8000-000000000001','10000000-0000-4000-8000-000000000004','10000000-0000-4000-8000-000000000001'),
+  ('20000000-0000-4000-8000-000000000002','10000000-0000-4000-8000-000000000005','10000000-0000-4000-8000-000000000002'),
+  ('20000000-0000-4000-8000-000000000004','10000000-0000-4000-8000-000000000004','10000000-0000-4000-8000-000000000001'),
+  ('20000000-0000-4000-8000-000000000005','10000000-0000-4000-8000-000000000004','10000000-0000-4000-8000-000000000001');
+set local role service_role;
+select authorization_test.assert_that((select count(*) = 4 from private.venue_owners), 'owners can have multiple verified venue links');
 select public.authorize_venue_management('10000000-0000-4000-8000-000000000004','20000000-0000-4000-8000-000000000001');
 select public.authorize_venue_management('10000000-0000-4000-8000-000000000001','20000000-0000-4000-8000-000000000005');
 select authorization_test.expect_error($q$select public.authorize_venue_management('10000000-0000-4000-8000-000000000004','20000000-0000-4000-8000-000000000002')$q$, '42501');
@@ -108,7 +108,7 @@ select authorization_test.expect_error($q$select * from private.venue_owners$q$,
 select authorization_test.expect_error($q$select * from private.venue_claims$q$, '42501');
 select authorization_test.expect_error($q$select private.can_manage_venue('10000000-0000-4000-8000-000000000004','20000000-0000-4000-8000-000000000001')$q$, '42501');
 select authorization_test.expect_error($q$select public.set_account_role('10000000-0000-4000-8000-000000000001','10000000-0000-4000-8000-000000000003','admin',true)$q$, '42501');
-select authorization_test.expect_error($q$select public.set_verified_venue_owner('10000000-0000-4000-8000-000000000001','20000000-0000-4000-8000-000000000001','10000000-0000-4000-8000-000000000003',true)$q$, '42501');
+select authorization_test.expect_error($q$select public.ownership_revoke('10000000-0000-4000-8000-000000000001','20000000-0000-4000-8000-000000000001','10000000-0000-4000-8000-000000000004','other')$q$, '42501');
 select authorization_test.expect_error($q$select public.authorize_venue_management('10000000-0000-4000-8000-000000000004','20000000-0000-4000-8000-000000000001')$q$, '42501');
 reset role;
 select authorization_test.assert_that((select display_name is null from public.profiles where id='10000000-0000-4000-8000-000000000004'), 'editing another profile affects no rows');
@@ -172,8 +172,8 @@ update public.venues set claim_status='verified' where id='20000000-0000-4000-80
 -- Revocation takes effect on the next statement, even with an old token.
 set local role service_role;
 select public.set_account_role('10000000-0000-4000-8000-000000000001','10000000-0000-4000-8000-000000000002','moderator',false);
-select authorization_test.expect_error($q$select public.set_verified_venue_owner('10000000-0000-4000-8000-000000000002','20000000-0000-4000-8000-000000000001','10000000-0000-4000-8000-000000000003',true)$q$, '42501');
-select public.set_verified_venue_owner('10000000-0000-4000-8000-000000000001','20000000-0000-4000-8000-000000000001','10000000-0000-4000-8000-000000000004',false);
+select authorization_test.expect_error($q$select public.ownership_revoke('10000000-0000-4000-8000-000000000002','20000000-0000-4000-8000-000000000001','10000000-0000-4000-8000-000000000004','other')$q$, '42501');
+select public.ownership_revoke('10000000-0000-4000-8000-000000000001','20000000-0000-4000-8000-000000000001','10000000-0000-4000-8000-000000000004','other');
 select authorization_test.expect_error($q$select public.authorize_venue_management('10000000-0000-4000-8000-000000000004','20000000-0000-4000-8000-000000000001')$q$, '42501');
 reset role;
 select set_config('request.jwt.claims', '{"sub":"10000000-0000-4000-8000-000000000004","role":"authenticated"}', true);

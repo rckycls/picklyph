@@ -1,4 +1,4 @@
-// T17: actual production Next server + local Supabase/Mailpit/Storage. Never reads mobile env or hosted data.
+// T17/T46: actual production Next server + local Supabase/Mailpit/Storage. Never reads mobile env or hosted data.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const net = require('node:net');
@@ -235,8 +235,45 @@ async function main() {
     assert.equal(value(`select string_agg(action, ',' order by action) from private.ownership_audit_events where subject_id in ('${claimId}', '${submissionId}');`),
       `${approved ? 'claim.approve' : 'claim.reject'},claim.submit,venue.approve,venue.submit`, 'One audit row per command.');
 
+    stage = 'moderation console';
+    // T46: a player's report on the claimed listing, then moderation through the production console.
+    const reported = check(await service.rpc('venue_report_submit', { actor_user_id: users.submitter.id,
+      report_input: { request_id: randomUUID(), venue_id: venueId, reason: 'unsafe', details: 'Broken fence by court 1' } }), 'Fixture report.');
+    const reportId = reported.report.id;
+    const moderate = (jar, body, headers) => request('/api/console/moderation/decide', jar, body, headers);
+    const reportsGuest = await request('/console/reports');
+    assert.ok([303, 307].includes(reportsGuest.status) && reportsGuest.headers.get('location') === '/login', 'Guest reports page redirects to sign-in.');
+    const suspend = { venue_id: venueId, decision: 'suspend', reason: 'unsafe', report_ids: [reportId] };
+    assert.equal((await moderate(new Map(), suspend)).status, 401, 'Guest moderation denied.');
+    const playerReports = await (await request('/console/reports', jars.claimant)).text();
+    assert.ok(playerReports.includes('Moderator access required.') && !playerReports.includes(fixtureName), 'Players see no reports.');
+    assert.equal((await moderate(jars.claimant, suspend)).status, 403, 'Player cannot moderate.');
+    const reportsHtml = await (await request('/console/reports', jars.moderator)).text();
+    assert.ok(reportsHtml.includes(fixtureName), 'Moderator queue lists the reported listing.');
+    const reportHtml = await (await request(`/console/reports/${venueId}`, jars.moderator)).text();
+    assert.ok(reportHtml.includes('Broken fence by court 1') && reportHtml.includes('Suspend listing') && !reportHtml.includes(settings.SERVICE_ROLE_KEY), 'Detail shows the report.');
+    assert.equal((await request(`/console/reports/${randomUUID()}`, jars.moderator)).status, 404, 'Unknown listing is not found.');
+    assert.equal((await moderate(jars.moderator, suspend, { Origin: 'https://attacker.invalid' })).status, 403, 'Cross-site moderation denied.');
+    assert.equal((await moderate(jars.moderator, { ...suspend, actor_user_id: users.admin.id })).status, 400, 'Caller cannot supply an actor.');
+    const suspended = await moderate(jars.moderator, suspend);
+    assert.equal(suspended.status, 200, 'Moderator suspends the listing.');
+    assert.equal((await suspended.json()).data.item.venue.publication_status, 'suspended');
+    assert.equal(check(await publicClient.from('venues').select('id').eq('id', venueId), 'Public read.').length, 0, 'Suspended listing leaves Discover.');
+    assert.equal((await (await moderate(jars.admin, suspend)).json()).data.outcome, 'existing', 'Repeating the suspension is retry-safe.');
+    const revoked = await request('/api/console/moderation/revoke', jars.moderator, { venue_id: venueId, owner_user_id: users.claimant.id, reason: 'not_owner' });
+    assert.equal(revoked.status, 200, 'Moderator removes an owner.');
+    assert.equal((await revoked.json()).data.outcome, approved ? 'decided' : 'existing', 'Only a linked owner is removed.');
+    assert.equal(value(`select count(*) from private.venue_owners where venue_id = '${venueId}';`), '0');
+    const reinstated = await moderate(jars.admin, { venue_id: venueId, decision: 'reinstate', reason: null, report_ids: [] });
+    assert.equal(reinstated.status, 200, 'Administrator lifts the suspension.');
+    assert.equal(check(await publicClient.from('venues').select('claim_status').eq('id', venueId), 'Public read.')[0]?.claim_status, 'unclaimed', 'Published again, unclaimed.');
+    assert.equal(value(`select string_agg(action, ',' order by id) from private.moderation_audit_events where target_venue_id = '${venueId}';`),
+      `report.submit,venue.suspend,report.resolve,${approved ? 'owner.revoke,' : ''}venue.reinstate`, 'One moderation audit row per change.');
+    console.log('PASS: production moderation console: guest/player denial, reviewer queue/detail, CSRF/actor rejection, suspend (retry-safe) leaves Discover, owner removal, admin reinstatement, audited once each.');
+
     stage = 'revocation';
     sql(`delete from private.account_roles where user_id = '${users.moderator.id}'::uuid;`);
+    assert.equal((await moderate(jars.moderator, suspend)).status, 403, 'Revoked moderator cannot moderate.');
     assert.equal((await request(`/api/console/ownership/evidence/${claimId}`, jars.moderator)).status, 403, 'Revoked reviewer loses evidence access.');
     assert.equal((await decide(jars.moderator, claimId, 'approve')).status, 403, 'Revoked reviewer cannot decide.');
     assert.ok((await (await request('/console/ownership', jars.moderator)).text()).includes('Reviewer access required.'), 'Revoked reviewer loses the queue.');
@@ -266,7 +303,7 @@ async function main() {
     // Audit tables have no cascading FKs; trusted local SQL removes only this run's actor history.
     if (ids.length) {
       const list = ids.map((id) => `'${id}'::uuid`).join(',');
-      try { sql(`delete from private.ownership_audit_events where actor_user_id in (${list}); delete from private.directory_audit_events where actor_user_id in (${list});`); }
+      try { sql(`delete from private.ownership_audit_events where actor_user_id in (${list}); delete from private.directory_audit_events where actor_user_id in (${list}); delete from private.moderation_audit_events where actor_user_id in (${list});`); }
       catch { cleanupFailed = true; }
     }
     if (messageIds.size) {

@@ -172,6 +172,14 @@ export function VenueSheet({ venue, onClose, onMissing }: { venue: VenueSearchIt
                       </Text>
                     ))}
                   <Text style={styles.caption}>{notice.text}</Text>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityHint="Tells a pickly reviewer what's wrong. The venue doesn't see who reported it."
+                    onPress={() => router.push({ pathname: '/report/[id]', params: { id: current.id } })}
+                    style={({ pressed }) => [styles.link, styles.report, pressed && styles.linkPressed]}
+                  >
+                    <Text style={styles.linkText}>Report a problem with this listing</Text>
+                  </Pressable>
                 </View>
               )}
             </>
@@ -210,6 +218,7 @@ const styles = StyleSheet.create({
   link: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 8, borderRadius: 10 },
   linkPressed: { backgroundColor: colors.selectedBackground },
   linkText: { fontFamily: fonts.semibold, color: colors.link, fontSize: 14, lineHeight: 20 },
+  report: { alignSelf: 'flex-start', marginHorizontal: -8 },
   details: { gap: 6, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 10 },
   photos: { gap: 8, paddingVertical: 4 },
   photo: { width: 220, height: 165, borderRadius: 12, backgroundColor: colors.selectedBackground },

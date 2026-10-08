@@ -80,8 +80,11 @@ async function main() {
       city: 'Manila', province: 'Metro Manila', latitude: 14.6, longitude: 121,
       publication_status: 'approved', claim_status: 'verified' }), 'Local venue fixture must be created.');
     venueCreated = true;
-    const ownership = { actor_user_id: adminUserId, target_venue_id: venueId, owner_user_id: ownerUserId, enabled: true };
-    check(await server.rpc('set_verified_venue_owner', ownership), 'Verified server ownership assignment must succeed.');
+    // T46: no RPC links owners directly; the audited review or trusted SQL does.
+    assert.ok((await server.rpc('set_verified_venue_owner', { actor_user_id: adminUserId, target_venue_id: venueId, owner_user_id: ownerUserId, enabled: true }))
+      .error, 'The unaudited direct owner RPC must no longer exist.');
+    run(['exec', '-i', container, 'psql', '-U', 'postgres', '-d', 'postgres', '-X', '-q', '-v', 'ON_ERROR_STOP=1'],
+      `insert into private.venue_owners(venue_id,user_id,verified_by) values ('${venueId}'::uuid,'${ownerUserId}'::uuid,'${adminUserId}'::uuid);`);
     const scope = check(await ownerClient.rpc('my_account_access'), 'Owner scope read must succeed.');
     assert.ok(scope[0].privileged_roles.length === 0 && scope[0].owned_venue_ids.length === 1
       && scope[0].owned_venue_ids[0] === venueId, 'Owner scope must be tied to the verified venue.');
@@ -89,13 +92,16 @@ async function main() {
     check(await server.rpc('authorize_venue_management', guard), 'Server must authorize the verified venue owner.');
     assert.ok((await ownerClient.rpc('authorize_venue_management', guard)).error?.code === '42501',
       'Owner cannot call server-only commands directly.');
-    check(await server.rpc('set_verified_venue_owner', { ...ownership, enabled: false }), 'Ownership revocation must succeed.');
+    check(await server.rpc('ownership_revoke', { actor_user_id: adminUserId, target_venue_id: venueId, owner_user_id: ownerUserId, reason: 'other' }),
+      'Audited ownership revocation must succeed.');
     assert.ok((await server.rpc('authorize_venue_management', guard)).error?.code === '42501',
       'Revoked owner must be rejected through the actual API.');
     console.log('PASS: local API signup/profile privacy, metadata spoofing, server-only commands, role refresh and owner revocation.');
   } finally {
     const cleanup = [
-      ...(venueCreated ? [async () => check(await server.from('venues').delete().eq('id', venueId), 'Own local venue fixture cleanup must succeed.')] : []),
+      ...(venueCreated ? [async () => check(await server.from('venues').delete().eq('id', venueId), 'Own local venue fixture cleanup must succeed.'),
+        () => run(['exec', '-i', container, 'psql', '-U', 'postgres', '-d', 'postgres', '-X', '-q', '-v', 'ON_ERROR_STOP=1'],
+          `delete from private.moderation_audit_events where target_venue_id='${venueId}'::uuid;`)] : []),
       ...users.map((userId) => async () => check(await server.auth.admin.deleteUser(userId), 'Own local Auth fixture cleanup must succeed.')),
       ...clients.map((client) => () => client.auth.stopAutoRefresh()),
     ];

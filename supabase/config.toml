@@ -74,3 +74,8 @@ import_map = "./functions/deno.json"
 # Signed-in players and current owners; requests/acceptance fail closed, release/read survive Redis outages.
 verify_jwt = false
 import_map = "./functions/deno.json"
+
+[functions.venue-reports]
+# Signed-in players report published listings; every bearer is verified in code and creation fails closed.
+verify_jwt = false
+import_map = "./functions/deno.json"
