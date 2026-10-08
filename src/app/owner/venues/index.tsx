@@ -71,6 +71,8 @@ export function OwnedVenuesScreen({ includeTop = false }: { includeTop?: boolean
               {venue.city}, {venue.province} · {venue.active_court_count === 1 ? '1 active court' : `${venue.active_court_count} active courts`} · {venue.photo_count === 1 ? '1 photo' : `${venue.photo_count} photos`}
             </Text>
             {status.note && <Text style={screenText.body}>{status.note}</Text>}
+            {venue.publication_status === 'approved' && venue.claim_status === 'verified' && <Button label="Open-play sessions" variant="secondary"
+              accessibilityLabel={`Open-play sessions for ${venue.name}`} onPress={() => router.push({ pathname: '/owner/sessions/[id]', params: { id: venue.id } })} />}
             {venue.editable && <>
               <Button label="Court calendar" accessibilityLabel={`Court calendar for ${venue.name}`}
                 onPress={() => router.push({ pathname: '/owner/calendar/[id]', params: { id: venue.id } })} />

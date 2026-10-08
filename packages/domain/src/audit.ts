@@ -13,7 +13,9 @@ export type DirectoryAuditAction =
   | 'policy.update'
   | 'allocation.block'
   | 'allocation.release'
-  | 'schedule.court_update';
+  | 'schedule.court_update'
+  | 'session.create'
+  | 'session.cancel';
 
 /** Safe audit projection; no request bodies, evidence, names or credentials. */
 export type DirectoryAuditEvent = {

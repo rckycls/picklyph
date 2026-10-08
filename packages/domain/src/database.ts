@@ -8,6 +8,7 @@ import type { OwnershipDecisionResult, OwnershipQueuePage, OwnershipReview, Revi
 import type { OwnedVenueSummary, OwnerPhotoAddResult, OwnerPhotoRemoveResult, OwnerVenue, OwnerVenueDetails, OwnerVenuePhoto } from './ownerVenues.ts';
 import type { ScheduleView, VenueSchedule } from './schedule.ts';
 import type { VenuePolicy, VenuePolicyView } from './policy.ts';
+import type { SessionCreate, SessionResult, SessionPage } from './session.ts';
 import type { AllocationRange, AllocationResult } from './allocation.ts';
 import type { CalendarView, CourtHours, CourtHoursView } from './calendar.ts';
 import type { RentalBooking, RentalBookingPage, RentalBookingResult, RentalQuote, RentalQuoteVersion } from './rentalBooking.ts';
@@ -64,6 +65,9 @@ export interface Database {
     };
     Views: { [_ in never]: never };
     Functions: {
+      owner_session_create: { Args: { actor_user_id: string; session_input: SessionCreate }; Returns: SessionResult };
+      owner_session_cancel: { Args: { actor_user_id: string; target_session_id: string }; Returns: SessionResult };
+      owner_session_read: { Args: { actor_user_id: string; target_venue_id: string; after_id?: string | null }; Returns: SessionPage };
       rental_booking_quote: { Args: { actor_user_id: string; target_court_id: string; starts: string; ends: string }; Returns: RentalQuote };
       rental_booking_request: { Args: { actor_user_id: string; target_court_id: string; request_id: string; starts: string; ends: string; expected_quote: RentalQuoteVersion }; Returns: RentalBookingResult };
       rental_booking_change: { Args: { actor_user_id: string; target_booking_id: string; command: string }; Returns: RentalBookingResult };

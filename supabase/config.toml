@@ -64,3 +64,8 @@ import_map = "./functions/deno.json"
 # Every bearer is independently verified with getUser; creation fails closed.
 verify_jwt = false
 import_map = "./functions/deno.json"
+
+[functions.owner-sessions]
+# Current verified owners only; creation fails closed and cancellation survives Redis outages.
+verify_jwt = false
+import_map = "./functions/deno.json"
