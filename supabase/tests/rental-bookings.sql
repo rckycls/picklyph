@@ -164,4 +164,40 @@ begin
     or jsonb_array_length(second_page->'bookings')<>16 or second_page->>'next_cursor' is not null then raise exception 'Pagination failed'; end if;
 end;
 $$;
+-- T26: a lifecycle event failure must roll back status AND inventory, not only creation.
+do $$
+declare before_booking jsonb; target_id uuid; command_name text; n bigint;
+  owner uuid:='a1000000-0000-4000-8000-000000000001';
+  player uuid:='a1000000-0000-4000-8000-000000000002';
+begin
+  before_booking:=booking_test.request(100,1050)->'booking'; target_id:=(before_booking->>'id')::uuid;
+  if before_booking->>'status'<>'pending' then raise exception 'Rollback fixture must be pending'; end if;
+  execute 'create trigger booking_fail before insert on private.rental_events for each row execute function booking_test.fail_event()';
+  foreach command_name in array array['accept','decline','cancel'] loop
+    perform booking_test.expect_error(format('select public.rental_booking_change(%L,%L,%L)',
+      case when command_name='cancel' then player else owner end,target_id,command_name),'test_audit_failure');
+    if public.rental_booking_read(player,target_id)->'booking'<>before_booking then
+      raise exception 'Failed % event changed booking/allocation/snapshot',command_name;
+    end if;
+  end loop;
+  update private.court_allocations set expires_at=clock_timestamp()-interval '1 second' where court_allocations.id=target_id;
+  perform booking_test.expect_error(format('select public.rental_booking_change(%L,%L,''expire'')',player,target_id),'test_audit_failure');
+  if (select state from private.court_allocations where court_allocations.id=target_id)<>'active'
+    or (select status from private.rental_bookings where rental_bookings.id=target_id)<>'pending' then
+    raise exception 'Failed expiry event persisted a lifecycle mutation';
+  end if;
+  select count(*) into n from private.rental_events where booking_id=target_id;
+  if n<>1 then raise exception 'Failed lifecycle event leaked'; end if;
+  execute 'drop trigger booking_fail on private.rental_events';
+  if public.rental_booking_change(player,target_id,'expire')->'booking'->>'status'<>'expired'
+    or public.rental_booking_change(player,target_id,'expire')->>'outcome'<>'existing' then
+    raise exception 'Expiry did not recover after event failure';
+  end if;
+  if booking_test.request(100,1050)->'booking'->'snapshot'<>before_booking->'snapshot' then
+    raise exception 'Recovered expiry changed retry snapshot';
+  end if;
+  select count(*) into n from private.rental_events where booking_id=target_id and action='expire';
+  if n<>1 then raise exception 'Recovered expiry duplicated event'; end if;
+end;
+$$;
 rollback;

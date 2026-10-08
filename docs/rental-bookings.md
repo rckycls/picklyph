@@ -63,9 +63,31 @@ Errors: malformed input `400`; missing/forged identity `401`; wrong player/owner
 
 ## Verification and rollout
 
-`npm run test:bookings` covers embedded PostgreSQL lifecycle/permissions/rollback and handler/guard behavior. `npm run test:bookings:local` covers rollback-only Docker SQL, real local Auth/handler/PostgREST lifecycle/races (retries, overlap, cross-court keys, accept/cancel, waited expiry, rate/policy edits), revocation/suspension, and served Edge forged JWT/outage creation/cancellation. It removes its own fixtures/accounts/events/temp credentials and stops its own child server. Contracts/regressions use `test:domain`, `test:directory`, `typecheck`, `lint`, `functions:check` and `functions:lint`.
+`npm run test:bookings` covers embedded PostgreSQL lifecycle/permissions/rollback and handler/guard behavior. `npm run test:bookings:local` runs the same SQL on Docker, then real local Auth/handler/PostgREST and served Edge regressions, including the T26 cases below. It removes its own fixtures/accounts/events/temp credentials and stops its own child server. Contracts/regressions use `test:domain`, `test:directory`, `typecheck`, `lint`, `functions:check` and `functions:lint`.
 
-Applied locally only. Hosted rollout needs T18–T24 migrations in order and `rental-bookings` deployment with its explicit import map, existing server Supabase secret names and configured Upstash guard. No new dependencies/native rebuild. T25 provides mobile review/history UI below; T26 expands race regressions; T31 adds operational/payment recording; T32 owns cleanup; T34–T36 own online checkout. No payment execution/refund/push/outbox/venue cancellation is implemented. Events/snapshots cascade on allocation/venue deletion; T47 must define retention before deletion ships.
+Hosted rollout needs T18–T24 migrations in order and `rental-bookings` deployment with its explicit import map, existing server Supabase secret names and configured Upstash guard; see `vibe-plus/HANDOFF.md` for current staging rollout. No new dependencies/native rebuild. T25 provides mobile review/history UI below; T26 provides race regressions; T31 adds operational/payment recording; T32 owns cleanup; T34–T36 own online checkout. No payment execution/refund/push/outbox/venue cancellation is implemented. Events/snapshots cascade on allocation/venue deletion; T47 must define retention before deletion ships.
+
+## Race and recovery regressions (T26)
+
+Run `npm run test:bookings`, `npm run test:rental:mobile`, and `npm run test:bookings:local`. The local command requires the existing Docker Supabase project and current local migrations; it reads only local CLI status, checks loopback API/local Docker, and never loads hosted/mobile env. `supabase/tests/rental-booking-races.cjs` extends that harness; it is not a standalone command.
+
+| Scenario | Required result |
+| --- | --- |
+| Six partially overlapping requests; concurrent touching intervals and different courts | One overlap winner with one request event; every adjacent/cross-court request succeeds. |
+| Six identical requests, or one player/key naming different courts | One booking/allocation/snapshot/event; changed identity conflicts. |
+| Acceptance versus cancellation, forced in both orders | Final cancellation releases inventory; accept-first records accept then cancel, cancel-first rejects acceptance. |
+| Six concurrent accept, decline, cancel or elapsed-expire commands | Exactly one transition event; every successful reply carries the original snapshot. |
+| Expired inventory acquired by a replacement before waited acceptance | Old booking stays expired, new booking keeps its hold; original retry creates nothing. |
+| Acceptance commits before an expiry command | Firm confirmed inventory survives; no expiry event. |
+| Schedule/policy editor-first and request-first | Editor-first rejects the stale review before inventory; request-first stores original revisions/price/policy, and later retries preserve them. |
+| Ownership revocation before/after acceptance | Revocation-first rejects acceptance; acceptance-first can commit, but subsequent owner commands/reads fail. Player cancellation still works. |
+| Mobile committed reply lost, then cancellation/expiry and rate/policy edits, then journal restart | Exact original body/key returns authoritative terminal status and original snapshot; no new inventory/events; recovery journal clears. |
+| Lifecycle event insert fails for acceptance, decline, cancellation or expiry | Status, allocation and snapshot changes roll back together; retry after recovery expires once. |
+| Served Edge without Redis: six requests and acceptance; four cancellation retries | Creation/acceptance return 503 without booking writes; cancellations return 200 and release once. Forged bearer fails and history remains readable. |
+
+Races use independent PostgreSQL sessions and wait for an observed lock before releasing the holder, so both commit orders are tested deliberately. The revocation fixture follows venue-before-owner-link locking; it does not introduce an ownership-revocation API. Hold-expiry fixtures shorten only their own allocation's expiry to exercise server-clock decisions without waiting two hours. The earlier waited-expiry case also crosses a real clock deadline behind a held court lock.
+
+The local harness compares pre-existing venue/account/allocation/snapshot/booking/event/audit IDs before and after cleanup, in addition to checking its own IDs are gone. SQL fixtures and failure triggers roll back; process termination targets the run's application-name prefix; temporary credentials stay in a unique system-temp folder that is checked before removal. Concurrent unrelated changes to this local fixture inventory will fail the cleanup comparison, so run this harness by itself. These automated checks do not replace the physical iPhone runbook below.
 
 ## Mobile arrival rentals (T25)
 

@@ -17,6 +17,15 @@ async function main() {
   assert.equal(run(['inspect','supabase_db_picklyph','--format','{{index .Config.Labels "com.supabase.cli.project"}}']).trim(),'picklyph');
   const sqlArgs=['exec','-i','supabase_db_picklyph','psql','-U','postgres','-d','postgres','-X','-q','-t','-A','-v','ON_ERROR_STOP=1'];
   const psql=sql=>run(sqlArgs,sql).trim();
+  const fixtureInventory=()=>psql(`select jsonb_build_object(
+    'venues',(select coalesce(jsonb_agg(id order by id),'[]') from public.venues),
+    'users',(select coalesce(jsonb_agg(id order by id),'[]') from auth.users),
+    'allocations',(select coalesce(jsonb_agg(id order by id),'[]') from private.court_allocations),
+    'snapshots',(select coalesce(jsonb_agg(allocation_id order by allocation_id),'[]') from private.rental_snapshots),
+    'bookings',(select coalesce(jsonb_agg(id order by id),'[]') from private.rental_bookings),
+    'events',(select coalesce(jsonb_agg(id order by id),'[]') from private.rental_events),
+    'audits',(select coalesce(jsonb_agg(id order by id),'[]') from private.directory_audit_events));`);
+  const existingFixtureInventory=fixtureInventory();
   run([...sqlArgs,'-o','/dev/null'],fs.readFileSync(path.join(__dirname,'rental-bookings.sql'),'utf8'));
   console.log('PASS: Docker lifecycle SQL (instant/approval, holds, retries, permissions, freshness, suspension, expiry, pagination, audit rollback); fixtures rolled back.');
   const cli=path.resolve('node_modules/@supabase/cli-windows-x64/bin/supabase.exe');
@@ -161,6 +170,7 @@ async function main() {
     const mobileHistory=await mobile.client.loadHistory(mobileTransport,null);assert.equal(mobileHistory.ok,true,'Mobile history parser');
     assert.ok(mobileHistory.value.bookings.some(b=>b.status==='expired'));assert.ok(mobileHistory.value.bookings.some(b=>b.id===recovered.value.booking.id));
     console.log('PASS: T25 actual mobile quote/history/status parsers, durable lost-reply recovery with one allocation, unpaid approval and cancellation with unchanged snapshot.');
+    const raceProof=await require('./rental-booking-races.cjs')({psql,query,waitFor,users,venue,courts,quote,command,post,change,get,daily,at,mobileTransport});
     const servedCancel=await reserve(930);const countBefore=psql(`select count(*) from private.court_allocations where venue_id='${venue}'`);
     console.log('PASS: Owner revocation/admin-role isolation, suspended request/accept refusal and suspended player cancellation.');
 
@@ -170,23 +180,34 @@ async function main() {
     child=spawn(cli,['functions','serve','rental-bookings','--env-file',envPath],{windowsHide:true,stdio:['ignore','pipe','pipe']});
     child.stdout.on('data',()=>{});child.stderr.on('data',()=>{});let launchError=false;child.on('error',()=>launchError=true);
     const endpoint=new URL('functions/v1/rental-bookings',api).href;
-    const invoke=(token,tail='',init={})=>fetch(endpoint+tail,{...init,headers:{apikey:config.ANON_KEY,...(token?{authorization:`Bearer ${token}`}:{ }),...init.headers},signal:AbortSignal.timeout(8000)});
+    const invoke=async(token,tail='',init={})=>{
+      try{return await fetch(endpoint+tail,{...init,headers:{apikey:config.ANON_KEY,...(token?{authorization:`Bearer ${token}`}:{ }),...init.headers},signal:AbortSignal.timeout(20000)});}
+      catch(error){assert.fail(`Local served Edge ${init.method??'GET'} transport failed (${error.name})`);}
+    };
     let ready=false;for(let n=0;n<90;n++){
       assert.ok(!launchError&&child.exitCode===null,'Own Edge server running');
       try{if((await invoke(null)).status===401){ready=true;break;}}catch{}
       await new Promise(resolve=>setTimeout(resolve,500));
     }
     assert.ok(ready,'Local Edge ready');
+    console.log('PASS: Own local Edge server ready for guarded outage races.');
     const token=sessions[1].access_token;
     const forged=`${token.split('.')[0]}.${Buffer.from(JSON.stringify({sub:users[1],role:'authenticated',exp:9999999999})).toString('base64url')}.forged`;
     assert.equal((await invoke(forged,'?section=history')).status,401);
     assert.equal((await invoke(token,'?section=history')).status,200);
-    const refused=await invoke(token,'',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(command(1020,await quote(1020)))});
-    assert.equal(refused.status,503);assert.equal(refused.headers.get('retry-after'),'5');
+    const beforeOutage=raceProof.counts();
+    const outageCommand=command(1020,await quote(1020));
+    const refused=await Promise.all(Array.from({length:6},()=>invoke(token,'',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(outageCommand)})));
+    for(const response of refused){assert.equal(response.status,503);assert.equal(response.headers.get('retry-after'),'5');}
+    const deniedAccept=await invoke(sessions[0].access_token,'',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({kind:'accept',booking_id:servedCancel.id})});
+    assert.equal(deniedAccept.status,503);assert.equal(deniedAccept.headers.get('retry-after'),'5');
+    assert.equal(raceProof.counts(),beforeOutage,'Outage creation/acceptance writes no allocations/bookings/snapshots/events');
     assert.equal(psql(`select count(*) from private.court_allocations where venue_id='${venue}'`),countBefore);
-    const cancelled=await invoke(token,'',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({kind:'cancel',booking_id:servedCancel.id})});
-    assert.equal(cancelled.status,200);assert.equal((await cancelled.json()).booking.status,'cancelled');
-    console.log('PASS: Served Edge forged-JWT 401, bounded history 200, Redis-outage hold 503 with unchanged inventory, cancellation 200.');
+    const cancelled=await Promise.all(Array.from({length:4},()=>invoke(token,'',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({kind:'cancel',booking_id:servedCancel.id})})));
+    for(const response of cancelled){assert.equal(response.status,200);assert.equal((await response.json()).booking.status,'cancelled');}
+    assert.deepEqual(raceProof.events(servedCancel.id),{request:1,cancel:1});
+    assert.equal((await (await get(1,{section:'booking',booking_id:servedCancel.id})).json()).booking.allocation.state,'released');
+    console.log('PASS: Served Edge forged-JWT 401/history 200; six Redis-outage requests and acceptance 503 write nothing; four cancellation retries 200 release once.');
   } finally {
     if(child&&child.exitCode===null)child.kill();
     if(workers.size){psql(`select pg_terminate_backend(pid) from pg_stat_activity where application_name like '${prefix}-%';`);await new Promise(resolve=>setTimeout(resolve,100));}
@@ -202,6 +223,7 @@ async function main() {
     assert.equal(psql(`select (select count(*) from private.court_allocations where venue_id='${venue}')+
       (select count(*) from private.directory_audit_events where target_venue_id='${venue}')+
       (select count(*) from auth.users where id in (${users.map(id=>`'${id}'`).join(',')||'null'}))`),'0');
+    assert.equal(fixtureInventory(),existingFixtureInventory,'Cleanup removes own booking/snapshot/event fixtures and preserves existing IDs');
   }
   console.log('PASS: Own local fixtures/accounts/events/env removed; own server stopped; no hosted changes.');
 }
