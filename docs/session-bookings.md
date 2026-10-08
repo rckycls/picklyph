@@ -1,6 +1,6 @@
 # Open-play group booking API (T28, walk-ins T29)
 
-`/functions/v1/session-bookings` lets signed-in players reserve a named group in a T27 open-play session and pay on arrival. Every bearer is independently verified with `getUser`; the server derives the actor and calls service-only RPCs through an isolated client with no caller session or headers. Responses are `Cache-Control: private, no-store` without CORS. GET URLs are at most 2048 characters. POST JSON is streamed and capped at 16 KiB (`MAX_SESSION_BOOKING_BYTES`), larger than other commands so a full group of names fits. Unknown fields and duplicate query parameters fail validation. Owners also enter walk-ins here (T29, below). Players use it from the app (T30, below). There is no payment execution, owner approval screen (T31) or occupied-session venue cancellation (T40).
+`/functions/v1/session-bookings` lets signed-in players reserve a named group in a T27 open-play session and pay on arrival. Every bearer is independently verified with `getUser`; the server derives the actor and calls service-only RPCs through an isolated client with no caller session or headers. Responses are `Cache-Control: private, no-store` without CORS. GET URLs are at most 2048 characters. POST JSON is streamed and capped at 16 KiB (`MAX_SESSION_BOOKING_BYTES`), larger than other commands so a full group of names fits. Unknown fields and duplicate query parameters fail validation. Owners also enter walk-ins here (T29, below). Players use it from the app (T30, below). There is no payment execution or occupied-session venue cancellation (T40). Owner approvals, attendance and arrival payments are in the [owner front desk](booking-operations.md) (T31).
 
 ## Reads
 
@@ -53,7 +53,7 @@ The walk-in shares the `(actor, request_id)` retry key space with player request
 
 - `POST {kind:"accept",booking_id}`: a current owner confirms a pending group. This needs an approved venue (`venue_unavailable` under suspension). Accepting a confirmed group returns `existing`.
 - `POST {kind:"decline",booking_id}`: a current owner declines a pending group and releases its spots. This works during suspension.
-- `POST {kind:"cancel",booking_id}`: the booking player cancels a pending or confirmed group before the session starts and releases its spots. Owners cannot cancel a player's group here; venue cancellation with refunds is T31. For a walk-in, any current owner (not only the one who entered it) removes it until the session ends; players cannot. Accepting a walk-in returns `existing`; declining one is `invalid_transition`.
+- `POST {kind:"cancel",booking_id}`: the booking player cancels a pending or confirmed group before the session starts and releases its spots. Owners cannot cancel a player's group here; venue cancellation with refunds is T40. For a walk-in, any current owner (not only the one who entered it) removes it until the session ends; players cannot. Accepting a walk-in returns `existing`; declining one is `invalid_transition`.
 
 Replies are `{outcome: created|existing|changed|expired, booking}`. A pending hold that elapsed before the command returns `expired`. It is never accepted or cancelled, and it is never revived. Changes after the session starts, or out of order, return `invalid_transition`. Admin or moderator roles alone grant no access.
 

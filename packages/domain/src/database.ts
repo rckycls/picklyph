@@ -76,6 +76,11 @@ export interface Database {
         Returns: SessionOfferPage | { at: string; session: SessionOffer } | { booking: SessionBooking } | SessionBookingPage };
       rental_booking_quote: { Args: { actor_user_id: string; target_court_id: string; starts: string; ends: string }; Returns: RentalQuote };
       rental_booking_request: { Args: { actor_user_id: string; target_court_id: string; request_id: string; starts: string; ends: string; expected_quote: RentalQuoteVersion }; Returns: RentalBookingResult };
+      rental_booking_owner_entry: { Args: { actor_user_id: string; target_court_id: string; request_id: string; starts: string; ends: string; guest_name: string; expected_quote: RentalQuoteVersion }; Returns: RentalBookingResult };
+      booking_operation: { Args: { actor_user_id: string; target_kind: 'rental' | 'session'; target_booking_id: string; command: string; method?: string | null; amount?: number | null };
+        Returns: RentalBookingResult | SessionBookingResult };
+      booking_operations_read: { Args: { actor_user_id: string; target_kind: 'rental' | 'session'; target_venue_id: string; target_day: string; after_id?: string | null };
+        Returns: { venue_id: string; date: string; at: string; bookings: RentalBooking[] | SessionBooking[]; next_cursor: string | null } };
       rental_booking_change: { Args: { actor_user_id: string; target_booking_id: string; command: string }; Returns: RentalBookingResult };
       rental_booking_read: { Args: { actor_user_id: string; target_booking_id?: string | null; target_venue_id?: string | null; after_id?: string | null }; Returns: RentalBookingPage | { booking: RentalBooking } };
       venues_in_bounds: { Args: MapBounds; Returns: VenueMapPin[] };

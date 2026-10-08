@@ -1,17 +1,19 @@
 import { readRentalCommand, readRentalQuery, type RentalCommand, type RentalQuery } from '../../../packages/domain/src/rentalBooking.ts';
+import { isOperationKind } from '../../../packages/domain/src/operations.ts';
 import type { RateAction, RateDecision, RatePrincipal } from '../_shared/rate-limit.ts';
 export const RENTAL_STATUS: Record<string, number> = {
   invalid_input: 400, invalid_time: 400, minimum_duration: 400, duration_increment: 400, maximum_duration: 400, slot_alignment: 400,
   player_required: 403, not_player: 403, not_owner: 403, booking_not_found: 404, court_unavailable: 404, venue_unavailable: 404,
   start_not_future: 409, outside_horizon: 409, outside_hours: 409, allocation_conflict: 409, request_reused: 409,
   stale_quote: 409, arrival_unavailable: 409, invalid_transition: 409, allocation_ended: 409, price_overflow: 409,
+  not_started: 409, payment_recorded: 409, amount_mismatch: 409,
 };
 export class RentalRejected extends Error {
   constructor(readonly reason: string) { super(reason); }
 }
 type Dependencies = {
   verifyUser: (token: string) => Promise<string | null>;
-  limit: (action: Extract<RateAction, 'hold-create' | 'owner-read' | 'owner-edit' | 'cancel'>, principal: RatePrincipal) => Promise<RateDecision>;
+  limit: (action: Extract<RateAction, 'hold-create' | 'owner-read' | 'owner-edit' | 'owner-ops' | 'cancel'>, principal: RatePrincipal) => Promise<RateDecision>;
   read: (actor: string, query: RentalQuery) => Promise<unknown>;
   command: (actor: string, command: RentalCommand) => Promise<unknown>;
 };
@@ -48,11 +50,13 @@ export function createRentalHandler(deps: Dependencies) {
       }
     } catch { return respond(400, { error: 'invalid_request' }); }
     // Bounded parsing selects a release bucket without preventing cancellation in outages.
-    const action = query ? 'owner-read' : command?.kind === 'request' ? 'hold-create' : command?.kind === 'accept' ? 'owner-edit' : 'cancel';
+    // Outside rentals take inventory, so like acceptance they need an enforced owner allowance; front-desk records continue.
+    const action = query ? 'owner-read' : command?.kind === 'request' ? 'hold-create'
+      : command?.kind === 'accept' || command?.kind === 'owner_entry' ? 'owner-edit' : isOperationKind(command?.kind) ? 'owner-ops' : 'cancel';
     let decision: RateDecision;
     try { decision = await deps.limit(action, { kind: 'user', id: actor }); }
     catch {
-      if (action === 'cancel' || action === 'owner-read') decision = { allowed: true, status: 200, state: 'degraded', headers: {} };
+      if (action === 'cancel' || action === 'owner-read' || action === 'owner-ops') decision = { allowed: true, status: 200, state: 'degraded', headers: {} };
       else return respond(503, { error: 'temporarily_unavailable' }, { 'Retry-After': '5' });
     }
     if (!decision.allowed) return respond(decision.status, { error: decision.status === 429 ? 'rate_limited' : 'temporarily_unavailable' }, decision.headers);

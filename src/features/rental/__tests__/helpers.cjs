@@ -2,8 +2,9 @@ const path = require('node:path');
 const load = require('../../../../supabase/tests/load-ts.cjs');
 const here = path.dirname(module.filename);
 const root = path.resolve(here, '../../../..');
-const domain = Object.assign({}, ...['booking', 'money', 'rental', 'rentalBooking'].map(name => require(path.join(root, `packages/domain/src/${name}.ts`))));
+const domain = Object.assign({}, ...['booking', 'money', 'rental', 'rentalBooking', 'operations'].map(name => require(path.join(root, `packages/domain/src/${name}.ts`))));
 const imports = { '@picklyph/domain': domain, '../owner/venueClient': require('../../owner/venueClient.ts') };
+imports['../owner/operationsModel'] = load(path.join(root, 'src/features/owner/operationsModel.ts'), imports, { Intl });
 const client = load(path.join(here, '../client.ts'), imports, { Intl });
 const model = load(path.join(here, '../model.ts'), imports, { Intl });
 const { createAttemptJournal } = load(path.join(here, '../attempt.ts'), { ...imports, './model': model }, { Intl });
@@ -19,7 +20,7 @@ const quote = () => ({ ...domain.priceRental(starts_at, ends_at, [{ starts_at, e
   expected_quote: { total_centavos: 70000, schedule_revision: '3', court_hours_revision: null, policy_revision: '0' } });
 const booking = (status = 'confirmed') => {
   const q = quote(); const pending = status === 'pending'; const expired = status === 'expired';
-  return { id: ID, status, payment_method: 'arrival', payment_status: 'unpaid', created_at: q.quoted_at, updated_at: q.quoted_at,
+  return { id: ID, source: 'player', guest_name: null, status, payment_method: 'arrival', payment_status: 'unpaid', operations: { attendance: 'none', attendance_at: null, payment: null },  created_at: q.quoted_at, updated_at: q.quoted_at,
     allocation: { id: ID, venue_id: VENUE, court_id: COURT, kind: 'rental', starts_at, ends_at,
       state: pending || status === 'confirmed' ? 'active' : expired ? 'expired' : 'released',
       expires_at: pending || expired ? '2026-10-08T03:00:00.000Z' : null, ended_at: pending || status === 'confirmed' ? null : '2026-10-08T03:00:00.000Z' },

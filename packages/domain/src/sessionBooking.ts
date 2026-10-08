@@ -1,5 +1,7 @@
 import { MAX_SESSION_CAPACITY, type SessionSnapshot } from './session.ts';
 import type { VenuePolicy } from './policy.ts';
+import { isOperationKind, readBookingOperation, readOperationsDayQuery,
+  type BookingOperationCommand, type BookingOperations, type OperationsDayQuery } from './operations.ts';
 
 export const MAX_PARTICIPANT_NAME = 60;
 /** Streamed body bound for group requests; a full 200-name group of short names fits. */
@@ -17,8 +19,8 @@ export type SessionBookingSnapshot = {
 };
 export type SessionBooking = {
   id: string; session_id: string; source: 'player' | 'walk_in'; status: 'pending' | 'confirmed' | 'declined' | 'cancelled' | 'expired';
-  payment_method: 'arrival'; payment_status: 'unpaid'; participants: string[]; spots: number;
-  expires_at: string | null; created_at: string; updated_at: string; snapshot: SessionBookingSnapshot;
+  payment_method: 'arrival'; payment_status: 'unpaid' | 'paid'; participants: string[]; spots: number;
+  expires_at: string | null; created_at: string; updated_at: string; snapshot: SessionBookingSnapshot; operations: BookingOperations;
 };
 export type SessionBookingResult = { outcome: 'created' | 'existing' | 'changed' | 'expired'; booking: SessionBooking };
 export type SessionBookingPage = { bookings: SessionBooking[]; next_cursor: string | null };
@@ -26,13 +28,14 @@ export type SessionBookingRequest = { kind: 'request'; session_id: string; reque
 /** Owner-entered arrival group (T29): same body as a player request, confirmed on entry. */
 export type SessionWalkIn = Omit<SessionBookingRequest, 'kind'> & { kind: 'walk_in' };
 export type SessionBookingChange = { kind: 'accept' | 'decline' | 'cancel'; booking_id: string };
-export type SessionBookingCommand = SessionBookingRequest | SessionWalkIn | SessionBookingChange;
+export type SessionBookingCommand = SessionBookingRequest | SessionWalkIn | SessionBookingChange | BookingOperationCommand;
 export type SessionBookingQuery = { section: 'sessions'; venue_id: string; after_id: string | null }
   | { section: 'session'; session_id: string }
   | { section: 'booking'; booking_id: string }
   | { section: 'history'; after_id: string | null }
   | { section: 'requests'; venue_id: string; after_id: string | null }
-  | { section: 'walk_ins'; session_id: string; after_id: string | null };
+  | { section: 'walk_ins'; session_id: string; after_id: string | null }
+  | OperationsDayQuery;
 
 export class SessionBookingInputError extends Error {
   constructor() { super('Check the group names and session.'); this.name = 'SessionBookingInputError'; }
@@ -75,6 +78,9 @@ export function readSessionBookingCommand(raw: unknown): SessionBookingCommand {
     return { kind, session_id: uuid(r.session_id), request_id: uuid(r.request_id), participants: readParticipantNames(r.participants),
       expected_total_centavos: r.expected_total_centavos };
   }
+  if (isOperationKind(kind)) {
+    try { return readBookingOperation(raw); } catch { throw new SessionBookingInputError(); }
+  }
   if (kind !== 'accept' && kind !== 'decline' && kind !== 'cancel') throw new SessionBookingInputError();
   return { kind, booking_id: uuid(fields(raw, 'booking_id,kind').booking_id) };
 }
@@ -96,6 +102,9 @@ export function readSessionBookingQuery(params: URLSearchParams): SessionBooking
   if (section === 'walk_ins') {
     const after_id = after('section,session_id');
     return { section, session_id: uuid(r.session_id), after_id };
+  }
+  if (r.section === 'day') {
+    try { return readOperationsDayQuery(r); } catch { throw new SessionBookingInputError(); }
   }
   if (r.section === 'history') return { section: 'history', after_id: after('section') };
   if (r.section === 'session') return { section: 'session', session_id: uuid(fields(r, 'section,session_id').session_id) };

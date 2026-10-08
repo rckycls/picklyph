@@ -56,7 +56,9 @@
     "test:sessions": "node --test supabase/tests/sessions.test.cjs supabase/tests/session-handler.test.cjs",
     "test:sessions:local": "node supabase/tests/sessions-local.cjs",
     "test:session-bookings": "node --test supabase/tests/session-bookings.test.cjs supabase/tests/session-booking-handler.test.cjs",
-    "test:session-bookings:local": "node supabase/tests/session-bookings-local.cjs"
+    "test:session-bookings:local": "node supabase/tests/session-bookings-local.cjs",
+    "test:operations": "node --test supabase/tests/booking-operations.test.cjs",
+    "test:operations:local": "node supabase/tests/booking-operations-local.cjs"
   },
   "dependencies": {
     "@expo-google-fonts/bricolage-grotesque": "0.4.1",

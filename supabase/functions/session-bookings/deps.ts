@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '../../../packages/domain/src/database.ts';
 import type { SessionBookingCommand, SessionBookingQuery } from '../../../packages/domain/src/sessionBooking.ts';
+import { isOperationKind } from '../../../packages/domain/src/operations.ts';
 import { SESSION_BOOKING_STATUS, SessionBookingRejected } from './handler.ts';
 function rejected(error: { code?: string; hint?: string | null } | null): never {
   if (error?.hint && SESSION_BOOKING_STATUS[error.hint]) throw new SessionBookingRejected(error.hint);
@@ -17,6 +18,12 @@ export function createSupabaseSessionBookingDeps(verifier: () => SupabaseClient<
       return data.user?.id ?? null;
     },
     read: async (actor: string, query: SessionBookingQuery) => {
+      if (query.section === 'day') {
+        const { data, error } = await server().rpc('booking_operations_read', { actor_user_id: actor, target_kind: 'session', target_venue_id: query.venue_id,
+          target_day: query.date, after_id: query.after_id });
+        if (error || !data) return rejected(error);
+        return data;
+      }
       const target = query.section === 'sessions' || query.section === 'requests' ? query.venue_id
         : query.section === 'session' || query.section === 'walk_ins' ? query.session_id : query.section === 'booking' ? query.booking_id : null;
       const after = query.section === 'session' || query.section === 'booking' ? null : query.after_id;
@@ -31,6 +38,13 @@ export function createSupabaseSessionBookingDeps(verifier: () => SupabaseClient<
         const { data, error } = command.kind === 'request'
           ? await server().rpc('session_booking_request', { actor_user_id: actor, booking_input: input })
           : await server().rpc('session_walk_in', { actor_user_id: actor, walk_in_input: input });
+        if (error || !data) return rejected(error);
+        return data;
+      }
+      if (isOperationKind(command.kind)) {
+        const { data, error } = await server().rpc('booking_operation', { actor_user_id: actor, target_kind: 'session', target_booking_id: command.booking_id,
+          command: command.kind, method: command.kind === 'record_payment' ? command.method : null,
+          amount: command.kind === 'record_payment' ? command.amount_centavos : null });
         if (error || !data) return rejected(error);
         return data;
       }

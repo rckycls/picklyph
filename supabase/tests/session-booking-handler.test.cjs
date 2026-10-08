@@ -85,3 +85,28 @@ test('Supabase deps send only the derived actor and normalized body; unknown dat
   const failing=createSupabaseSessionBookingDeps(()=>({auth:{getUser:async()=>({data:{user:null},error:{status:500}})}}),server);
   await assert.rejects(failing.verifyUser('token'));
 });
+test('front desk (T31): attendance/payment use owner-ops and continue in an outage; day reads and refusals are bounded',async()=>{
+  const seen=[];const calls=[];const deps=base();deps.limit=async action=>{seen.push(action);return allowed;};deps.command=async(actor,c)=>{calls.push(c);return {};};
+  const handler=createSessionBookingHandler(deps);const pay={kind:'record_payment',booking_id:id,method:'cash',amount_centavos:50000};
+  for(const kind of ['check_in','no_show','complete']) assert.equal((await handler(post({kind,booking_id:id}))).status,200);
+  assert.equal((await handler(post(pay))).status,200);assert.equal((await handler(get(`section=day&venue_id=${id}&date=2026-10-09`))).status,200);
+  assert.deepEqual(seen,['owner-ops','owner-ops','owner-ops','owner-ops','owner-read']);assert.deepEqual(JSON.parse(JSON.stringify(calls.at(-1))),pay);
+  for(const bad of [{...pay,method:'crypto'},{...pay,amount_centavos:-1},{...pay,amount_centavos:1.5},{...pay,status:'paid'},{kind:'check_in',booking_id:id,method:'cash'},
+    {kind:'record_payment',booking_id:id,method:'cash'},{kind:'check_in',booking_id:'nope'}]) assert.equal((await handler(post(bad))).status,400);
+  for(const tail of [`section=day&venue_id=${id}`,`section=day&venue_id=${id}&date=2026-02-30`,`section=day&venue_id=${id}&date=2100-01-01`,`section=day&venue_id=${id}&date=2026-10-09&limit=5`])
+    assert.equal((await handler(get(tail))).status,400);
+  for(const backend of [async()=>{throw new Error('Outage');},()=>new Promise(()=>{})]){
+    deps.limit=createRateGuard({backend,identifier:async()=>id,timeoutMs:5});
+    assert.equal((await createSessionBookingHandler(deps)(post({kind:'check_in',booking_id:id}))).status,200);
+    assert.equal((await createSessionBookingHandler(deps)(post(pay))).status,200);
+  }
+  for(const reason of ['not_started','payment_recorded','amount_mismatch']){
+    deps.command=async()=>{throw new SessionBookingRejected(reason);};assert.equal((await createSessionBookingHandler(deps)(post(pay))).status,409);
+  }
+  const rpc=[];const server=()=>({rpc:async(name,args)=>{rpc.push([name,args]);return {data:{ok:true},error:null};}});
+  const supa=createSupabaseSessionBookingDeps(()=>({}),server);
+  await supa.command(id,pay);await supa.command(id,{kind:'complete',booking_id:id});await supa.read(id,{section:'day',venue_id:id,date:'2026-10-09',after_id:null});
+  assert.deepEqual(JSON.parse(JSON.stringify(rpc)),[['booking_operation',{actor_user_id:id,target_kind:'session',target_booking_id:id,command:'record_payment',method:'cash',amount:50000}],
+    ['booking_operation',{actor_user_id:id,target_kind:'session',target_booking_id:id,command:'complete',method:null,amount:null}],
+    ['booking_operations_read',{actor_user_id:id,target_kind:'session',target_venue_id:id,target_day:'2026-10-09',after_id:null}]]);
+});

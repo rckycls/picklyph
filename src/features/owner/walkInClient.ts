@@ -1,6 +1,7 @@
 import { readSessionBookingCommand, sessionGroupTotal, toUtcIso,
   type SessionBooking, type SessionBookingPage, type SessionBookingResult, type SessionWalkIn } from '@picklyph/domain';
 import type { AttemptStore } from '../rental/attempt';
+import { parseOperations } from './operationsModel';
 import { ownerRequest, type HttpFailure, type HttpOutcome, type OwnerHttpTransport } from './venueClient';
 
 export const WALK_IN_REJECTIONS = ['invalid_request', 'invalid_input', 'not_owner', 'booking_not_found', 'session_not_found',
@@ -22,7 +23,7 @@ export function parseSessionBooking(raw: unknown): SessionBooking {
     expected_total_centavos: snap.total_centavos });
   if (body.kind !== 'request' || !['player', 'walk_in'].includes(b.source as string)
     || !['pending', 'confirmed', 'declined', 'cancelled', 'expired'].includes(b.status as string)
-    || b.payment_method !== 'arrival' || b.payment_status !== 'unpaid' || b.spots !== body.participants.length || snap.spots !== b.spots
+    || b.payment_method !== 'arrival' || b.spots !== body.participants.length || snap.spots !== b.spots
     || typeof snap.price_centavos !== 'number' || sessionGroupTotal(snap.price_centavos, body.participants.length) !== body.expected_total_centavos
     || (b.source === 'walk_in' && (b.status === 'pending' || b.expires_at !== null))
     || (b.status === 'pending' && b.expires_at === null) || (b.status === 'confirmed' && b.expires_at !== null) || typeof snap.title !== 'string' || !Array.isArray(snap.court_ids)
@@ -30,8 +31,9 @@ export function parseSessionBooking(raw: unknown): SessionBooking {
     || !['arrival', 'online', 'both'].includes(policy.payment as string) || typeof policy.merchant_active !== 'boolean'
     || typeof snap.policy_revision !== 'string' || snap.approval_hold_minutes !== 120 || snap.payment_hold_minutes !== 15 || snap.refund_cutoff_hours !== 24)
     return unexpected();
+  const operations = parseOperations(b.operations, b.payment_status, body.expected_total_centavos);
   return { id: id(b.id), session_id: body.session_id, source: b.source as SessionBooking['source'], status: b.status as SessionBooking['status'],
-    payment_method: 'arrival', payment_status: 'unpaid', participants: body.participants, spots: body.participants.length,
+    payment_method: 'arrival', payment_status: operations.payment ? 'paid' : 'unpaid', operations, participants: body.participants, spots: body.participants.length,
     expires_at: b.expires_at === null ? null : instant(b.expires_at), created_at: instant(b.created_at), updated_at: instant(b.updated_at),
     snapshot: { venue_id: id(snap.venue_id), title: snap.title, court_ids: snap.court_ids.map(id), starts_at: instant(snap.starts_at), ends_at: instant(snap.ends_at),
       price_centavos: snap.price_centavos, spots: body.participants.length, total_centavos: body.expected_total_centavos, currency: 'PHP', timezone: 'Asia/Manila',

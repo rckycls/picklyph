@@ -1,6 +1,6 @@
 /** Server-only. Principals MUST come from verified Auth or a trusted ingress. */
 export type RatePrincipal = { kind: 'user' | 'guest' | 'provider'; id: string };
-export type RateAction = 'discovery' | 'owner-lookup' | 'owner-submit' | 'owner-read' | 'owner-edit' | 'hold-create' | 'checkout-create' | 'cancel' | 'provider-webhook';
+export type RateAction = 'discovery' | 'owner-lookup' | 'owner-submit' | 'owner-read' | 'owner-edit' | 'owner-ops' | 'hold-create' | 'checkout-create' | 'cancel' | 'provider-webhook';
 export type LimitReply = { success: boolean; limit: number; remaining: number; reset: number; reason?: string; pending?: Promise<unknown> };
 export type RateDecision = { allowed: boolean; status: 200 | 429 | 503; state: 'enforced' | 'degraded' | 'bypassed'; headers: Record<string, string> };
 export type RateBackend = (action: RateAction, principal: RatePrincipal, identifier: string) => Promise<LimitReply>;
@@ -13,6 +13,8 @@ export const RATE_POLICIES = {
   // Verified-owner venue editing (T18): bounded reads continue in an outage; edits and uploads stop.
   'owner-read': { user: 60, guest: 0, outage: 'continue' },
   'owner-edit': { user: 20, guest: 0, outage: 'reject' },
+  // Front-desk attendance/arrival-payment records (T31) create no inventory or charge, so the desk keeps working in an outage.
+  'owner-ops': { user: 60, guest: 0, outage: 'continue' },
   'hold-create': { user: 10, guest: 0, outage: 'reject' },
   'checkout-create': { user: 5, guest: 0, outage: 'reject' },
   cancel: { user: 30, guest: 0, outage: 'continue' },

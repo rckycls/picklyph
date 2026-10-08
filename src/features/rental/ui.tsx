@@ -9,6 +9,7 @@ import { screenText } from '@/components/ui/Screen';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { useAuth } from '@/features/auth/AuthProvider';
 import { SignInForm } from '@/features/auth/SignInForm';
+import { attendanceText, paymentText } from '@/features/owner/operationsModel';
 import { OwnerScreen } from '@/features/owner/OwnerScreen';
 import { colors } from '@/theme/colors';
 import { bookingStatus } from './model';
@@ -48,8 +49,9 @@ export function BookingSummary({ booking, children }: { booking: RentalBooking; 
   const status = bookingStatus(booking);
   return <Card>{children}<StatusBadge label={status.label} tone={status.tone} />
     <Text style={screenText.body}>{status.text}</Text>
-    <Text style={screenText.label}>{booking.status === 'pending' || booking.status === 'confirmed'
-      ? 'Payment: unpaid · pay at venue' : 'Payment record: unpaid · no online charge'}</Text>
+    <Text style={screenText.label}>{booking.operations.payment ? paymentText(booking.operations)
+      : booking.status === 'pending' || booking.status === 'confirmed' ? 'Payment: unpaid · pay at venue' : 'Payment record: unpaid · no online charge'}</Text>
+    {booking.operations.attendance !== 'none' && <Text style={screenText.body}>Venue record: {attendanceText(booking.operations)}</Text>}
     <Text selectable style={screenText.body}>Booking reference: {booking.id}</Text>
     {booking.status === 'pending' && booking.allocation.expires_at && <Text style={screenText.body}>Hold ends: {formatManilaDateTime(booking.allocation.expires_at)} (Manila). Refresh to check the server’s current status.</Text>}
   </Card>;

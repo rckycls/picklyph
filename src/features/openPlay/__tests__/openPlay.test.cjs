@@ -10,7 +10,7 @@ const offer = (delta = {}, snap = {}) => ({ id: SESSION, venue_id: VENUE, status
   snapshot: { court_ids: [COURT], title: 'Evening open play', starts_at: '2026-10-10T10:00:00+00:00', ends_at: '2026-10-10T12:00:00+00:00',
     capacity: 8, group_limit: 4, price_centavos: 25000, currency: 'PHP', timezone: 'Asia/Manila',
     policy: { confirmation: 'instant', payment: 'arrival', merchant_active: false }, approval_hold_minutes: 120, payment_hold_minutes: 15, refund_cutoff_hours: 24, ...snap } });
-const booking = (delta = {}) => ({ id: BOOKING, session_id: SESSION, source: 'player', status: 'confirmed', payment_method: 'arrival', payment_status: 'unpaid',
+const booking = (delta = {}) => ({ id: BOOKING, session_id: SESSION, source: 'player', status: 'confirmed', payment_method: 'arrival', payment_status: 'unpaid', operations: { attendance: 'none', attendance_at: null, payment: null },
   participants: ['Ana', 'Ben'], spots: 2, expires_at: null, created_at: AT, updated_at: AT,
   snapshot: { venue_id: VENUE, title: 'Evening open play', court_ids: [COURT], starts_at: '2026-10-10T10:00:00+00:00', ends_at: '2026-10-10T12:00:00+00:00',
     price_centavos: 25000, spots: 2, total_centavos: 50000, currency: 'PHP', timezone: 'Asia/Manila',

@@ -1,16 +1,17 @@
 import {
-  isPhpCentavos, priceRental, readRentalCommand, toUtcIso,
+  isPhpCentavos, priceRental, readGuestName, readRentalCommand, toUtcIso,
   type RentalBooking, type RentalBookingPage, type RentalBookingResult, type RentalPrice,
   type RentalQuote, type RentalRequest, type RentalSnapshot, type VenuePolicy,
 } from '@picklyph/domain';
 
+import { parseOperations } from '../owner/operationsModel';
 import { ownerRequest, type HttpFailure, type HttpOutcome, type OwnerHttpTransport } from '../owner/venueClient';
 
 export type RentalTransport = OwnerHttpTransport;
 const REASONS = ['invalid_request', 'invalid_input', 'invalid_time', 'minimum_duration', 'duration_increment', 'maximum_duration',
   'slot_alignment', 'player_required', 'not_player', 'not_owner', 'booking_not_found', 'court_unavailable', 'venue_unavailable',
   'start_not_future', 'outside_horizon', 'outside_hours', 'allocation_conflict', 'request_reused', 'stale_quote',
-  'arrival_unavailable', 'invalid_transition', 'allocation_ended', 'price_overflow'] as const;
+  'arrival_unavailable', 'invalid_transition', 'allocation_ended', 'price_overflow', 'not_started', 'payment_recorded', 'amount_mismatch'] as const;
 export type RentalReason = typeof REASONS[number];
 export type RentalFailure = HttpFailure<RentalReason>;
 export type RentalOutcome<T> = HttpOutcome<T, RentalReason>;
@@ -55,7 +56,8 @@ export function parseBooking(raw: unknown): RentalBooking {
   const starts_at = instant(a.starts_at); const ends_at = instant(a.ends_at);
   if (id(a.id) !== bookingId || a.kind !== 'rental' || !['active', 'released', 'expired'].includes(String(a.state))
     || !['pending', 'confirmed', 'declined', 'cancelled', 'expired'].includes(String(b.status))
-    || b.payment_method !== 'arrival' || b.payment_status !== 'unpaid' || s.version !== 1
+    || b.payment_method !== 'arrival' || !['player', 'owner'].includes(String(b.source)) || (b.source === 'player') !== (b.guest_name === null)
+    || (b.source === 'owner' && !['confirmed', 'cancelled'].includes(String(b.status))) || s.version !== 1
     || id(s.allocation_id) !== bookingId || id(s.venue_id) !== venueId || id(s.court_id) !== courtId
     || instant(s.starts_at) !== starts_at || instant(s.ends_at) !== ends_at
     || p.player_refund_cutoff_hours !== 24 || p.approval_hold_minutes !== 120 || p.payment_hold_minutes !== 15) return fail();
@@ -68,8 +70,11 @@ export function parseBooking(raw: unknown): RentalBooking {
     || (b.status === 'confirmed' && (expires_at !== null || a.state !== 'active'))
     || (['declined', 'cancelled'].includes(String(b.status)) && a.state !== 'released')
     || (b.status === 'expired' && a.state !== 'expired')) return fail();
-  return { id: bookingId, status: b.status as RentalBooking['status'], payment_method: 'arrival', payment_status: 'unpaid',
-    created_at: instant(b.created_at), updated_at: instant(b.updated_at), snapshot,
+  const guest_name = b.guest_name === null ? null : readGuestName(b.guest_name);
+  if (guest_name !== null && guest_name !== b.guest_name) return fail();
+  const operations = parseOperations(b.operations, b.payment_status, snapshot.total_centavos);
+  return { id: bookingId, source: b.source as RentalBooking['source'], guest_name, status: b.status as RentalBooking['status'], payment_method: 'arrival',
+    payment_status: operations.payment ? 'paid' : 'unpaid', operations, created_at: instant(b.created_at), updated_at: instant(b.updated_at), snapshot,
     allocation: { id: bookingId, venue_id: venueId, court_id: courtId, kind: 'rental', starts_at, ends_at,
       expires_at, state: a.state as RentalBooking['allocation']['state'], ended_at: a.ended_at === null ? null : instant(a.ended_at) } };
 }
@@ -86,16 +91,16 @@ export const loadHistory = (t: RentalTransport, after: string | null, signal?: A
   get(t, { section: 'history', ...(after ? { after_id: after } : {}) }, (body) => {
     if (!Array.isArray(body.bookings) || body.bookings.length > 25) return fail();
     const bookings = body.bookings.map(parseBooking); const cursor = body.next_cursor === null ? null : id(body.next_cursor);
-    if (bookings.some((b, i) => b.id <= (i ? bookings[i - 1]!.id : after ?? '')) || (cursor !== null && (bookings.length !== 25 || cursor !== bookings.at(-1)?.id))) return fail();
+    if (bookings.some((b, i) => b.source !== 'player' || b.id <= (i ? bookings[i - 1]!.id : after ?? '')) || (cursor !== null && (bookings.length !== 25 || cursor !== bookings.at(-1)?.id))) return fail();
     return { bookings, next_cursor: cursor };
   }, signal);
 export function requestRental(t: RentalTransport, command: RentalRequest): Promise<RentalOutcome<RentalBookingResult>> {
-  return mutate(t, command, (b) => b.allocation.court_id === command.court_id && b.allocation.starts_at === command.starts_at && b.allocation.ends_at === command.ends_at
+  return mutate(t, command, (b) => b.source === 'player' && b.allocation.court_id === command.court_id && b.allocation.starts_at === command.starts_at && b.allocation.ends_at === command.ends_at
     && b.snapshot.total_centavos === command.expected_quote.total_centavos && b.snapshot.schedule_revision === command.expected_quote.schedule_revision
     && b.snapshot.court_hours_revision === command.expected_quote.court_hours_revision && b.snapshot.policy_revision === command.expected_quote.policy_revision);
 }
 export const cancelRental = (t: RentalTransport, bookingId: string) => mutate(t, { kind: 'cancel', booking_id: bookingId }, (b) => b.id === bookingId);
-function mutate(t: RentalTransport, command: unknown, matches: (b: RentalBooking) => boolean): Promise<RentalOutcome<RentalBookingResult>> {
+export function mutate(t: RentalTransport, command: unknown, matches: (b: RentalBooking) => boolean): Promise<RentalOutcome<RentalBookingResult>> {
   const validated = readRentalCommand(command);
   return ownerRequest(t, t.endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(validated) }, (body) => {
     if (!['created', 'existing', 'changed', 'expired'].includes(String(body.outcome))) return fail();

@@ -1,12 +1,14 @@
 const assert=require('node:assert/strict');const {test}=require('node:test');const path=require('node:path');
 const load=require('../../../../supabase/tests/load-ts.cjs');
-const domain={...require('../../../../packages/domain/src/sessionBooking.ts'),...require('../../../../packages/domain/src/booking.ts')};
+const domain={...require('../../../../packages/domain/src/sessionBooking.ts'),...require('../../../../packages/domain/src/booking.ts'),
+  ...require('../../../../packages/domain/src/money.ts'),...require('../../../../packages/domain/src/operations.ts')};
 const here=path.dirname(module.filename);
-const client=load(path.join(here,'../walkInClient.ts'),{'@picklyph/domain':domain,'./venueClient':require('../venueClient.ts')});
+const client=load(path.join(here,'../walkInClient.ts'),{'@picklyph/domain':domain,'./venueClient':require('../venueClient.ts'),
+  './operationsModel':load(path.join(here,'../operationsModel.ts'),{'@picklyph/domain':domain},{Intl})});
 const id='c5100000-0000-4000-8000-000000000001';const other='c5100000-0000-4000-8000-000000000002';const venue='c5100000-0000-4000-8000-000000000003';
 const plain=value=>JSON.parse(JSON.stringify(value));
 const command=()=>client.walkInDraft({sessionId:id,requestId:id,names:' Ana \n\nBen\r\nCy ',priceCentavos:25000});
-const booking=(delta={})=>({id:other,session_id:id,source:'walk_in',status:'confirmed',payment_method:'arrival',payment_status:'unpaid',
+const booking=(delta={})=>({id:other,session_id:id,source:'walk_in',status:'confirmed',payment_method:'arrival',payment_status:'unpaid',operations:{attendance:'none',attendance_at:null,payment:null},
   participants:['Ana','Ben','Cy'],spots:3,expires_at:null,created_at:'2026-10-10T02:00:00.123456+00:00',updated_at:'2026-10-10T02:00:00.123456+00:00',
   snapshot:{venue_id:venue,title:'Open play',court_ids:[venue],starts_at:'2026-10-10T10:00:00+00:00',ends_at:'2026-10-10T12:00:00+00:00',
     price_centavos:25000,spots:3,total_centavos:75000,currency:'PHP',timezone:'Asia/Manila',policy:{confirmation:'instant',payment:'arrival',merchant_active:false},

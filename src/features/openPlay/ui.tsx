@@ -8,6 +8,7 @@ import { Card } from '@/components/ui/Card';
 import { screenText } from '@/components/ui/Screen';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import type { VenueDetail } from '@/features/discovery/venueDetail';
+import { attendanceText, paymentText } from '@/features/owner/operationsModel';
 import { groupFailureMessage, type GroupFailure } from './client';
 import { groupStatus } from './model';
 
@@ -54,8 +55,9 @@ export function GroupSummary({ booking, children }: { booking: SessionBooking; c
   return <Card>{children}<StatusBadge label={status.label} tone={status.tone} />
     <Text style={screenText.body}>{status.text}</Text>
     {booking.source === 'walk_in' && <Text style={screenText.body}>The venue entered this group in person.</Text>}
-    <Text style={screenText.label}>{booking.status === 'pending' || booking.status === 'confirmed'
-      ? 'Payment: unpaid · pay at venue' : 'Payment record: unpaid · no online charge'}</Text>
+    <Text style={screenText.label}>{booking.operations.payment ? paymentText(booking.operations)
+      : booking.status === 'pending' || booking.status === 'confirmed' ? 'Payment: unpaid · pay at venue' : 'Payment record: unpaid · no online charge'}</Text>
+    {booking.operations.attendance !== 'none' && <Text style={screenText.body}>Venue record: {attendanceText(booking.operations)}</Text>}
     <Text selectable style={screenText.body}>Booking reference: {booking.id}</Text>
     {booking.status === 'pending' && booking.expires_at && <Text style={screenText.body}>Hold ends: {formatManilaDateTime(booking.expires_at)} (Manila). Refresh to check the server’s current status.</Text>}
   </Card>;

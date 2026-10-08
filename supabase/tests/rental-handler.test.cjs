@@ -49,3 +49,32 @@ test('rental HTTP bounds streams/queries, maps domain errors and sanitizes infra
   deps.command=async()=>{throw new Error('Sensitive database details');};
   const hidden=await createRentalHandler(deps)(post());assert.equal(hidden.status,503);assert.equal(await hidden.text(),'{"error":"temporarily_unavailable"}');
 });
+test('outside rentals and front desk (T31): entries fail closed on owner-edit; attendance/payment continue on owner-ops',async()=>{
+  const path=require('node:path');const handlerModule=load(path.join(__dirname,'../functions/rental-bookings/handler.ts'),{},{TextDecoder});
+  const {createSupabaseRentalDeps}=load(path.join(__dirname,'../functions/rental-bookings/deps.ts'),{'./handler.ts':handlerModule});
+  const entry={...body,kind:'owner_entry',guest_name:' Wei '};const pay={kind:'record_payment',booking_id:id,method:'ewallet',amount_centavos:40000};
+  const seen=[];const calls=[];const deps=base();deps.limit=async action=>{seen.push(action);return allowed;};deps.command=async(actor,c)=>{calls.push(c);return {};};
+  const handler=createRentalHandler(deps);
+  assert.equal((await handler(post(entry))).status,200);assert.equal(calls[0].guest_name,'Wei');
+  for(const kind of ['check_in','no_show','complete']) assert.equal((await handler(post({kind,booking_id:id}))).status,200);
+  assert.equal((await handler(post(pay))).status,200);
+  assert.equal((await handler(new Request(`https://rental.local?section=day&venue_id=${id}&date=2026-10-09`,{headers:{authorization:'Bearer valid'}}))).status,200);
+  assert.deepEqual(seen,['owner-edit','owner-ops','owner-ops','owner-ops','owner-ops','owner-read']);
+  for(const bad of [{...entry,guest_name:''},{...entry,guest_name:'x'.repeat(61)},{...entry,guest_name:'A\tB'},{...entry,actor_user_id:id},{...body,guest_name:'Wei'},{...pay,method:'gcash'}])
+    assert.equal((await handler(post(bad))).status,400);
+  for(const backend of [async()=>{throw new Error('Outage');},async()=>({success:true,reason:'timeout'})]){
+    calls.length=0;deps.limit=createRateGuard({backend,identifier:async()=>id,timeoutMs:5});const outage=createRentalHandler(deps);
+    assert.equal((await outage(post(entry))).status,503);assert.equal(calls.length,0);
+    assert.equal((await outage(post({kind:'check_in',booking_id:id}))).status,200);assert.equal((await outage(post(pay))).status,200);
+  }
+  for(const reason of ['not_started','payment_recorded','amount_mismatch']){
+    deps.limit=async()=>allowed;deps.command=async()=>{throw new RentalRejected(reason);};assert.equal((await createRentalHandler(deps)(post(pay))).status,409);
+  }
+  const rpc=[];const server=()=>({rpc:async(name,args)=>{rpc.push([name,args]);return {data:{ok:true},error:null};}});
+  const supa=createSupabaseRentalDeps(()=>({}),server);const parsed=require('../../packages/domain/src/rentalBooking.ts').readRentalCommand(entry);
+  await supa.command(id,parsed);await supa.command(id,pay);await supa.read(id,{section:'day',venue_id:id,date:'2026-10-09',after_id:id});
+  assert.deepEqual(JSON.parse(JSON.stringify(rpc)),[['rental_booking_owner_entry',{actor_user_id:id,target_court_id:id,request_id:id,starts:parsed.starts_at,ends:parsed.ends_at,
+    guest_name:'Wei',expected_quote:body.expected_quote}],
+    ['booking_operation',{actor_user_id:id,target_kind:'rental',target_booking_id:id,command:'record_payment',method:'ewallet',amount:40000}],
+    ['booking_operations_read',{actor_user_id:id,target_kind:'rental',target_venue_id:id,target_day:'2026-10-09',after_id:id}]]);
+});
