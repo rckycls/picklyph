@@ -9,7 +9,7 @@ signup metadata, an email-domain heuristic or cached JWT role claims.
 
 | Record | Access |
 | --- | --- |
-| `public.profiles` | A signed-in user reads their own row and edits only `display_name`. Other profiles are private. |
+| `public.profiles` | A signed-in user reads their own row and edits only `display_name` and (2026-10-08, [profile details](profile.md)) `first_name`, `last_name`, `phone`, `avatar_path`. Other profiles are private. |
 | `private.account_roles` | Protected admin/moderator assignments; clients cannot read or mutate this table. |
 | `private.venue_owners` | Verified user-to-venue links; clients cannot read or mutate this table. |
 | `private.venue_claims` | Private claim evidence; T15 writes it only through the audited `owner_submit_claim` command. |

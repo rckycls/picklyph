@@ -1,6 +1,6 @@
 import Constants from 'expo-constants';
-import { useLocalSearchParams } from 'expo-router';
-import { Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { router, useLocalSearchParams } from 'expo-router';
+import { Image, KeyboardAvoidingView, Linking, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { PageHeader, pageLayout } from '@/components/ui/PageHeader';
 
@@ -9,6 +9,7 @@ import { ProfileHero } from '@/features/account/ProfileHero';
 import { SignedInProfile } from '@/features/account/SignedInProfile';
 import { SignInForm } from '@/features/auth/SignInForm';
 import { useAuth } from '@/features/auth/AuthProvider';
+import { locationAccessLabel, useLocationPermission } from '@/features/preferences/useLocationPermission';
 import { colors } from '@/theme/colors';
 import { fonts } from '@/theme/typography';
 
@@ -43,6 +44,7 @@ export default function AccountScreen() {
 }
 
 function GuestProfile({ restoring }: { restoring: boolean }) {
+  const location = useLocationPermission();
   return (
     <>
       <ProfileHero name={restoring ? null : 'Guest player'} initials=""
@@ -51,6 +53,11 @@ function GuestProfile({ restoring }: { restoring: boolean }) {
       <MenuGroup title="Own or manage a court?">
         <MenuRow icon="flag" tone="lime" title="Sign in, then switch to Owner"
           subtitle="Use the account you’ll manage your venue with. Owner mode is where you add or claim it; a pickly reviewer checks every request." />
+      </MenuGroup>
+      <MenuGroup title="Settings">
+        <MenuRow icon="settings" title="Preferences" subtitle="How Discover opens" onPress={() => router.push('/preferences')} />
+        <MenuRow icon="location" tone="green" title="Location access" subtitle={locationAccessLabel(location)}
+          onPress={() => void Linking.openSettings().catch(() => undefined)} />
       </MenuGroup>
     </>
   );

@@ -41,6 +41,7 @@
     "test:mascot": "node --test src/components/mascot/__tests__/*.test.cjs src/features/welcome/__tests__/*.test.cjs src/features/rental/__tests__/celebration.test.cjs src/features/rental/__tests__/bookingMascot.test.cjs",
     "test:auth:local": "node supabase/tests/auth-local.cjs",
     "test:authorization:local": "node supabase/tests/authorization-local.cjs",
+    "test:profile:local": "node supabase/tests/profile-local.cjs",
     "test:domain": "npm test --workspace @picklyph/domain",
     "admin:dev": "npm run dev --workspace @picklyph/admin",
     "admin:build": "npm run build --workspace @picklyph/admin",

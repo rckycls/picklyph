@@ -4,6 +4,13 @@ export type PrivilegedRole = 'admin' | 'moderator';
 export type Profile = {
   id: string;
   display_name: string | null;
+  /** Personal details, self-only like the rest of the row. */
+  first_name: string | null;
+  last_name: string | null;
+  /** Philippine mobile number in E.164 (+639XXXXXXXXX). */
+  phone: string | null;
+  /** Object in the private `avatars` bucket under the account's own folder. */
+  avatar_path: string | null;
   created_at: string;
   updated_at: string;
 };

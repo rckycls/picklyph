@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { TabIcon } from '@/components/ui/TabIcon';
 import { colors } from '@/theme/colors';
@@ -27,6 +27,14 @@ export function BallAvatar({ initials, size = 58 }: { initials: string; size?: n
   );
 }
 
+/** The profile photo when there is one, otherwise the pickleball with initials. */
+export function Avatar({ photoUri, initials, size = 58 }: { photoUri?: string | null; initials: string; size?: number }) {
+  const [failed, setFailed] = useState<string | null>(null);
+  if (!photoUri || failed === photoUri) return <BallAvatar initials={initials} size={size} />;
+  return <Image source={{ uri: photoUri }} onError={() => setFailed(photoUri)} accessible accessibilityLabel="Your profile photo"
+    style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: colors.accent }} />;
+}
+
 /** Court lines behind the hero; purely decorative. */
 function CourtLines() {
   return (
@@ -44,6 +52,7 @@ type ProfileHeroProps = {
   /** null renders a placeholder while the name loads. */
   name: string | null;
   initials: string;
+  photoUri?: string | null;
   detail?: string;
   /** Emails read better on one line, shortened in the middle, than broken mid-word. */
   detailIsEmail?: boolean;
@@ -52,13 +61,13 @@ type ProfileHeroProps = {
   action?: { label: string; accessibilityLabel: string; onPress: () => void };
 };
 
-export function ProfileHero({ name, initials, detail, detailIsEmail, chips = [], stats = [], action }: ProfileHeroProps) {
+export function ProfileHero({ name, initials, photoUri, detail, detailIsEmail, chips = [], stats = [], action }: ProfileHeroProps) {
   const [focused, setFocused] = useState(false);
   return (
     <View style={styles.hero}>
       <CourtLines />
       <View style={styles.top}>
-        <View style={styles.ring}><BallAvatar initials={initials} /></View>
+        <View style={styles.ring}><Avatar photoUri={photoUri} initials={initials} /></View>
         <View style={styles.identity}>
           {name === null
             ? <View style={styles.namePlaceholder} accessibilityLabel="Loading your name" />

@@ -4,7 +4,7 @@ import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'rea
 import { colors } from '@/theme/colors';
 import { fonts } from '@/theme/typography';
 
-export type GlyphName = 'venue' | 'plus' | 'flag' | 'mail' | 'lock' | 'leave' | 'retry';
+export type GlyphName = 'venue' | 'plus' | 'flag' | 'mail' | 'lock' | 'leave' | 'retry' | 'user' | 'phone' | 'settings' | 'location' | 'eye' | 'eyeOff';
 export type RowTone = 'blue' | 'green' | 'lime' | 'red';
 
 const tones = {
@@ -43,11 +43,13 @@ type MenuRowProps = {
   destructive?: boolean;
   loading?: boolean;
   accessibilityLabel?: string;
+  /** A separate control at the end of the row (outside the row's own accessibility element). */
+  accessory?: ReactNode;
   children?: ReactNode;
 };
 
 /** Pressable rows show a chevron; rows without onPress are read-only details. */
-export function MenuRow({ icon, tone = 'blue', title, overline, subtitle, onPress, destructive, loading, accessibilityLabel, children }: MenuRowProps) {
+export function MenuRow({ icon, tone = 'blue', title, overline, subtitle, onPress, destructive, loading, accessibilityLabel, accessory, children }: MenuRowProps) {
   const [focused, setFocused] = useState(false);
   const appearance = tones[destructive ? 'red' : tone];
   const label = accessibilityLabel ?? [overline, title, subtitle].filter(Boolean).join(', ');
@@ -67,12 +69,25 @@ export function MenuRow({ icon, tone = 'blue', title, overline, subtitle, onPres
     </>
   );
 
-  if (!onPress) return <View style={styles.row} accessible accessibilityLabel={label}>{body}</View>;
-  return (
+  const row = !onPress ? <View style={[styles.row, accessory !== undefined && styles.grow]} accessible accessibilityLabel={label}>{body}</View> : (
     <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ disabled: loading, busy: loading }}
       disabled={loading} onPress={onPress} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
-      style={({ pressed }) => [styles.row, (pressed || focused) && styles.pressed, focused && styles.focused]}>
+      style={({ pressed }) => [styles.row, accessory !== undefined && styles.grow, (pressed || focused) && styles.pressed, focused && styles.focused]}>
       {body}
+    </Pressable>
+  );
+  if (accessory === undefined) return row;
+  return <View style={styles.withAccessory}>{row}<View style={styles.accessory}>{accessory}</View></View>;
+}
+
+/** Eye button that shows or hides a private value such as an email address. */
+export function RevealButton({ shown, label, onToggle }: { shown: boolean; label: string; onToggle: () => void }) {
+  const [focused, setFocused] = useState(false);
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel={shown ? `Hide ${label}` : `Show ${label}`} onPress={onToggle} hitSlop={8}
+      onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
+      style={({ pressed }) => [styles.reveal, (pressed || focused) && styles.pressed, focused && styles.focused]}>
+      <Glyph name={shown ? 'eyeOff' : 'eye'} color={colors.textSecondary} />
     </Pressable>
   );
 }
@@ -108,6 +123,30 @@ export function Glyph({ name, color }: { name: GlyphName; color: string }) {
         <View style={[styles.ring, { borderColor: color }]} />
         <View style={[styles.ringTip, { borderColor: color }]} />
       </>}
+      {name === 'user' && <>
+        <View style={[styles.head, { borderColor: color }]} />
+        <View style={[styles.shoulders, { borderColor: color }]} />
+      </>}
+      {name === 'phone' && (
+        <View style={[styles.handset, { borderColor: color }]}>
+          <View style={[styles.speaker, { backgroundColor: color }]} />
+        </View>
+      )}
+      {name === 'settings' && <>
+        <View style={[styles.slider, styles.sliderTop, { backgroundColor: color }]} />
+        <View style={[styles.knob, styles.knobTop, { borderColor: color }]} />
+        <View style={[styles.slider, styles.sliderBottom, { backgroundColor: color }]} />
+        <View style={[styles.knob, styles.knobBottom, { borderColor: color }]} />
+      </>}
+      {name === 'location' && <>
+        <View style={[styles.target, { borderColor: color }]} />
+        <View style={[styles.dot, { backgroundColor: color }]} />
+      </>}
+      {(name === 'eye' || name === 'eyeOff') && <>
+        <View style={[styles.eye, { borderColor: color }]} />
+        <View style={[styles.pupil, { backgroundColor: color }]} />
+        {name === 'eyeOff' && <View style={[styles.strike, { backgroundColor: color }]} />}
+      </>}
     </View>
   );
 }
@@ -141,4 +180,23 @@ const styles = StyleSheet.create({
   arrowHead: { position: 'absolute', right: 2, width: 7, height: 7, borderTopWidth: 2, borderRightWidth: 2, transform: [{ rotate: '45deg' }] },
   ring: { width: 16, height: 16, borderRadius: 8, borderWidth: 2, borderTopColor: 'transparent' },
   ringTip: { position: 'absolute', top: 1, right: 3, width: 6, height: 6, borderTopWidth: 2, borderRightWidth: 2, transform: [{ rotate: '20deg' }] },
+  grow: { flex: 1 },
+  withAccessory: { flexDirection: 'row', alignItems: 'center' },
+  accessory: { paddingRight: 12 },
+  reveal: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'transparent' },
+  head: { position: 'absolute', top: 1, width: 9, height: 9, borderRadius: 5, borderWidth: 2 },
+  shoulders: { position: 'absolute', bottom: 1, width: 16, height: 8, borderWidth: 2, borderBottomWidth: 0, borderTopLeftRadius: 8, borderTopRightRadius: 8 },
+  handset: { width: 12, height: 19, borderWidth: 2, borderRadius: 3, alignItems: 'center', justifyContent: 'flex-end', paddingBottom: 2 },
+  speaker: { width: 4, height: 2, borderRadius: 1 },
+  slider: { position: 'absolute', left: 1, right: 1, height: 2, borderRadius: 1 },
+  sliderTop: { top: 5 },
+  sliderBottom: { bottom: 5 },
+  knob: { position: 'absolute', width: 7, height: 7, borderRadius: 4, borderWidth: 2, backgroundColor: colors.surface },
+  knobTop: { top: 2.5, left: 3 },
+  knobBottom: { bottom: 2.5, right: 3 },
+  target: { width: 16, height: 16, borderRadius: 8, borderWidth: 2 },
+  dot: { position: 'absolute', width: 6, height: 6, borderRadius: 3 },
+  eye: { width: 20, height: 12, borderRadius: 10, borderWidth: 2 },
+  pupil: { position: 'absolute', width: 6, height: 6, borderRadius: 3 },
+  strike: { position: 'absolute', width: 22, height: 2, borderRadius: 1, transform: [{ rotate: '-35deg' }] },
 });

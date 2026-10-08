@@ -15,6 +15,7 @@ import { useDeviceLocation } from '@/features/discovery/useDeviceLocation';
 import { useVenueSearch } from '@/features/discovery/useVenueSearch';
 import { ResultsBar, VenueList } from '@/features/discovery/VenueList';
 import { VenueSheet } from '@/features/discovery/VenueSheet';
+import { loadDiscoverView } from '@/features/preferences/discoverView';
 import type { LocationResult } from '@/lib/location';
 import { colors } from '@/theme/colors';
 import { fonts } from '@/theme/typography';
@@ -40,6 +41,13 @@ function DiscoverScreen() {
   const query = useMemo(() => ({ bounds, ...filters }), [bounds, filters]);
   const { results, recovery, loadMore, retry, remove } = useVenueSearch(query);
   const regionTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  // Account → Preferences can open Discover on the list; a choice made before it loads wins.
+  const viewChosen = useRef(false);
+  useEffect(() => {
+    let active = true;
+    void loadDiscoverView().then((saved) => { if (active && !viewChosen.current && saved === 'list') setView('list'); });
+    return () => { active = false; };
+  }, []);
 
   const applyLocation = useCallback((result: LocationResult) => {
     setSelected(null);
@@ -70,6 +78,7 @@ function DiscoverScreen() {
     if (view === 'map') setFocusRegion(selectedVenueRegion(venue));
   };
   const changeView = (next: DiscoveryView) => {
+    viewChosen.current = true;
     setView(next);
     if (next === 'map' && selected && selected.id !== missingId) setFocusRegion(selectedVenueRegion(selected));
   };
