@@ -66,7 +66,8 @@
     "test:moderation": "node --test supabase/tests/moderation.test.cjs supabase/tests/report-handler.test.cjs",
     "test:moderation:local": "node supabase/tests/moderation-local.cjs",
     "test:privacy": "node --test supabase/tests/account-deletion.test.cjs supabase/tests/account-deletion-handler.test.cjs",
-    "test:privacy:local": "node supabase/tests/account-deletion-local.cjs"
+    "test:privacy:local": "node supabase/tests/account-deletion-local.cjs",
+    "test:acceptance:local": "node supabase/tests/acceptance-local.cjs"
   },
   "dependencies": {
     "@expo-google-fonts/bricolage-grotesque": "0.4.1",
