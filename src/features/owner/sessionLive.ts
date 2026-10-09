@@ -1,4 +1,5 @@
 import { fetchWithDeadline } from '@/lib/fetchWithDeadline';
+import { recoveryNamespace } from '@/lib/recoveryKeys';
 import { getSupabase } from '@/lib/supabase';
 import { attemptStore } from '../rental/attemptStore';
 import { createSessionJournal } from './sessionAttempt';
@@ -9,7 +10,7 @@ const journals = new Map<string, Journals>();
 export function sessionServices(actor: string): { transport: OwnerHttpTransport; journal: Journals['session'];
   walkIns: { transport: OwnerHttpTransport; journal: Journals['walkIn'] } } {
   const client = getSupabase(); const url = process.env.EXPO_PUBLIC_SUPABASE_URL!.trim();
-  const namespace = `pickly.${new URL(url).host.replace(/[^a-z0-9.-]/gi, '_')}.${actor}`;
+  const namespace = recoveryNamespace(url, actor);
   let saved = journals.get(namespace);
   if (!saved) { saved = { session: createSessionJournal(attemptStore, namespace), walkIn: createWalkInJournal(attemptStore, namespace) }; journals.set(namespace, saved); }
   const transport = (name: string): OwnerHttpTransport => ({ endpoint: `${url}/functions/v1/${name}`, apiKey: process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY!.trim(),

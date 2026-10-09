@@ -1,6 +1,6 @@
 /** Server-only. Principals MUST come from verified Auth or a trusted ingress. */
 export type RatePrincipal = { kind: 'user' | 'guest' | 'provider'; id: string };
-export type RateAction = 'discovery' | 'owner-lookup' | 'owner-submit' | 'owner-read' | 'owner-edit' | 'owner-ops' | 'hold-create' | 'checkout-create' | 'report-create' | 'cancel' | 'provider-webhook';
+export type RateAction = 'discovery' | 'owner-lookup' | 'owner-submit' | 'owner-read' | 'owner-edit' | 'owner-ops' | 'hold-create' | 'checkout-create' | 'report-create' | 'account-delete' | 'cancel' | 'provider-webhook';
 export type LimitReply = { success: boolean; limit: number; remaining: number; reset: number; reason?: string; pending?: Promise<unknown> };
 export type RateDecision = { allowed: boolean; status: 200 | 429 | 503; state: 'enforced' | 'degraded' | 'bypassed'; headers: Record<string, string> };
 export type RateBackend = (action: RateAction, principal: RatePrincipal, identifier: string) => Promise<LimitReply>;
@@ -19,6 +19,8 @@ export const RATE_POLICIES = {
   'checkout-create': { user: 5, guest: 0, outage: 'reject' },
   // Listing reports (T46) create reviewer work; signed-in players only, stopped in an outage.
   'report-create': { user: 5, guest: 0, outage: 'reject' },
+  // Account deletion (T47) is a privacy right: like cancellation it keeps working in an outage.
+  'account-delete': { user: 5, guest: 0, outage: 'continue' },
   cancel: { user: 30, guest: 0, outage: 'continue' },
   'provider-webhook': { user: 0, guest: 0, outage: 'continue' },
 } as const;

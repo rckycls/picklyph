@@ -92,6 +92,6 @@ npm run admin:build; npm run test:review:local   # production console moderation
 
 - Migration applied to local Docker only. Staging needs `supabase db push` (it also drops `set_verified_venue_owner`), then the `venue-reports` function deployed. The function reuses the `DISCOVERY_SUPABASE_*` and Upstash secrets, and `config.toml` sets `verify_jwt = false` and the import map. The console page runs wherever the console runs. Reload Metro; no native build.
 - iPhone check: as a signed-in player, open a venue → Show courts → Report a problem; send a report; send another on the same listing (already reported); check VoiceOver on the reason list and large text.
-- T47 must set retention for reports (they hold free text and the reporter ID) and for moderation audit rows.
+- Retention (T47, [privacy](privacy.md)): report free text is cleared 180 days after a decision; moderation audit rows are kept; a deleted reporter's reports stay, anonymous. Account deletion releases an owner's venues with an `owner.revoke` row (reason `owner_request`, actor = subject).
 - T39/T40 must keep refunds and manual payment reconciliation away from moderators.
 - Not covered: player/account suspension; reporter notifications; appeals. `set_account_role` (admin only) is still unaudited. Trusted infrastructure (`service_role` table grants from T05, operator SQL) can still change listings directly without moderation audit.

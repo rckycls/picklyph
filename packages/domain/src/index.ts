@@ -23,6 +23,8 @@ export { MAX_OWNER_COURTS, MAX_PHOTO_BYTES, MAX_PHOTO_PIXELS, MAX_PHOTO_SIDE, MA
 export type { OwnedVenueSummary, OwnerPhotoAdd, OwnerPhotoAddResult, OwnerPhotoRemove, OwnerPhotoRemoveResult, OwnerVenue, OwnerVenueCommand, OwnerVenueDetails, OwnerVenuePhoto, OwnerVenueSave, PhotoType } from './ownerVenues';
 export { MAX_REPORT_BYTES, MAX_REPORT_DETAILS, ModerationInputError, REPORT_REASONS, REPORT_REASON_LABELS, REVOCATION_REASONS, REVOCATION_REASON_LABELS, readModerationDecision, readOwnershipRevocation, readReportDetails, readVenueReport } from './moderation';
 export type { ModerationAuditAction, ModerationDecision, ModerationEvent, ModerationQueueItem, ModerationQueuePage, ModerationReport, ModerationResult, ModerationVenue, OwnershipRevocation, ReportReason, ReportStatus, RevocationReason, VenueReport, VenueReportRequest, VenueReportResult } from './moderation';
+export { ACCOUNT_DELETION_CONFIRMATION, MAX_ACCOUNT_DELETION_BYTES, PrivacyInputError, readAccountDeletionRequest } from './privacy';
+export type { AccountDeletionBegin, AccountDeletionRequest, AccountDeletionResult, AccountDeletionStatus } from './privacy';
 export { REVIEW_REASON_LABELS, REVIEW_REJECTION_REASONS, ReviewInputError, formatReviewCursor, readOwnershipDecision, readReviewCursor } from './review';
 export type { ClaimReview, OwnershipDecision, OwnershipDecisionResult, OwnershipQueueItem, OwnershipQueuePage, OwnershipReview, ReviewCursor, ReviewOutcome, ReviewRejectionReason, ReviewSubmitter, VenueSubmissionReview } from './review';
 export { PHP_CURRENCY, CENTAVOS_PER_PESO, isPhpCentavos, assertPhpCentavos, pesosToCentavos, formatPhpCentavos } from './money';

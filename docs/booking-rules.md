@@ -139,7 +139,7 @@ client quote, compare its version/total under the locks and reject stale quotes
 before commit. Generic `allocation_acquire` does not automatically create a
 snapshot: rental commands must use this wrapper. T35 must also check current
 merchant activation/payment eligibility. Snapshots cascade with allocation
-deletion; T47 must establish retention before account/directory deletion ships.
+deletion; account deletion keeps them ([privacy](privacy.md)).
 
 **Verify:** `npm run test:domain`, `npm run test:rentals` and
 `npm run test:rentals:local`. The local suite uses real Docker PostgreSQL sessions,

@@ -74,7 +74,7 @@ Your venues shows **Booking requests** and **Front desk** for published, verifie
 
 - **Booking requests** (`/owner/requests/[id]`) lists pending rentals and groups, with hold ends and short references. Accept, or decline after a confirmation prompt.
 - **Front desk** (`/owner/desk/[id]?date=`) steps through Manila dates and lists that day's confirmed rentals and groups. Each card shows the court or session, guest or names, short reference, attendance and payment. Check-in, completion, no-show (confirmed first) and payment (method, then a confirmation) appear once the server's read time passes the start.
-- **Outside booking** (`/owner/entry/[id]`) quotes a court and time, takes a guest label and records the entry. Before dispatch, the original body is kept in device-only SecureStore under `<backend>.<account>.owner-entry-attempt`, and an uncertain reply offers **Retry original outside booking**. **T47 must delete this key on account deletion.**
+- **Outside booking** (`/owner/entry/[id]`) quotes a court and time, takes a guest label and records the entry. Before dispatch, the original body is kept in device-only SecureStore under `<backend>.<account>.owner-entry-attempt`, and an uncertain reply offers **Retry original outside booking**. Account deletion removes this key ([privacy](privacy.md)).
 
 Players' rental and group details show "Paid at the venue …" and the venue's attendance record.
 

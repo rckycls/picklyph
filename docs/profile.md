@@ -13,7 +13,7 @@ Name shown in the hero: display name, else first + last name, else a guess from 
 - `public.profiles` gains `first_name`, `last_name` (trimmed, 1–50 characters, no control characters), `phone` (Philippine mobile, `+639XXXXXXXXX`) and `avatar_path`. The app accepts `0917 123 4567`, `9171234567`, `+63 917…` and normalizes. Column grants let `authenticated` update only these plus `display_name`, on their own row (T08 RLS). Nothing new is exposed to reviewers, owners or other players: `ownership_submitter` still returns `display_name` only.
 - Profile photos live in the private `avatars` bucket (5 MiB, JPEG/PNG) as `<user id>/<uuid>.jpg|png`. Storage policies let a signed-in user insert, read (signed links) and delete objects in **their own folder only**; `avatar_path` must point into the same folder. The app uploads a new object, points the profile at it, then deletes the previous one (or deletes the new upload if the profile update fails).
 - Photos come from the system picker (square crop, quality 0.7, `exif: false`, HEIC delivered as JPEG). They are not re-encoded, so leftover metadata is possible, but only the uploader can read the file.
-- **T47 must delete `avatars/<user id>/` on account deletion**; storage objects don't cascade from `auth.users`.
+- Account deletion empties `avatars/<user id>/` before deleting the Auth user, because storage objects don't cascade from `auth.users` ([privacy](privacy.md)).
 
 ## Preferences
 

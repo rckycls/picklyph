@@ -6,6 +6,7 @@ import type { VenueSearch, VenueSearchPage } from './search.ts';
 import type { OwnerDuplicate, OwnerSubmission, OwnerSubmitResult, OwnerVenueInput } from './owner.ts';
 import type { OwnershipDecisionResult, OwnershipQueuePage, OwnershipReview, ReviewRejectionReason } from './review.ts';
 import type { ModerationQueuePage, ModerationResult, ModerationVenue, ReportReason, RevocationReason, VenueReportRequest, VenueReportResult } from './moderation.ts';
+import type { AccountDeletionBegin, AccountDeletionStatus } from './privacy.ts';
 import type { OwnedVenueSummary, OwnerPhotoAddResult, OwnerPhotoRemoveResult, OwnerVenue, OwnerVenueDetails, OwnerVenuePhoto } from './ownerVenues.ts';
 import type { ScheduleView, VenueSchedule } from './schedule.ts';
 import type { VenuePolicy, VenuePolicyView } from './policy.ts';
@@ -161,6 +162,9 @@ export interface Database {
         Args: { actor_user_id: string; target_venue_id: string; owner_user_id: string; reason: RevocationReason };
         Returns: ModerationResult;
       };
+      // T47 account deletion: begin with the verified actor; status confirms a retry whose token outlived the account.
+      account_deletion_begin: { Args: { actor_user_id: string }; Returns: AccountDeletionBegin };
+      account_deletion_status: { Args: { target_user_id: string }; Returns: AccountDeletionStatus };
       authorize_venue_management: {
         Args: { actor_user_id: string; target_venue_id: string };
         Returns: undefined;

@@ -54,6 +54,6 @@ The migration was applied to hosted staging on 2026-10-07, together with T15's. 
 Not in T17:
 - Notifying submitters, or showing them the rejection reason (only the status).
 - Audited ownership revocation: done in T46, which dropped T08's unaudited `set_verified_venue_owner`; see [moderation](moderation.md).
-- Evidence retention and metadata stripping (T47).
+- Evidence purge after a decision and metadata stripping (evidence is deleted with the account; see [privacy](privacy.md)).
 
 H06 (a pilot owner trial of claim and review) can now run on staging.

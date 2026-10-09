@@ -165,6 +165,8 @@ export function SignedInProfile({ session, startInOwnerMode = false }: { session
             setSignOutError(null);
             void auth.signOut().catch(() => setSignOutError('We couldn’t sign out. Please try again.'));
           }} />
+          <MenuRow icon="user" destructive title="Delete account" subtitle="Remove your profile and cancel upcoming bookings"
+            onPress={() => router.push('/delete-account')} />
         </MenuGroup>
         {signOutError && <Text accessibilityRole="alert" style={styles.error}>{signOutError}</Text>}
       </View>

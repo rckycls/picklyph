@@ -106,7 +106,7 @@ export function enterOutsideRental(t: DeskTransports, command: RentalOwnerEntry)
   });
 }
 
-/** One durable uncertain outside rental per backend/account; T47 must clear `.owner-entry-attempt` on account deletion. */
+/** One durable uncertain outside rental per backend/account; account deletion clears it (`@/lib/recoveryKeys`). */
 export function createEntryJournal(store: AttemptStore, namespace: string) {
   const key = `${namespace}.owner-entry-attempt`; let busy = false;
   const read = async (): Promise<RentalOwnerEntry | null> => {

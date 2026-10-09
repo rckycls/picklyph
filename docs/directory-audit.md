@@ -58,7 +58,7 @@ moderation/admin tools through their own verified server guards.
 
 Actor/venue IDs deliberately have no cascading foreign keys, so deleting a
 record does not silently erase its history. These IDs remain pseudonymous
-personal data; T47 must define retention and account-deletion handling. Trusted
+personal data; they are kept after account deletion ([privacy](privacy.md)). Trusted
 database maintenance can change records; this is not a cryptographic seal or
 auditing for direct SQL, T08 role/owner assignment, or future booking commands.
 

@@ -79,3 +79,8 @@ import_map = "./functions/deno.json"
 # Signed-in players report published listings; every bearer is verified in code and creation fails closed.
 verify_jwt = false
 import_map = "./functions/deno.json"
+
+[functions.account-deletion]
+# Signed-in users delete their own account; the bearer is verified in code and a retry after a lost reply is confirmed.
+verify_jwt = false
+import_map = "./functions/deno.json"

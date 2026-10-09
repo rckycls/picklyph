@@ -61,7 +61,7 @@ Service-role RPCs for owners/admins, with the same editors and locks as T19 sche
 - **T22 (done):** court hours/closures, owner calendar and Edge wiring. Venue schedule saves and court-hours saves refuse to leave any live, unended allocation outside its court's hours (`hours_conflict`); a `courts` trigger refuses deactivating a court with one (`court_allocated`). Both run under the venue editor lock that every acquisition shares first.
 - **T23 (done)/T24:** `private.rental_acquire` atomically acquires a rental and stores its immutable price/policy snapshot. All API roles are denied execution; T24 must invoke it inside its guarded, authorized booking transaction. See [rental snapshot contract](booking-rules.md#authoritative-rental-snapshots-t23). Generic allocation primitives alone do not create snapshots.
 - **T27:** authorize the player (approved, verified, configured, not suspended), call `allocation_acquire` with `session` inside its transaction and snapshot session prices/policy. Apply the fail-closed `hold-create` Upstash guard before inventory creation.
-- **T47:** `requested_by` has no FK (retention policy pending); deleting a venue or court cascades to its rows.
+- `requested_by` has no FK; account deletion keeps the UUID ([privacy](privacy.md)). Deleting a venue or court cascades to its rows.
 
 ## Verification and rollout
 

@@ -61,7 +61,8 @@ test('account-bound live transport cannot submit with another account’s refres
   let actor = ID;
   const live = load(path.join(path.dirname(module.filename), '../live.ts'), {
     '@/lib/supabase': { getSupabase: () => ({ auth: { getSession: async () => ({ data: { session: { user: { id: actor }, access_token: 'fixture' } }, error: null }) } }) },
-    '@/lib/fetchWithDeadline': { fetchWithDeadline: async () => { throw new Error('not used'); } }, './attempt': { createAttemptJournal }, './attemptStore': { attemptStore: memory() },
+    '@/lib/fetchWithDeadline': { fetchWithDeadline: async () => { throw new Error('not used'); } },
+    '@/lib/recoveryKeys': require(path.join(path.dirname(module.filename), '../../../lib/recoveryKeys.ts')), './attempt': { createAttemptJournal }, './attemptStore': { attemptStore: memory() },
   }, { process: { env: { EXPO_PUBLIC_SUPABASE_URL: 'https://fixture.supabase.co', EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'fixture' } } });
   const services = live.rentalServices(ID); assert.equal(await services.transport.accessToken(), 'fixture');
   actor = REQUEST; assert.equal(await services.transport.accessToken(), null);
