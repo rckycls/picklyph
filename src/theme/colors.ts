@@ -19,6 +19,8 @@ export const palette = {
   softRed: '#FFF0EE',
   haze: '#C5D0E4',
   whiteVeil: 'rgba(255, 255, 255, 0.14)',
+  cloud: '#E4EAF3',
+  inkScrim: 'rgba(16, 24, 32, 0.45)',
 } as const;
 
 export const colors = {
@@ -47,6 +49,10 @@ export const colors = {
   pendingBackground: palette.softLime,
   error: palette.errorRed,
   errorBackground: palette.softRed,
+  /** Calendar time outside opening hours. */
+  closedBackground: palette.cloud,
+  /** Dims the screen behind bottom sheets. */
+  scrim: palette.inkScrim,
   mapCourtPin: palette.courtBlue,
   onMapCourtPin: palette.white,
   mapSessionPin: palette.strongGreen,

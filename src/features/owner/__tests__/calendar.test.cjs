@@ -67,6 +67,25 @@ test('block commands, clock labels and dates use Manila wall time', () => {
   assert.match(model.dayTitle('2026-10-09'), /Friday/);
 });
 
+test('week calendar: Monday-to-Sunday reads inside 2000–2099, dots, tapped slots and the server clock minute', () => {
+  assert.deepEqual(plain(model.weekSpan('2026-10-09')), { start: '2026-10-05', days: 7 });
+  assert.deepEqual(plain(model.weekSpan('2026-10-11')), { start: '2026-10-05', days: 7 });
+  // 2000-01-01 is a Saturday and 2099-12-31 a Thursday: the read never leaves the server's range.
+  assert.deepEqual(plain(model.weekSpan('2000-01-01')), { start: '2000-01-01', days: 2 });
+  assert.deepEqual(plain(model.weekSpan('2099-12-31')), { start: '2099-12-28', days: 4 });
+  // Blocks are not bookings; a pending hold outranks a firm booking on the same day.
+  const extra = allocation('a6000000-0000-4000-8000-000000000004', COURT, 'rental', '2026-10-10T08:00:00', '2026-10-10T09:00:00');
+  const onlyBlock = allocation('a6000000-0000-4000-8000-000000000005', COURT, 'block', '2026-10-11T08:00:00', '2026-10-11T09:00:00');
+  const view = client.parseCalendar(calendar({ days: 7, allocations: [...calendar().allocations, extra, onlyBlock] }), VENUE);
+  assert.deepEqual(plain(Object.fromEntries(model.calendarMarks(view))), { '2026-10-09': 'attention', '2026-10-10': 'busy' });
+  const day = model.courtDay(client.parseCalendar(calendar(), VENUE), COURT, '2026-10-09');
+  assert.deepEqual(plain(model.slotForm(day.free, 570)), { start: 570, end: 630 });
+  assert.deepEqual(plain(model.slotForm(day.free, 690)), { start: 690, end: 720 });
+  assert.equal(model.slotForm(day.free, 540), null);
+  assert.equal(model.slotForm(day.free, 720), null);
+  assert.equal(model.minuteOfDay('2026-10-09', iso('2026-10-09T09:10:00')), 550);
+});
+
 test('venue hours draft groups touching stretches, keeps rates exact and reports owner-facing problems', () => {
   const schedule = { weekly: [[], [{ start_minute: 1320, end_minute: 1560, rates: [{ start_minute: 1320, end_minute: 1440, hourly_centavos: 25050 },
     { start_minute: 1440, end_minute: 1560, hourly_centavos: 30000 }] }], [], [], [], [], []],

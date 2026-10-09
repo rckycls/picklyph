@@ -118,6 +118,34 @@ export function endOptions(free: Span[], start: number): number[] {
   for (let m = start + STEP; m <= span.end; m += STEP) options.push(m);
   return options;
 }
+/** The Monday-to-Sunday week holding `date`, clipped to the server's 2000–2099 calendar range (at most 7 days). */
+export function weekSpan(date: string): { start: string; days: number } {
+  const monday = addDays(date, -((new Date(`${date}T00:00:00Z`).getUTCDay() + 6) % 7));
+  const start = monday < '2000-01-01' ? '2000-01-01' : monday;
+  const sunday = addDays(monday, 6); const last = sunday > '2099-12-31' ? '2099-12-31' : sunday;
+  return { start, days: Math.round((Date.parse(`${last}T00:00:00Z`) - Date.parse(`${start}T00:00:00Z`)) / 86400000) + 1 };
+}
+/** Week-strip dots: days with rentals or open play; a pending request's hold marks its day for attention. Blocks are not bookings. */
+export function calendarMarks(view: CalendarView): Map<string, 'busy' | 'attention'> {
+  const marks = new Map<string, 'busy' | 'attention'>();
+  for (const allocation of view.allocations) {
+    if (allocation.kind === 'block') continue;
+    const date = manilaDate(allocation.starts_at);
+    if (allocation.expires_at !== null) marks.set(date, 'attention');
+    else if (!marks.has(date)) marks.set(date, 'busy');
+  }
+  return marks;
+}
+/** Minutes from the date's Manila midnight to an instant (the server clock for the "now" line). */
+export function minuteOfDay(date: string, at: string): number {
+  return Math.floor((Date.parse(at) - midnight(date)) / MINUTE_MS);
+}
+/** A start option for a tapped slot and a default end one hour later (or the longest that fits). */
+export function slotForm(free: Span[], start: number): Span | null {
+  if (!startOptions(free).includes(start)) return null;
+  const ends = endOptions(free, start);
+  return { start, end: ends[Math.min(1, ends.length - 1)]! };
+}
 export function blockCommand(courtId: string, date: string, span: Span, requestId: string): AllocationBlock {
   const dayStart = midnight(date);
   return { court_id: courtId, request_id: requestId,

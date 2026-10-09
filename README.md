@@ -84,6 +84,7 @@ If PowerShell blocks the npm scripts, use `npm.cmd`/`npx.cmd` for these commands
 | --- | --- |
 | `npm start` | Start Metro for Expo Go or an installed development client. |
 | `npm run start:ios` | Start Metro and open a local iOS Simulator on macOS. |
+| `npm run start:dev-client` | Start Metro for the installed development build instead of Expo Go. |
 | `npm run typecheck` | Check mobile TypeScript and the shared domain workspace. |
 | `npm run lint` | Lint the mobile/domain/config source; fail on warnings. |
 | `npm run test:discovery` | Run location permission/failure, live search client/paging/listing, and build-configuration checks with Node's test runner. |
@@ -201,7 +202,7 @@ The checklist below is retained for future native builds and regression checks.
    ```powershell
    npx eas-cli@latest device:create
    npx eas-cli@latest build --platform ios --profile development
-   npm start -- --dev-client
+   npm run start:dev-client
    ```
 
    Adding another device after a build may require updating provisioning and a

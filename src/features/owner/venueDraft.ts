@@ -73,14 +73,17 @@ export function photoProblem(asset: { uri: string; mimeType?: string | null; fil
 }
 
 /** Why a linked venue can or can't be edited, in owner terms. */
-export function summaryStatus(venue: Pick<OwnedVenueSummary, 'editable' | 'publication_status'>): { label: string; tone: 'success' | 'pending' | 'error'; note: string | null } {
+export function summaryStatus(venue: Pick<OwnedVenueSummary, 'editable' | 'publication_status'>): {
+  label: string; short: string; tone: 'success' | 'pending' | 'error'; note: string | null;
+} {
   // Only the owner's own new venue is editable as a draft, while pickly reviews it.
   if (venue.editable && venue.publication_status === 'draft') {
-    return { label: 'Under review · Not on Discover yet', tone: 'pending', note: 'Set up courts, hours, photos and policies now. Players see it once pickly approves your proof.' };
+    return { label: 'Under review · Not on Discover yet', short: 'Under review', tone: 'pending',
+      note: 'Set up courts, hours, photos and policies now. Players see it once pickly approves your proof.' };
   }
-  if (venue.editable) return { label: 'Published · You manage this venue', tone: 'success', note: null };
+  if (venue.editable) return { label: 'Published · You manage this venue', short: 'Published', tone: 'success', note: null };
   if (venue.publication_status === 'draft') {
-    return { label: 'Waiting to be published', tone: 'pending', note: 'pickly is preparing this listing. You can edit it once it’s published.' };
+    return { label: 'Waiting to be published', short: 'Waiting to publish', tone: 'pending', note: 'pickly is preparing this listing. You can edit it once it’s published.' };
   }
-  return { label: 'Not shown on pickly', tone: 'error', note: 'This listing is suspended, so it can’t be edited. Contact pickly support.' };
+  return { label: 'Not shown on pickly', short: 'Suspended', tone: 'error', note: 'This listing is suspended, so it can’t be edited. Contact pickly support.' };
 }

@@ -14,6 +14,7 @@
   "scripts": {
     "start": "expo start",
     "start:ios": "expo start --ios",
+    "start:dev-client": "expo start --dev-client",
     "typecheck": "tsc --noEmit && npm run typecheck --workspace @picklyph/domain",
     "lint": "eslint . --max-warnings 0",
     "test:discovery": "node --test src/features/discovery/__tests__/*.test.cjs",
@@ -39,6 +40,7 @@
     "test:rental:mobile": "node --test src/features/rental/__tests__/*.test.cjs",
     "test:open-play": "node --test src/features/openPlay/__tests__/*.test.cjs",
     "test:account": "node --test src/features/account/__tests__/*.test.cjs",
+    "test:calendar": "node --test src/components/calendar/__tests__/*.test.cjs src/features/bookings/__tests__/*.test.cjs",
     "test:mascot": "node --test src/components/mascot/__tests__/*.test.cjs src/features/welcome/__tests__/*.test.cjs src/features/rental/__tests__/celebration.test.cjs src/features/rental/__tests__/bookingMascot.test.cjs",
     "test:auth:local": "node supabase/tests/auth-local.cjs",
     "test:authorization:local": "node supabase/tests/authorization-local.cjs",

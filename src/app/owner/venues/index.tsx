@@ -1,18 +1,19 @@
 import type { OwnedVenueSummary } from '@picklyph/domain';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { CourtArtwork } from '@/components/ui/CourtArtwork';
+import { Icon } from '@/components/ui/Icon';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { screenText } from '@/components/ui/Screen';
-import { StatusBadge } from '@/components/ui/StatusBadge';
 import { liveOwnedVenues } from '@/features/owner/liveOwner';
 import { VerifiedOwnerGate } from '@/features/owner/OwnerMode';
 import { OwnerScreen } from '@/features/owner/OwnerScreen';
+import { VenueCard } from '@/features/owner/VenueCard';
 import { venueFailureMessage } from '@/features/owner/venueClient';
-import { summaryStatus } from '@/features/owner/venueDraft';
 import { colors } from '@/theme/colors';
 import { fonts } from '@/theme/typography';
 
@@ -26,7 +27,8 @@ export function OwnedVenuesScreen({ includeTop = false }: { includeTop?: boolean
   const [venues, setVenues] = useState<Venues>({ status: 'loading' });
   const load = useCallback(() => {
     let active = true;
-    setVenues({ status: 'loading' });
+    // Keep the last list on screen while it refreshes, so returning from a tool doesn't flash.
+    setVenues((current) => (current.status === 'ready' ? current : { status: 'loading' }));
     void liveOwnedVenues().then((outcome) => {
       if (!active) return;
       setVenues(outcome.ok ? { status: 'ready', items: outcome.value } : { status: 'error', message: venueFailureMessage(outcome.failure) });
@@ -39,7 +41,7 @@ export function OwnedVenuesScreen({ includeTop = false }: { includeTop?: boolean
   return (
     <OwnerScreen includeTop={includeTop}>
       {includeTop && <PageHeader title="Venues" />}
-      <Text style={screenText.body}>Venues you manage, including ones pickly is still reviewing. Run each court’s calendar, set hours and closures, and edit details, courts and photos.</Text>
+      <Text style={styles.intro}>Run each court’s calendar and front desk, answer requests, and keep hours and details current.</Text>
       {venues.status === 'loading' && (
         <View style={styles.row} accessibilityLiveRegion="polite">
           <ActivityIndicator color={colors.primary} accessible={false} />
@@ -54,6 +56,8 @@ export function OwnedVenuesScreen({ includeTop = false }: { includeTop?: boolean
       )}
       {venues.status === 'ready' && venues.items.length === 0 && (
         <Card>
+          <CourtArtwork />
+          <Text style={screenText.title}>Bring your courts to pickly.</Text>
           <Text style={screenText.body}>
             You don’t manage a venue yet. Add your venue, or open your listing on Discover and tap Claim. pickly reviews every request.
           </Text>
@@ -61,40 +65,24 @@ export function OwnedVenuesScreen({ includeTop = false }: { includeTop?: boolean
           <Button label="Find your listing on Discover" variant="secondary" onPress={() => router.navigate('/(tabs)')} />
         </Card>
       )}
-      {venues.status === 'ready' && venues.items.map((venue) => {
-        const status = summaryStatus(venue);
-        return (
-          <Card key={venue.id}>
-            <StatusBadge label={status.label} tone={status.tone} />
-            <Text accessibilityRole="header" style={styles.name}>{venue.name}</Text>
-            <Text style={screenText.body}>
-              {venue.city}, {venue.province} · {venue.active_court_count === 1 ? '1 active court' : `${venue.active_court_count} active courts`} · {venue.photo_count === 1 ? '1 photo' : `${venue.photo_count} photos`}
-            </Text>
-            {status.note && <Text style={screenText.body}>{status.note}</Text>}
-            {venue.publication_status === 'approved' && venue.claim_status === 'verified' && <>
-              <Button label="Booking requests" accessibilityLabel={`Booking requests for ${venue.name}`}
-                onPress={() => router.push({ pathname: '/owner/requests/[id]', params: { id: venue.id } })} />
-              <Button label="Front desk" variant="secondary" accessibilityLabel={`Front desk for ${venue.name}`}
-                onPress={() => router.push({ pathname: '/owner/desk/[id]', params: { id: venue.id } })} />
-            </>}
-            {venue.publication_status === 'approved' && venue.claim_status === 'verified' && <Button label="Open-play sessions" variant="secondary"
-              accessibilityLabel={`Open-play sessions for ${venue.name}`} onPress={() => router.push({ pathname: '/owner/sessions/[id]', params: { id: venue.id } })} />}
-            {venue.editable && <>
-              <Button label="Court calendar" accessibilityLabel={`Court calendar for ${venue.name}`}
-                onPress={() => router.push({ pathname: '/owner/calendar/[id]', params: { id: venue.id } })} />
-              <Button label="Hours and closures" variant="secondary" accessibilityLabel={`Hours and closures for ${venue.name}`}
-                onPress={() => router.push({ pathname: '/owner/hours/[id]', params: { id: venue.id } })} />
-              <Button label="Edit venue" variant="secondary" accessibilityLabel={`Edit ${venue.name}`}
-                onPress={() => router.push({ pathname: '/owner/venues/[id]', params: { id: venue.id } })} />
-            </>}
-          </Card>
-        );
-      })}
+      {venues.status === 'ready' && venues.items.map((venue) => <VenueCard key={venue.id} venue={venue} />)}
+      {venues.status === 'ready' && venues.items.length > 0 && (
+        <Pressable accessibilityRole="button" accessibilityLabel="Add another venue" onPress={() => router.push('/owner/submit')}
+          style={({ pressed }) => [styles.add, pressed && styles.pressed]}>
+          <View style={styles.addIcon}><Icon name="plus" color={colors.primary} size={20} /></View>
+          <Text style={styles.addText}>Add another venue</Text>
+        </Pressable>
+      )}
     </OwnerScreen>
   );
 }
 
 const styles = StyleSheet.create({
+  intro: { fontFamily: fonts.medium, color: colors.textSecondary, fontSize: 15, lineHeight: 22, marginTop: -8 },
   row: { flexDirection: 'row', gap: 10, alignItems: 'center' },
-  name: { fontFamily: fonts.extrabold, color: colors.text, fontSize: 19, lineHeight: 25 },
+  add: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, minHeight: 56, borderRadius: 20,
+    borderWidth: 1.5, borderStyle: 'dashed', borderColor: colors.border, paddingHorizontal: 16 },
+  addIcon: { width: 32, height: 32, borderRadius: 11, backgroundColor: colors.selectedBackground, alignItems: 'center', justifyContent: 'center' },
+  addText: { fontFamily: fonts.semibold, color: colors.text, fontSize: 15, lineHeight: 21 },
+  pressed: { backgroundColor: colors.surface },
 });
