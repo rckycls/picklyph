@@ -5,6 +5,7 @@ import { Linking, StyleSheet, Text, View } from 'react-native';
 
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { useAuth } from '@/features/auth/AuthProvider';
+import { BookingAlertsRow } from '@/features/notifications/BookingAlertsRow';
 import { useOwnerMode } from '@/features/owner/OwnerMode';
 import { submissionBadge } from '@/features/owner/ownerForm';
 import { useMySubmissions } from '@/features/owner/useMySubmissions';
@@ -155,6 +156,7 @@ export function SignedInProfile({ session, startInOwnerMode = false }: { session
 
       <MenuGroup title="Settings">
         <MenuRow icon="settings" title="Preferences" subtitle="How Discover opens" onPress={() => router.push('/preferences')} />
+        <BookingAlertsRow actor={user.id} />
         <MenuRow icon="location" tone="green" title="Location access" subtitle={locationAccessLabel(location)}
           onPress={() => void Linking.openSettings().catch(() => undefined)} />
       </MenuGroup>

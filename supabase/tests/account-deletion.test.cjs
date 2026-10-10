@@ -69,7 +69,7 @@ test('account deletion: console refusal, booking cancellation, name erasure, ven
       await assert.rejects(db.exec(suite), /Expected failure/, `dropped ${name}`);
       await db.exec('rollback;');
     }
-    assert.equal((await db.query(`select count(*)::integer n from pg_trigger where tgname like '%_account_deleting'`)).rows[0].n, 9, 'triggers restored');
+    assert.equal((await db.query(`select count(*)::integer n from pg_trigger where tgname like '%_account_deleting'`)).rows[0].n, 10, 'triggers restored (T43 adds push devices)');
   } catch (e) {
     if (e instanceof assert.AssertionError) throw e;
     throw new Error(`Account deletion SQL ${e.code ?? ''}: ${e.message}${e.where ? ` (${e.where})` : ''}`);

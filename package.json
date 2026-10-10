@@ -30,7 +30,7 @@
     "test:calendar:local": "node supabase/tests/calendar-local.cjs",
     "test:rentals": "node --test supabase/tests/rentals.test.cjs",
     "test:rentals:local": "node supabase/tests/rentals-local.cjs",
-    "functions:check": "npm exec --yes --package=deno@2.9.6 -- deno check --config supabase/functions/deno.json supabase/functions/venue-search/index.ts supabase/functions/owner-submissions/index.ts supabase/functions/owner-venues/index.ts supabase/functions/owner-schedules/index.ts supabase/functions/_shared/allocations.ts supabase/functions/rental-bookings/index.ts supabase/functions/owner-sessions/index.ts supabase/functions/session-bookings/index.ts supabase/functions/venue-reports/index.ts supabase/functions/account-deletion/index.ts",
+    "functions:check": "npm exec --yes --package=deno@2.9.6 -- deno check --config supabase/functions/deno.json supabase/functions/venue-search/index.ts supabase/functions/owner-submissions/index.ts supabase/functions/owner-venues/index.ts supabase/functions/owner-schedules/index.ts supabase/functions/_shared/allocations.ts supabase/functions/rental-bookings/index.ts supabase/functions/owner-sessions/index.ts supabase/functions/session-bookings/index.ts supabase/functions/venue-reports/index.ts supabase/functions/account-deletion/index.ts supabase/functions/push-devices/index.ts supabase/functions/push-dispatch/index.ts",
     "functions:lint": "npm exec --yes --package=deno@2.9.6 -- deno lint --config supabase/functions/deno.json supabase/functions",
     "test:functions": "npm exec --yes --package=deno@2.9.6 -- deno test --allow-env --config supabase/functions/deno.json supabase/functions/tests",
     "test:directory:local": "docker exec -i supabase_db_picklyph psql -U postgres -d postgres -v ON_ERROR_STOP=1 -X -q < supabase/tests/directory.sql",
@@ -69,6 +69,8 @@
     "test:moderation:local": "node supabase/tests/moderation-local.cjs",
     "test:privacy": "node --test supabase/tests/account-deletion.test.cjs supabase/tests/account-deletion-handler.test.cjs",
     "test:privacy:local": "node supabase/tests/account-deletion-local.cjs",
+    "test:notifications": "node --test supabase/tests/notifications.test.cjs supabase/tests/push-handler.test.cjs src/features/notifications/__tests__/*.test.cjs",
+    "test:notifications:local": "node supabase/tests/notifications-local.cjs",
     "test:acceptance:local": "node supabase/tests/acceptance-local.cjs"
   },
   "dependencies": {
@@ -88,6 +90,7 @@
     "expo-image-picker": "57.0.20",
     "expo-linking": "57.0.11",
     "expo-location": "57.0.20",
+    "expo-notifications": "57.0.22",
     "expo-router": "57.0.24",
     "expo-secure-store": "57.0.4",
     "expo-status-bar": "57.0.1",

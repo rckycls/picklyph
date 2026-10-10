@@ -32,6 +32,8 @@ const config: ExpoConfig = {
       cameraPermission: false,
       microphonePermission: false,
     }],
+    // Booking alerts (T43): adds the iOS push entitlement, so the next EAS build needs the push capability.
+    'expo-notifications',
     ['expo-location', {
       locationWhenInUsePermission: 'Allow PicklyPH to use your location to center the court map near you.',
       locationAlwaysPermission: false,

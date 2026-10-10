@@ -4,7 +4,7 @@ import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'rea
 import { colors } from '@/theme/colors';
 import { fonts } from '@/theme/typography';
 
-export type GlyphName = 'venue' | 'plus' | 'flag' | 'mail' | 'lock' | 'leave' | 'retry' | 'user' | 'phone' | 'settings' | 'location' | 'eye' | 'eyeOff';
+export type GlyphName = 'venue' | 'plus' | 'flag' | 'mail' | 'lock' | 'leave' | 'retry' | 'user' | 'phone' | 'settings' | 'location' | 'bell' | 'eye' | 'eyeOff';
 export type RowTone = 'blue' | 'green' | 'lime' | 'red';
 
 const tones = {
@@ -142,6 +142,11 @@ export function Glyph({ name, color }: { name: GlyphName; color: string }) {
         <View style={[styles.target, { borderColor: color }]} />
         <View style={[styles.dot, { backgroundColor: color }]} />
       </>}
+      {name === 'bell' && <>
+        <View style={[styles.bellBody, { borderColor: color }]} />
+        <View style={[styles.bellRim, { backgroundColor: color }]} />
+        <View style={[styles.bellClapper, { backgroundColor: color }]} />
+      </>}
       {(name === 'eye' || name === 'eyeOff') && <>
         <View style={[styles.eye, { borderColor: color }]} />
         <View style={[styles.pupil, { backgroundColor: color }]} />
@@ -175,6 +180,9 @@ const styles = StyleSheet.create({
   flap: { width: 10, height: 10, borderRightWidth: 2, borderBottomWidth: 2, marginTop: -6, transform: [{ rotate: '45deg' }] },
   shackle: { position: 'absolute', top: 1, width: 10, height: 10, borderWidth: 2, borderBottomWidth: 0, borderTopLeftRadius: 5, borderTopRightRadius: 5 },
   lockBody: { position: 'absolute', bottom: 1, width: 15, height: 10, borderRadius: 3 },
+  bellBody: { position: 'absolute', top: 2, width: 14, height: 13, borderWidth: 2, borderBottomWidth: 0, borderTopLeftRadius: 7, borderTopRightRadius: 7 },
+  bellRim: { position: 'absolute', top: 14, width: 18, height: 2, borderRadius: 1 },
+  bellClapper: { position: 'absolute', bottom: 1, width: 6, height: 3, borderBottomLeftRadius: 3, borderBottomRightRadius: 3 },
   door: { position: 'absolute', left: 1, width: 9, height: 16, borderWidth: 2, borderRightWidth: 0, borderTopLeftRadius: 3, borderBottomLeftRadius: 3 },
   arrowShaft: { position: 'absolute', left: 6, width: 11, height: 2, borderRadius: 1 },
   arrowHead: { position: 'absolute', right: 2, width: 7, height: 7, borderTopWidth: 2, borderRightWidth: 2, transform: [{ rotate: '45deg' }] },

@@ -10,6 +10,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { colors } from '@/theme/colors';
 import { fonts } from '@/theme/typography';
 import { AuthProvider } from '@/features/auth/AuthProvider';
+import { PushRegistration } from '@/features/notifications/usePushRegistration';
 import { OwnerModeProvider } from '@/features/owner/OwnerMode';
 
 // Owner screens sit directly in the root stack (no nested owner stack), so the first one
@@ -40,6 +41,7 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <AuthProvider>
+        <PushRegistration />
         <OwnerModeProvider>
           <StatusBar style="dark" />
           <Stack

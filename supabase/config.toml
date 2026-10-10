@@ -84,3 +84,13 @@ import_map = "./functions/deno.json"
 # Signed-in users delete their own account; the bearer is verified in code and a retry after a lost reply is confirmed.
 verify_jwt = false
 import_map = "./functions/deno.json"
+
+[functions.push-devices]
+# Signed-in users register or remove this phone's Expo push token; every bearer is verified in code.
+verify_jwt = false
+import_map = "./functions/deno.json"
+
+[functions.push-dispatch]
+# The notification worker, called by pg_cron through pg_net; it requires the PUSH_WORKER_SECRET bearer, never a user token.
+verify_jwt = false
+import_map = "./functions/deno.json"
