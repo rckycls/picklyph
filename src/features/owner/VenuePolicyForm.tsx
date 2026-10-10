@@ -47,7 +47,7 @@ export function VenuePolicyForm({ venueId }: { venueId: string }) {
   const dirty = saved && draft && (saved.confirmation !== draft.confirmation || saved.payment !== draft.payment);
   return <View style={styles.form}>
     <Text accessibilityRole="header" style={screenText.title}>Booking policies</Text>
-    <Text style={screenText.body}>Choose how future reservations are confirmed and paid at this venue.</Text>
+    <Text style={screenText.body}>Choose how future reservations are confirmed. Players pay your venue on arrival.</Text>
     {busy && !saved && <ActivityIndicator color={colors.primary} accessibilityLabel="Loading venue policies" />}
     {saved && draft && <>
       <Text style={screenText.label}>Confirmation</Text>
@@ -58,10 +58,8 @@ export function VenuePolicyForm({ venueId }: { venueId: string }) {
       <Text style={screenText.label}>Payment options</Text>
       <View accessibilityRole="radiogroup" accessibilityLabel="Allowed payment options" style={styles.options}>
         <Choice label="Pay on arrival" selected={draft.payment === 'arrival'} disabled={busy} onPress={() => setDraft({ ...draft, payment: 'arrival' })} />
-        <Choice label="Online only" selected={draft.payment === 'online'} disabled={busy || !saved.merchant_active} onPress={() => setDraft({ ...draft, payment: 'online' })} />
-        <Choice label="Online or arrival" selected={draft.payment === 'both'} disabled={busy || !saved.merchant_active} onPress={() => setDraft({ ...draft, payment: 'both' })} />
       </View>
-      {!saved.merchant_active && <Text style={screenText.body}>Online payment is available after pickly verifies and activates this venue’s merchant account. Pay on arrival remains available.</Text>}
+      <Text style={screenText.body}>Collect payment directly from players when they arrive, then record it in Front desk.</Text>
       <Button label="Save policies" disabled={!dirty || busy || conflict} loading={busy} onPress={() => void save()} />
       {dirty && <Button label="Discard policy changes" variant="secondary" disabled={busy} onPress={() => { setDraft({ confirmation: saved.confirmation, payment: saved.payment }); setMessage(null); setConflict(false); }} />}
     </>}

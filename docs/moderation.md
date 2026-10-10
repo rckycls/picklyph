@@ -54,7 +54,7 @@ A moderation suspension sets `publication_status = 'suspended'` under the listin
 | --- | --- |
 | Rental quote and request, owner outside entry, calendar block, new session, group request, walk-in, owner acceptance of pending rentals/groups, new reports | Player booking reads, player cancellation of rentals and groups, owner decline |
 
-Existing bookings stay as they are. Pending holds expire on their own (T32). Venue cancellation of confirmed bookings, with refunds, is T40. The listing leaves Discover (public RLS shows published listings only).
+Existing bookings stay as they are. Pending holds expire on their own (T32). Owner cancellation of confirmed unpaid arrival bookings and occupied sessions is the independent pilot task T40a. Online payment refunds remain deferred in T40 (user decision 2026-10-10); moderators gain no booking cancellation authority. The listing leaves Discover (public RLS shows published listings only).
 
 **Reinstatement** undoes only a moderation suspension: it needs the marker and an active court (`active_court_required`), and it publishes the listing again. A listing suspended from the directory, or an owner draft retired by T17, has no marker (`not_moderation_suspension`); only an administrator can publish it, from the directory. Any change of status away from `suspended`, by any path, clears the marker (trigger), so a stale marker never lets moderation undo a later administrator suspension.
 

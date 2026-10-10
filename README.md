@@ -35,7 +35,7 @@ production HTTP flow pass locally; T11–T13 are applied to hosted staging, and 
 See [directory curation](docs/directory-curation.md).
 T14 replaced the demo pins with the T13 search endpoint; live hosted results now need
 only published venues (T11–T13 and `venue-search` are on staging).
-Reservations, payments and owner tools are still planned.
+Private rental and group open-play reservations, owner tools and Front desk arrival-payment recording are implemented; physical-device acceptance remains in progress. **Pilot scope (user decision 2026-10-10): pay-on-arrival only.** Players pay venues directly. Online reservation payments and PayMongo onboarding are deferred to a later release; see [payment scope](docs/payment-integration.md) and the current handoff.
 
 T01/T02 source checks and iOS bundling passed. Physical iPhone tab switching,
 large-text layout, and VoiceOver acceptance are still pending. Bundling alone
@@ -307,8 +307,8 @@ access and verified target selection; a mobile publishable key cannot apply them
 T04's native map and T05's embedded, Docker and hosted staging checks pass.
 First hosted administrator assignment remains an operator step. Before T13,
 prepare separate staging/production Upstash Redis databases near the backend
-region. Begin PayMongo/venue onboarding alongside these tasks; T06 verifies
-the supported payment flow and live activation requirements.
+region. PayMongo onboarding is deferred with online payments and does not block
+the pay-on-arrival pilot. T06 retains prerequisite research for that future release.
 
 The current dependency audit reports 34 upstream advisories (24 high/10 moderate), including
 the Maps package's inherited React Native chain and the admin lint dependency chain. The suggested Maps

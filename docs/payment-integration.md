@@ -1,14 +1,18 @@
 # PayMongo integration prerequisites (T06)
 
+**Current scope — user decision 2026-10-10:** the pilot uses pay-on-arrival only. Online reservation payments, PayMongo onboarding (H03), payment acceptance trials (H09), checkout, settlement, reconciliation and automated refunds are deferred to a later release. The user does not currently have DTI registration. These provider prerequisites do not block the arrival-only pilot. Players pay the venue directly; T31 records collection without processing money. Arrival-only owner cancellation remains a separate pilot task (T40a).
+
+The research below is retained for the future online-payment release. Recheck current provider documentation, linked-account/checkout options and account-specific eligibility before resuming; the 2026-10-06 review is not a current activation approval.
+
 Reviewed **2026-10-06** against official public documentation. This is a design
 and prerequisite review, not an account activation or sandbox acceptance test.
-H03 account/business/Platforms status is unconfirmed; the setup question is
-pending. No PayMongo credentials were read, no provider resources created, and
+H03 account/business/Platforms status remains unconfirmed and is deferred.
+No PayMongo credentials were read, no provider resources created, and
 no payment or refund requests made.
 
 ## Decision and activation gate
 
-Keep hosted online checkout and pay-on-arrival in the MVP. One booking pays one
+For the future online-payment release, one booking pays one
 venue, including a group booking. PicklyPH takes zero commission; the venue
 absorbs processing costs. The server calculates integer PHP centavos from the
 booking snapshot. Keep online payment disabled per venue until its provider

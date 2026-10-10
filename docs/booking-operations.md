@@ -1,6 +1,6 @@
 # Owner front desk (T31)
 
-Current owners work one request queue, record outside rentals in the shared court inventory, check guests in, mark no-shows and completions, and record arrival payments. Attendance and payments are **records beside a booking**: they never change its status, snapshot, hold or inventory. pickly collects no money here; online checkout is T34–T36, and venue cancellation with refunds is T40.
+Current owners work one request queue, record outside rentals in the shared court inventory, check guests in, mark no-shows and completions, and record arrival payments. Attendance and payments are **records beside a booking**: they never change its status, snapshot, hold or inventory. pickly collects no money here. The pilot is pay-on-arrival only (user decision 2026-10-10); online checkout T34–T36 and automated refunds T40 are deferred. Owner cancellation of confirmed unpaid arrival bookings and occupied sessions remains a pilot task, T40a, independent of PayMongo.
 
 Everything below runs through the existing `rental-bookings` and `session-bookings` Edge functions, with the same verified bearer, isolated service client, `private, no-store` replies and strict parsing as T24/T28. Admin or moderator roles alone grant no access. A current owner is a verified, still-linked owner of the booking's venue.
 
