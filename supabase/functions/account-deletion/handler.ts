@@ -1,11 +1,15 @@
-import { MAX_ACCOUNT_DELETION_BYTES, readAccountDeletionRequest } from '../../../packages/domain/src/privacy.ts';
+import { MAX_ACCOUNT_DELETION_BYTES, readAccountDeletionRequest, type AccountDeletionRequest } from '../../../packages/domain/src/privacy.ts';
+import type { AppleGrant, AppleRevocation } from '../_shared/apple.ts';
 import type { RateAction, RateDecision, RatePrincipal } from '../_shared/rate-limit.ts';
 export const DELETION_STATUS: Record<string, number> = { privileged_account: 403 };
 export class DeletionRejected extends Error {
   constructor(readonly reason: string) { super(reason); }
 }
-/** `missing`: Auth verified the token but its account no longer exists. */
-export type VerifiedCaller = { kind: 'user' | 'missing'; id: string } | null;
+/**
+ * `user.apple`: the Apple IDs (GoTrue provider IDs) of the account's Sign in with Apple identities, read from the verified
+ * Auth user, never the request. `missing`: Auth verified the token but its account no longer exists.
+ */
+export type VerifiedCaller = { kind: 'user'; id: string; apple: string[] } | { kind: 'missing'; id: string } | null;
 export const DELETION_BUCKETS = ['avatars', 'owner-evidence'] as const;
 type Dependencies = {
   verifyUser: (token: string) => Promise<VerifiedCaller>;
@@ -14,12 +18,16 @@ type Dependencies = {
   status: (user: string) => Promise<'none' | 'pending' | 'deleted'>;
   removeFolder: (bucket: typeof DELETION_BUCKETS[number], folder: string) => Promise<void>;
   deleteUser: (actor: string) => Promise<void>;
+  /** T50a: `null` when the Apple secrets are missing, so accounts with an Apple identity can't be deleted (fail closed). */
+  apple: AppleRevocation | null;
 };
 /**
  * POST /functions/v1/account-deletion: the signed-in user deletes their own account (T47).
- * Order: database begin (cancel, release, erase; retry-safe) → empty the account's storage
- * folders → delete the Auth user. Any failure before the last step answers 503 and a retry
- * resumes; the Auth user is never deleted while its files remain.
+ * Order: Apple code exchange (T50a, Apple-linked accounts only) → database begin (cancel, release,
+ * erase; retry-safe) → revoke the Apple tokens → empty the account's storage folders → delete the
+ * Auth user. A missing, refused or foreign Apple code stops before any deletion work. Any failure
+ * before the last step answers 503 and a retry resumes; the Auth user is never deleted while its
+ * files or Apple tokens remain.
  */
 export function createAccountDeletionHandler(deps: Dependencies) {
   return async (request: Request): Promise<Response> => {
@@ -34,6 +42,7 @@ export function createAccountDeletionHandler(deps: Dependencies) {
     try { caller = await deps.verifyUser(token); } catch { return respond(503, { error: 'auth_unavailable' }, { 'Retry-After': '5' }); }
     if (!caller) return respond(401, { error: 'invalid_auth' });
     if (!/^application\/json(?:;|$)/i.test(request.headers.get('content-type') ?? '')) return respond(415, { error: 'unsupported_media_type' });
+    let input: AccountDeletionRequest;
     try {
       const declared = request.headers.get('content-length');
       if (declared !== null && (!/^\d{1,9}$/.test(declared) || Number(declared) > MAX_ACCOUNT_DELETION_BYTES)) return respond(413, { error: 'request_too_large' });
@@ -46,7 +55,7 @@ export function createAccountDeletionHandler(deps: Dependencies) {
       }
       const bytes = new Uint8Array(size); let offset = 0;
       for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
-      readAccountDeletionRequest(JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)));
+      input = readAccountDeletionRequest(JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)));
     } catch { return respond(400, { error: 'invalid_request' }); }
     // A retry after a lost reply: the token is genuine but its account is gone. Confirm only a deletion that started here.
     if (caller.kind === 'missing') {
@@ -58,8 +67,23 @@ export function createAccountDeletionHandler(deps: Dependencies) {
     try { decision = await deps.limit('account-delete', { kind: 'user', id: actor }); }
     catch { return respond(503, { error: 'temporarily_unavailable' }, { 'Retry-After': '5' }); }
     if (!decision.allowed) return respond(decision.status, { error: decision.status === 429 ? 'rate_limited' : 'temporarily_unavailable' }, decision.headers);
+    // T50a: prove the Apple ID with a fresh code before anything changes; a code sent for an account without one is ignored.
+    let revokeApple: (() => Promise<void>) | null = null;
+    if (caller.apple.length > 0) {
+      const apple = deps.apple;
+      if (!apple) return respond(503, { error: 'apple_unavailable' }, decision.headers);
+      const code = input.apple_authorization_code;
+      if (!code) return respond(409, { error: 'apple_reauthorization_required' }, decision.headers);
+      let exchanged: AppleGrant | null;
+      try { exchanged = await apple.exchange(code); } catch { return respond(503, { error: 'temporarily_unavailable' }, { ...decision.headers, 'Retry-After': '5' }); }
+      if (!exchanged) return respond(409, { error: 'apple_reauthorization_required' }, decision.headers);
+      const grant = exchanged;
+      if (!caller.apple.includes(grant.subject)) return respond(403, { error: 'apple_account_mismatch' }, decision.headers);
+      revokeApple = () => apple.revoke(grant);
+    }
     try {
       await deps.begin(actor);
+      if (revokeApple) await revokeApple();
       for (const bucket of DELETION_BUCKETS) await deps.removeFolder(bucket, actor);
       await deps.deleteUser(actor);
     } catch (error) {

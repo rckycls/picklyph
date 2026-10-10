@@ -1,18 +1,20 @@
 # Privacy and account deletion (T47)
 
-Signed-in users delete their own account in the app: **Account → Delete account**, type `DELETE`, confirm. The server cancels their upcoming bookings under the normal player-cancel rule, releases any venues they manage, retires drafts still in review, erases their names, photos, evidence and profile, and keeps only UUID-level booking and audit references that venues need for reconciliation. The phone then forgets every account-scoped recovery request and signs out.
+Signed-in users delete their own account in the app: **Account → Delete account**, type `DELETE`, confirm (and confirm with Apple, for accounts that sign in with Apple). The server revokes the app's Apple tokens (T50a), cancels their upcoming bookings under the normal player-cancel rule, releases any venues they manage, retires drafts still in review, erases their names, photos, evidence and profile, and keeps only UUID-level booking and audit references that venues need for reconciliation. The phone then forgets every account-scoped recovery request and signs out.
 
 ## The deletion flow
 
-`POST /functions/v1/account-deletion` with exactly `{"confirm":"delete_account"}` and the user's bearer (no actor field is accepted).
+`POST /functions/v1/account-deletion` with exactly `{"confirm":"delete_account"}` and the user's bearer (no actor field is accepted). An account that signs in with Apple also sends `apple_authorization_code` (T50a, below).
 
 1. Auth verifies the bearer; the account-delete limit applies (5 per minute per user). Like cancellation, deletion **keeps working when Redis is down**.
-2. `account_deletion_begin(actor)` runs in one transaction (next section). Console accounts are refused here with `403 privileged_account`.
-3. The function empties `avatars/<id>/` and `owner-evidence/<id>/` through the Storage API (this also removes uploads whose commit was uncertain).
-4. `auth.admin.deleteUser(id)` deletes the Auth user; its cascades remove the rest (below).
-5. `200 {"status":"deleted"}`.
+2. Apple-linked accounts only: the Apple code is exchanged and its Apple ID checked (below). Nothing has changed yet.
+3. `account_deletion_begin(actor)` runs in one transaction (next section). Console accounts are refused here with `403 privileged_account`.
+4. Apple-linked accounts only: the app's Apple tokens are revoked.
+5. The function empties `avatars/<id>/` and `owner-evidence/<id>/` through the Storage API (this also removes uploads whose commit was uncertain).
+6. `auth.admin.deleteUser(id)` deletes the Auth user; its cascades remove the rest (below).
+7. `200 {"status":"deleted"}`.
 
-Any failure before step 4 answers `503` with `Retry-After`. A retry resumes, because `account_deletion_begin` is retry-safe, and the Auth user is never deleted while its files remain. If the reply to a finished deletion is lost, the retry's token has outlived the account. Auth checks the token's signature and then answers `user_not_found`, and the function confirms `deleted` only when `account_deletion_status` says the deletion started here (otherwise `401`).
+Any failure before step 6 answers `503` with `Retry-After`. A retry resumes, because `account_deletion_begin` is retry-safe, and the Auth user is never deleted while its files remain. If the reply to a finished deletion is lost, the retry's token has outlived the account. Auth checks the token's signature and then answers `user_not_found`, and the function confirms `deleted` only when `account_deletion_status` says the deletion started here (otherwise `401`).
 
 | Reply | Meaning |
 | --- | --- |
@@ -20,10 +22,21 @@ Any failure before step 4 answers `503` with `Retry-After`. A retry resumes, bec
 | 400 / 413 / 415 / 405 | Wrong body or query, too large, not JSON, not POST |
 | 401 | No valid bearer, or a missing account with no deletion record |
 | 403 `privileged_account` | The account holds an admin or moderator role |
+| 409 `apple_reauthorization_required` / 403 `apple_account_mismatch` | Apple-linked account: no usable Apple code, or a code for another Apple ID (T50a). Nothing changed. |
 | 429 | Limit reached (`Retry-After`) |
-| 503 | Auth, database, Storage or Auth-admin trouble; retry is safe |
+| 503 | Auth, database, Storage, Auth-admin or Apple trouble; retry is safe |
+| 503 `apple_unavailable` | Apple-linked account, but the function has no Apple secrets (no `Retry-After`) |
 
 On the phone, only a confirmed deletion clears device data: `src/lib/recoveryKeys.ts` removes the five recovery journals (`rental-attempt`, `group-attempt`, `session-attempt`, `walk-in-attempt`, `owner-entry-attempt`) under both namespace forms, then signs out locally. Ordinary sign-out still keeps them. Device preferences (Discover view, welcome screen) aren't account data and stay.
+
+## Sign in with Apple revocation (T50a)
+
+Apple requires apps that offer Sign in with Apple to revoke the user's Apple tokens when the account is deleted. Supabase Auth keeps no Apple tokens, so the phone gets a fresh authorization for this one request.
+
+- **Phone.** For an account that signs in with Apple (an `apple` identity or provider on the session user), Delete account adds a line about Apple, and the button reads **Continue with Apple and delete**. Apple's sheet opens only after `DELETE` is typed and the button is tapped. Closing it, or an Apple error, sends nothing. The single-use code goes into that request body only; it is never saved, journaled or logged. If the server still answers 409 (it knows an Apple identity the phone didn't, or Apple refused the code), the phone asks Apple once more in the same tap, never a third time.
+- **Server.** The account's Apple IDs come from the verified Auth user (GoTrue identity provider IDs), never the request. An account without one ignores a code and never calls Apple. Before any deletion work, the code is exchanged at `appleid.apple.com/auth/token` with an ES256 client secret: key ID, team ID, `client_id` = bundle ID, Apple's audience, a five-minute life, signed fresh for each call. The returned ID token's issuer, audience and subject are checked. It comes straight from Apple's token endpoint over TLS, so its signature isn't checked separately (OIDC Core 3.1.3.7). A refused code (`invalid_grant`: invalid, expired or used) answers 409, and a different Apple ID answers 403. After `account_deletion_begin`, the refresh token (or, failing that, the access token) is revoked at `/auth/revoke`, before the storage folders and the Auth user are removed.
+- **Failures.** Apple trouble answers 503 with `Retry-After`. If the revocation fails after begin, the deletion is `pending`, and the Auth user and files stay. The next tap's old code is spent, so it gets a 409, Apple again, then finishes. Without all four Apple secrets (`APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_CLIENT_ID`, `APPLE_PRIVATE_KEY`), Apple-linked accounts get `503 apple_unavailable` before anything changes (fail closed). A retry after a lost reply to a finished deletion is confirmed from the deletion record, without Apple.
+- **Not covered:** stored Apple refresh tokens, revocation at sign-out, and Apple's server-to-server notifications (a person stops using their Apple ID with pickly, or deletes their Apple account).
 
 ## What `account_deletion_begin` does
 
@@ -62,6 +75,6 @@ On the phone, only a confirmed deletion clears device data: `src/lib/recoveryKey
 - pg_cron: the migration schedules `privacy-retention-sweep` only if pg_cron is already enabled. Otherwise, after enabling it, run `select private.privacy_retention_schedule();` (idempotent).
 - Deletions that started but didn't finish (the account can't add anything new until the user retries): `select user_id, requested_at from private.account_deletions d where exists (select 1 from auth.users u where u.id = d.user_id);`
 - Deleting an account on someone's behalf (support): follow the same order with trusted access. Run `select public.account_deletion_begin('<id>');`, empty both storage folders, then delete the Auth user.
-- **Apple token revocation is not built (deferred, user decision 2026-10-09).** Apple asks apps with Sign in with Apple to revoke the user's token on deletion. That needs a Sign in with Apple key (`.p8`, Key ID, Team ID) as server secrets, a fresh Apple sign-in on the device to get an authorization code, then `appleid.apple.com/auth/token` and `/auth/revoke`. It must be done before App Store review (T50/H11).
-- iPhone check (signed-in test account with a booking): Account → Delete account; read the list; the button stays disabled until `DELETE` is typed; delete; the done screen appears and Account shows the guest view; Bookings asks you to sign in; a console account sees the role message. Check VoiceOver and large text on the list.
-- Not covered: data export, an admin console deletion tool, Apple revocation, an evidence purge job, an end date for booking records.
+- **Apple revocation (T50a), local only so far.** Set the four Apple secrets on the project (docs/auth-setup.md#apple-token-revocation-key-t50a), then redeploy `account-deletion`; until then, Apple-linked accounts get `503 apple_unavailable`. No migration, and no native build (`expo-apple-authentication` is already in the app); reload Metro.
+- iPhone check (signed-in test account with a booking): Account → Delete account; read the list; the button stays disabled until `DELETE` is typed; delete; the done screen appears and Account shows the guest view; Bookings asks you to sign in; a console account sees the role message. Check VoiceOver and large text on the list. With an Apple-signed-in account, the extra line and **Continue with Apple and delete** appear. Closing Apple's sheet shows "Nothing was deleted…". Confirming deletes the account, and pickly is gone from Sign in with Apple in the iPhone's Apple ID settings.
+- Not covered: data export, an admin console deletion tool, an evidence purge job, an end date for booking records.

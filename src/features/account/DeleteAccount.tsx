@@ -7,15 +7,17 @@ import { Card } from '@/components/ui/Card';
 import { Field } from '@/components/ui/Field';
 import { screenText } from '@/components/ui/Screen';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { appleAuthorizationCode } from '@/features/auth/apple';
 import { useAuth } from '@/features/auth/AuthProvider';
 import { SignInForm } from '@/features/auth/SignInForm';
 import { OwnerScreen } from '@/features/owner/OwnerScreen';
 import { colors } from '@/theme/colors';
 import { fonts } from '@/theme/typography';
 
-import { CONFIRM_WORD, confirmationTyped, deleteAccount, deletionFailureMessage } from './deletionClient';
+import { CONFIRM_WORD, confirmationTyped, deleteAccountConfirmed, deletionAttemptMessage, usesAppleSignIn } from './deletionClient';
 import { accountDeletionServices } from './deletionLive';
 
+const APPLE_CONSEQUENCE = 'You use Sign in with Apple, so Apple asks you to confirm. pickly then stops using your Apple ID and disappears from the apps listed under Sign in with Apple in your Apple ID settings.';
 const CONSEQUENCES = [
   'Your profile, name, mobile number, email sign-in and photo are deleted.',
   'Upcoming court rentals and open-play groups are cancelled. Bookings that already started stay as they are.',
@@ -38,22 +40,24 @@ export function DeleteAccount() {
       <SignInForm />
     </OwnerScreen>
   );
-  return <DeleteForm key={auth.session.user.id} actor={auth.session.user.id} onDeleted={setFinished} />;
+  return <DeleteForm key={auth.session.user.id} actor={auth.session.user.id} appleLinked={usesAppleSignIn(auth.session.user)} onDeleted={setFinished} />;
 }
 
-function DeleteForm({ actor, onDeleted }: { actor: string; onDeleted: (result: { deviceCleared: boolean }) => void }) {
+function DeleteForm({ actor, appleLinked, onDeleted }: { actor: string; appleLinked: boolean; onDeleted: (result: { deviceCleared: boolean }) => void }) {
   const auth = useAuth();
   const [typed, setTyped] = useState('');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const ready = confirmationTyped(typed);
+  const consequences = appleLinked ? [...CONSEQUENCES.slice(0, -1), APPLE_CONSEQUENCE, ...CONSEQUENCES.slice(-1)] : CONSEQUENCES;
 
   const submit = async () => {
     if (!ready || busy) return;
     setBusy(true); setMessage(null);
     const services = accountDeletionServices(actor);
-    const outcome = await deleteAccount(services.transport);
-    if (!outcome.ok) { setBusy(false); setMessage(deletionFailureMessage(outcome.failure)); return; }
+    // Apple's sheet opens only now, after DELETE is typed and the button tapped (T50a).
+    const outcome = await deleteAccountConfirmed(services.transport, appleLinked, appleAuthorizationCode);
+    if (!outcome.ok) { setBusy(false); setMessage(deletionAttemptMessage(outcome)); return; }
     // Only now, with the account confirmed gone, may this phone forget its uncertain requests.
     let deviceCleared = true;
     try { await services.clearDevice(); } catch { deviceCleared = false; }
@@ -66,7 +70,7 @@ function DeleteForm({ actor, onDeleted }: { actor: string; onDeleted: (result: {
       <Card>
         <Text accessibilityRole="header" style={screenText.title}>Delete your pickly account</Text>
         <View style={styles.list}>
-          {CONSEQUENCES.map((line) => (
+          {consequences.map((line) => (
             <View key={line} style={styles.item}>
               <View style={styles.bullet} accessible={false} />
               <Text style={[screenText.body, styles.itemText]}>{line}</Text>
@@ -78,7 +82,7 @@ function DeleteForm({ actor, onDeleted }: { actor: string; onDeleted: (result: {
         <Field label={`Type ${CONFIRM_WORD} to confirm`} value={typed} onChangeText={setTyped} autoCapitalize="characters" autoCorrect={false}
           autoComplete="off" editable={!busy} returnKeyType="done" onSubmitEditing={() => void submit()} />
         {message && <Text accessibilityRole="alert" style={styles.error}>{message}</Text>}
-        <Button label="Delete my account" loading={busy} disabled={!ready} onPress={() => void submit()} />
+        <Button label={appleLinked ? 'Continue with Apple and delete' : 'Delete my account'} loading={busy} disabled={!ready} onPress={() => void submit()} />
         <Button label="Keep my account" variant="secondary" disabled={busy} onPress={() => router.back()} />
       </Card>
     </OwnerScreen>

@@ -5,3 +5,5 @@ export const applePort: ApplePort = {
   hash: async () => { throw new Error('Apple sign-in is available on iPhone.'); },
   signIn: async () => { throw new Error('Apple sign-in is available on iPhone.'); },
 };
+
+export const appleAuthorizationCode = async (): Promise<string | null> => { throw new Error('Apple sign-in is available on iPhone.'); };

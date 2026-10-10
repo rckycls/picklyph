@@ -67,7 +67,7 @@
     "test:boundaries:local": "node supabase/tests/booking-boundaries-local.cjs",
     "test:moderation": "node --test supabase/tests/moderation.test.cjs supabase/tests/report-handler.test.cjs",
     "test:moderation:local": "node supabase/tests/moderation-local.cjs",
-    "test:privacy": "node --test supabase/tests/account-deletion.test.cjs supabase/tests/account-deletion-handler.test.cjs",
+    "test:privacy": "node --test supabase/tests/account-deletion.test.cjs supabase/tests/account-deletion-handler.test.cjs supabase/tests/apple-revocation.test.cjs",
     "test:privacy:local": "node supabase/tests/account-deletion-local.cjs",
     "test:notifications": "node --test supabase/tests/notifications.test.cjs supabase/tests/push-handler.test.cjs src/features/notifications/__tests__/*.test.cjs",
     "test:notifications:local": "node supabase/tests/notifications-local.cjs",

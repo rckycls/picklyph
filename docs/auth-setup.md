@@ -35,6 +35,31 @@ display metadata. Apple's private relay email is supported.
 See [Supabase native Apple setup](https://supabase.com/docs/guides/auth/social-login/auth-apple)
 and [Expo Apple authentication](https://docs.expo.dev/versions/v57.0.0/sdk/apple-authentication/).
 
+### Apple token revocation key (T50a)
+
+Account deletion revokes the app's Apple tokens (docs/privacy.md#sign-in-with-apple-revocation-t50a).
+Until the four secrets below are set on a project, its `account-deletion` function
+answers `503 apple_unavailable` to every account that signs in with Apple. Email
+accounts are unaffected. Do this for staging, then again for production at T50.
+
+1. Apple Developer → Certificates, Identifiers & Profiles → Keys → **+**. Name the
+   key, tick **Sign in with Apple**, choose **Configure**, select the primary App
+   ID `com.rckycls.picklyph`, save, then **Continue** → **Register**. Download the
+   `.p8` file (Apple allows this only once) and note its **Key ID**. Your **Team ID**
+   is under Membership details. Keep the `.p8` out of the repository and chat.
+2. Put the key into an ignored, temporary env file outside the repository, as one line with
+   literal `\n` line breaks: `APPLE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n…\n-----END PRIVATE KEY-----"`.
+   Add `APPLE_TEAM_ID=<Team ID>`, `APPLE_KEY_ID=<Key ID>` and
+   `APPLE_CLIENT_ID=com.rckycls.picklyph`, run
+   `supabase secrets set --env-file <that file> --project-ref <ref>`, then delete the file.
+3. Redeploy `account-deletion`; it now bundles `_shared/apple.ts`.
+4. iPhone check: delete an Apple-signed-in test account. Apple asks you to confirm
+   after you type `DELETE`. Afterwards pickly is gone from Settings → your name →
+   Sign-In & Security → Sign in with Apple.
+
+The secrets only sign a five-minute client secret per request inside the function.
+They never reach the app, and the native sign-in above still needs no secret.
+
 ### Email codes
 
 1. Keep Email enabled and email confirmation required; permit new signups for

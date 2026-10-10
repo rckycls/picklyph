@@ -1,5 +1,6 @@
 // T47: real local Docker/Auth/Storage/PostgREST, the shipped deletion handler and mobile client, observed lock orders and served Edge. No hosted/mobile env.
-const assert=require('node:assert/strict');const fs=require('node:fs');const os=require('node:os');const path=require('node:path');
+// T50a: Sign in with Apple revocation through real GoTrue Apple identities and a fake Apple server on loopback (never the real Apple service).
+const assert=require('node:assert/strict');const fs=require('node:fs');const http=require('node:http');const os=require('node:os');const path=require('node:path');
 const {randomUUID}=require('node:crypto');const {execFileSync,spawn}=require('node:child_process');const {createClient}=require('@supabase/supabase-js');
 const load=require('./load-ts.cjs');
 async function main(){
@@ -28,7 +29,7 @@ async function main(){
   const options={auth:{persistSession:false,autoRefreshToken:false},global:{fetch:(input,init)=>fetch(input,{...init,signal:AbortSignal.timeout(20000)})}};
   const service=createClient(api.href,config.SERVICE_ROLE_KEY,options);const anon=createClient(api.href,config.ANON_KEY,options);
   const check=(r,message)=>{assert.ok(!r.error,message);return r.data;};const users=[],clients=[],tokens=[];const venue=randomUUID();
-  const courts=[randomUUID(),randomUUID()].sort();let created=false;let child;let cronCreated=false,scheduled=false,jobBefore=null,checkJob=null;const workers=new Set();const temp=fs.mkdtempSync(path.join(os.tmpdir(),'pickly-deletion-'));
+  const courts=[randomUUID(),randomUUID()].sort();let created=false;let child;let appleFake;let cronCreated=false,scheduled=false,jobBefore=null,checkJob=null;const workers=new Set();const temp=fs.mkdtempSync(path.join(os.tmpdir(),'pickly-deletion-'));
   const dbSession=query=>new Promise(resolve=>{
     const worker=spawn(docker,args,{windowsHide:true});workers.add(worker);let out='',err='';
     worker.stdout.on('data',d=>out+=d);worker.stderr.on('data',d=>err+=d);
@@ -47,6 +48,7 @@ async function main(){
   };
   const handlerModule=load(path.join(__dirname,'../functions/account-deletion/handler.ts'),{},{TextDecoder});
   const {createSupabaseAccountDeletionDeps}=load(path.join(__dirname,'../functions/account-deletion/deps.ts'),{'./handler.ts':handlerModule},{TextDecoder,atob});
+  const appleModule=load(path.join(__dirname,'../functions/_shared/apple.ts'),{},{TextDecoder,atob,btoa});
   const root=path.resolve(__dirname,'../..');
   const mobile=load(path.join(root,'src/features/account/deletionClient.ts'),{'@picklyph/domain':require(path.join(root,'packages/domain/src/privacy.ts')),
     '../owner/venueClient':require(path.join(root,'src/features/owner/venueClient.ts'))});
@@ -58,8 +60,9 @@ async function main(){
   const objects=user=>sql(`select count(*) from storage.objects where bucket_id in ('avatars','owner-evidence') and name like '${users[user]}/%'`);
   const authUser=async user=>{const r=await service.auth.admin.getUserById(users[user]);return r.error?null:r.data.user.id;};
   try{
-    // Accounts: 0 owner, 1 player deleted through the shipped handler/client, 2 player who stays, 3 admin, 4-5 lock-order players, 6 served-Edge player.
-    for(let n=0;n<7;n++){
+    // Accounts: 0 owner, 1 player deleted through the shipped handler/client, 2 player who stays, 3 admin, 4-5 lock-order players, 6 served-Edge player,
+    // 7 Apple-linked player (shipped handler/client, fake Apple), 8 Apple-linked player on served Edge without Apple secrets.
+    for(let n=0;n<9;n++){
       const credentials={email:`deletion-${randomUUID()}@example.test`,password:`Local-${randomUUID()}!`};
       users.push(check(await service.auth.admin.createUser({...credentials,email_confirm:true}),'Own account').user.id);
       const c=createClient(api.href,config.ANON_KEY,options);clients.push(c);tokens.push(check(await c.auth.signInWithPassword(credentials),'Own login').session.access_token);
@@ -116,6 +119,66 @@ async function main(){
     assert.equal(sql(`select string_agg(action||':'||reason||':'||(actor_user_id=subject_id)::text,',') from private.moderation_audit_events where target_venue_id='${venue}'`),'owner.revoke:owner_request:true');
     assert.equal(rentalStatus(2),'confirmed');assert.equal(sql(`select status from private.open_play_sessions where id='${session}'`),'scheduled');
     console.log('PASS: real API owner deletion releases the sole-owned listing (unclaimed, one self revocation audit row); other bookings and the session stay.');
+    // T50a: real GoTrue Apple identities (inserted as GoTrue stores them) and a fake Apple on loopback that verifies each client secret like Apple.
+    const appleIds={7:`000777.${randomUUID().replaceAll('-','')}.0711`,8:`000888.${randomUUID().replaceAll('-','')}.0811`};
+    for(const n of [7,8])sql(`insert into auth.identities(provider_id,user_id,identity_data,provider,last_sign_in_at,created_at,updated_at)
+      values('${appleIds[n]}','${users[n]}',jsonb_build_object('sub','${appleIds[n]}','email','apple-${n}-${randomUUID()}@privaterelay.appleid.com','email_verified',true),'apple',now(),now(),now());`);
+    const applePair=await crypto.subtle.generateKey({name:'ECDSA',namedCurve:'P-256'},true,['sign','verify']);
+    const appleConfig={teamId:'TEAM000001',keyId:'KEY0000001',clientId:'com.rckycls.picklyph',
+      privateKey:`-----BEGIN PRIVATE KEY-----\n${Buffer.from(await crypto.subtle.exportKey('pkcs8',applePair.privateKey)).toString('base64')}\n-----END PRIVATE KEY-----`};
+    const appleCodes=new Map();const appleLog={exchanges:[],revoked:[],badSecrets:0};let revokeMode='ok';let atRevoke=()=>null;
+    const issueCode=sub=>{const code=`c${randomUUID().replaceAll('-','')}.0.local.${randomUUID().slice(0,8)}`;appleCodes.set(code,{sub,used:false,refresh:null});return code;};
+    appleFake=http.createServer((req,res)=>{let body='';req.on('data',d=>body+=d);req.on('end',async()=>{
+      const reply=(status,json)=>{res.writeHead(status,{'content-type':'application/json'});res.end(json===undefined?'':JSON.stringify(json));};
+      const form=Object.fromEntries(new URLSearchParams(body));const [h,p,s]=(form.client_secret??'').split('.');let valid=false;
+      try{const head=JSON.parse(Buffer.from(h,'base64url'));const claims=JSON.parse(Buffer.from(p,'base64url'));
+        valid=head.alg==='ES256'&&head.kid===appleConfig.keyId&&claims.iss===appleConfig.teamId&&claims.sub===appleConfig.clientId&&claims.aud==='https://appleid.apple.com'
+          &&claims.exp-claims.iat===300&&Math.abs(claims.iat-Date.now()/1000)<60&&form.client_id===appleConfig.clientId
+          &&await crypto.subtle.verify({name:'ECDSA',hash:'SHA-256'},applePair.publicKey,Buffer.from(s,'base64url'),Buffer.from(`${h}.${p}`));}catch{valid=false;}
+      if(!valid){appleLog.badSecrets++;return reply(400,{error:'invalid_client'});}
+      if(req.method==='POST'&&req.url==='/auth/token'){
+        const entry=appleCodes.get(form.code);appleLog.exchanges.push(form.code);
+        if(form.grant_type!=='authorization_code'||!entry||entry.used)return reply(400,{error:'invalid_grant'});
+        entry.used=true;entry.refresh=`r.${randomUUID()}`;const now=Math.floor(Date.now()/1000);
+        const idToken=`${[{alg:'RS256',kid:'local'},{iss:'https://appleid.apple.com',aud:appleConfig.clientId,sub:entry.sub,iat:now,exp:now+600}]
+          .map(v=>Buffer.from(JSON.stringify(v)).toString('base64url')).join('.')}.local`;
+        return reply(200,{access_token:`a.${randomUUID()}`,token_type:'Bearer',expires_in:3600,refresh_token:entry.refresh,id_token:idToken});
+      }
+      if(req.method==='POST'&&req.url==='/auth/revoke'){
+        if(revokeMode==='down')return reply(503,{});
+        appleLog.revoked.push({token:form.token,hint:form.token_type_hint,state:atRevoke()});return reply(200);
+      }
+      reply(404,{});
+    });});
+    await new Promise(r=>appleFake.listen(0,'127.0.0.1',r));const appleBase=`http://127.0.0.1:${appleFake.address().port}`;
+    const appleClient=appleModule.createAppleRevocation(appleConfig,(url,init)=>fetch(String(url).replace(appleModule.APPLE_ORIGIN,appleBase),{...init,signal:AbortSignal.timeout(10000)}));
+    const appleDeletion=handlerModule.createAccountDeletionHandler({...createSupabaseAccountDeletionDeps(()=>anon,server),apple:appleClient,limit:enforced});
+    const realDeps=createSupabaseAccountDeletionDeps(()=>anon,server);
+    assert.deepEqual(JSON.parse(JSON.stringify(await realDeps.verifyUser(tokens[7]))),{kind:'user',id:users[7],apple:[appleIds[7]]},'real GoTrue returns the Apple provider ID');
+    assert.deepEqual(JSON.parse(JSON.stringify(await realDeps.verifyUser(tokens[2]))),{kind:'user',id:users[2],apple:[]});
+    const appleAvatar=`${users[7]}/${randomUUID()}.jpg`;check(await clients[7].storage.from('avatars').upload(appleAvatar,jpeg,{contentType:'image/jpeg'}),'Own Apple avatar');
+    const appleTransport={endpoint:'https://local.test',apiKey:config.ANON_KEY,accessToken:async()=>tokens[7],fetch:async(url,init)=>{
+      const response=await appleDeletion(new Request(url,init));return {ok:response.ok,status:response.status,headers:response.headers,json:()=>response.json()};}};
+    const phone=(...list)=>async()=>list.shift();const appleStatus=()=>sql(`select public.account_deletion_status('${users[7]}')`);
+    // Another Apple ID's code: refused before anything changes, nothing revoked.
+    let attempt=await mobile.deleteAccountConfirmed(appleTransport,true,phone(issueCode('000999.other.0001')));
+    assert.deepEqual(JSON.parse(JSON.stringify(attempt.failure)),{kind:'rejected',reason:'apple_account_mismatch',retryAfterSeconds:null});
+    assert.equal(appleStatus(),'none');assert.ok(await authUser(7));assert.equal(objects(7),'1');assert.equal(appleLog.revoked.length,0);
+    // The phone didn't know about Apple: the server's 409 brings up Apple once; with Apple's revoke endpoint down the reply is 503 and the Auth user and files stay.
+    revokeMode='down';const firstCode=issueCode(appleIds[7]);
+    attempt=await mobile.deleteAccountConfirmed(appleTransport,false,phone(firstCode));assert.equal(attempt.failure.kind,'unavailable');
+    assert.equal(appleStatus(),'pending','begin ran');assert.ok(await authUser(7));assert.equal(objects(7),'1');
+    // The next tap: the spent code is refused (409), a fresh code finishes it, and revocation happened while the Auth user and files still existed.
+    revokeMode='ok';atRevoke=()=>({auth:sql(`select count(*) from auth.users where id='${users[7]}'`),objects:objects(7),status:appleStatus()});
+    const secondCode=issueCode(appleIds[7]);
+    attempt=await mobile.deleteAccountConfirmed(appleTransport,true,phone(firstCode,secondCode));assert.equal(attempt.ok,true);
+    assert.deepEqual(appleLog.revoked,[{token:appleCodes.get(secondCode).refresh,hint:'refresh_token',state:{auth:'1',objects:'1',status:'pending'}}]);
+    assert.equal(await authUser(7),null);assert.equal(objects(7),'0');assert.equal(appleStatus(),'deleted');
+    assert.equal(sql(`select count(*) from auth.identities where user_id='${users[7]}'`),'0');
+    // A lost reply's retry is confirmed from the deletion record, without Apple.
+    const exchanged=appleLog.exchanges.length;assert.equal((await mobile.deleteAccount(appleTransport)).ok,true);assert.equal(appleLog.exchanges.length,exchanged);
+    assert.equal(exchanged,4,'mismatch, first, spent first, second');assert.equal(appleLog.badSecrets,0,'every client secret verified');
+    console.log('PASS: T50a real GoTrue Apple identity + shipped handler/deps/client + fake Apple: another Apple ID 403 with nothing changed; unknown-to-phone 409 then one Apple prompt; revoke down 503 kept the Auth user and files; spent code 409 then a fresh code revoked the refresh token while the Auth user and files existed, then deleted both; lost-reply retry confirmed without Apple; every ES256 client secret verified.');
     // Observed lock orders, both ways (the venue is re-verified with a stand-in owner so new bookings are possible).
     sql(`insert into private.venue_owners(user_id,venue_id) values('${users[2]}','${venue}');update public.venues set claim_status='verified' where id='${venue}';`);
     let competitor=await heldRace(`select public.account_deletion_begin('${users[4]}');`,rentSql(4,courts[1],600,660,quote(4,courts[1],600,660)));
@@ -157,9 +220,16 @@ async function main(){
     const served=await invoke(tokens[6],{body:JSON.stringify({confirm:'delete_account'})});assert.equal(served.status,200);assert.deepEqual(await served.json(),{status:'deleted'});
     assert.equal(await authUser(6),null);
     const again=await invoke(tokens[6],{body:JSON.stringify({confirm:'delete_account'})});assert.equal(again.status,200,'served retry confirmed');
-    console.log('PASS: actual served Edge forged JWT 401, GET 405, deletion 200 with Redis absent (outage continues) and a confirmed retry.');
+    // T50a: the served function has no Apple secrets, so an Apple-linked account is refused before anything changes, with or without a code.
+    const exchangesBefore=appleLog.exchanges.length;
+    for(const body of [{confirm:'delete_account'},{confirm:'delete_account',apple_authorization_code:issueCode(appleIds[8])}]){
+      const refusedApple=await invoke(tokens[8],{body:JSON.stringify(body)});assert.equal(refusedApple.status,503);assert.deepEqual(await refusedApple.json(),{error:'apple_unavailable'});
+    }
+    assert.equal(sql(`select public.account_deletion_status('${users[8]}')`),'none');assert.ok(await authUser(8));assert.equal(appleLog.exchanges.length,exchangesBefore);
+    console.log('PASS: actual served Edge forged JWT 401, GET 405, deletion 200 with Redis absent (outage continues) and a confirmed retry; without Apple secrets an Apple-linked account gets 503 apple_unavailable with no deletion record (fail closed).');
   }finally{
     if(child&&child.exitCode===null)child.kill();for(const worker of workers)worker.kill();let clean=true;const steps=[];
+    if(appleFake)steps.push(()=>new Promise(resolve=>{appleFake.closeAllConnections();appleFake.close(()=>resolve());}));
     if(checkJob)steps.push(()=>sql(`select cron.unschedule(${checkJob});delete from cron.job_run_details where jobid=${checkJob};`));
     if(cronCreated)steps.push(()=>sql('drop extension pg_cron;'));
     else if(scheduled&&jobBefore==='')steps.push(()=>sql(`delete from cron.job_run_details where jobid=(select jobid from cron.job where jobname='privacy-retention-sweep');

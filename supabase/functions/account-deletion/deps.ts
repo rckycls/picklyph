@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '../../../packages/domain/src/database.ts';
 import { DELETION_STATUS, DeletionRejected, type DELETION_BUCKETS, type VerifiedCaller } from './handler.ts';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const APPLE_SUBJECT = /^[\x21-\x7e]{1,255}$/;
 // Read only after Auth has verified the token; never trusted on its own.
 function subject(token: string): string | null {
   try {
@@ -24,7 +25,11 @@ export function createSupabaseAccountDeletionDeps(verifier: () => SupabaseClient
         if ([400, 401, 403].includes(error.status ?? 0)) return null;
         throw new Error('Auth unavailable');
       }
-      return data.user ? { kind: 'user', id: data.user.id } : null;
+      if (!data.user) return null;
+      // GoTrue returns each identity's provider ID (the Apple ID it matches sign-ins on) as `id`.
+      const apple = (data.user.identities ?? []).filter((identity) => identity.provider === 'apple').map((identity) => identity.id);
+      if (apple.some((subject) => typeof subject !== 'string' || !APPLE_SUBJECT.test(subject))) throw new Error('Unexpected Apple identity');
+      return { kind: 'user', id: data.user.id, apple };
     },
     begin: async (actor: string) => {
       const { data, error } = await server().rpc('account_deletion_begin', { actor_user_id: actor });
