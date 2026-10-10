@@ -1,9 +1,9 @@
-# Booking notifications (T43)
+# Booking notifications (T43, T44)
 
 Push is supplementary: the booking screens stay the source of truth. T43 adds push device registration, a
-transactional outbox fed by booking events, and a worker that delivers through the Expo push service.
-Reminders and deep links are T44; per-kind preferences, a pre-permission explanation and sign-out
-unregistration are T45.
+transactional outbox fed by booking events, and a worker that delivers through the Expo push service. T44
+adds one-hour reminders and opening the right screen from a tapped push. Per-kind preferences, a
+pre-permission explanation and sign-out unregistration are T45.
 
 ## Who hears about what
 
@@ -20,6 +20,7 @@ notification, and a committed one always has its rows.
 | Player cancels | the venue's current owners | `booking.cancelled` (owner wording) |
 | Anyone else cancels (future T40a) | the player | `booking.cancelled` (player wording) |
 | Owner records the arrival payment (T31) | the player | `payment.recorded` |
+| A confirmed booking starts within the hour (T44) | the player | `booking.reminder` |
 | Owner entries, walk-ins, check-in, no-show, complete | nobody | — |
 
 Rentals and open-play groups behave the same. The actor never hears about their own action (an owner who
@@ -31,7 +32,47 @@ The payload is fixed booking facts at event time: `audience`, `booking_kind` (`r
 `booking_id`, `venue_id`, `venue_name`, `starts_at` (UTC) and, for payments, `amount_centavos`. No
 participant names, phone numbers or emails. The worker builds the lock-screen text with
 `notificationMessage()` in `packages/domain/src/notification.ts` (Manila time, PHP amounts). Each push
-carries `data = {notification_id, kind, audience, booking_kind, booking_id}` for T44 routing.
+carries `data = {notification_id, kind, audience, booking_kind, booking_id, venue_id, starts_at, recipient}`
+(`pushDataFor()`), where `recipient` is the account UUID the row was written for, so the app can tell
+whether the signed-in account may open it (see [Opening a push](#opening-a-push-t44)).
+
+## One-hour reminders (T44)
+
+`private.booking_reminders_enqueue(at_time, batch)` finds **confirmed player** rentals and open-play groups
+whose start is in `(at_time, at_time + 1 hour]` and records one `private.booking_reminders` row per booking
+(unique per rental or group booking), then an outbox row (`source = 'reminder'`, `event_id` = the reminder
+id, kind `booking.reminder`, player audience, the same payload shape) for a player with an active device.
+Pending, declined, cancelled and expired bookings, owner entries and walk-ins are never reminded; a booking
+confirmed inside the hour is reminded on the next sweep. The decision is recorded even when the player has
+no device, so each booking is decided once; concurrent sweeps insert each reminder once. Reminders older
+than two days are pruned (bounded).
+
+The every-minute `push-dispatch` cron hook (`private.push_dispatch_kick`) runs the sweep with the clock
+before checking for due work, so reminders need no extra job: latency is up to about a minute, and a booking
+confirmed with less than a minute to go can miss its reminder. When `push_outbox_claim` leases a reminder row
+it re-checks the booking (`private.booking_reminder_due`): if it is no longer confirmed or has started, the
+row is dropped as `obsolete` and never sent. A cancellation in the seconds between a claim and Expo's
+acceptance can still deliver it; the booking screen says what is true. Owners get no reminders.
+
+## Opening a push (T44)
+
+`NotificationLinks` (root layout, inside Owner mode) listens for taps (`addNotificationResponseReceivedListener`,
+plus the response that launched the app, cleared once read) and parses `data` with the strict
+`readPushData()`: unknown kinds, a kind the audience never receives or a malformed ID is ignored; keys the
+push service adds are ignored. Each notification is taken once. `links.ts` then decides:
+
+| Push | Opens |
+| --- | --- |
+| Player alert or reminder | `/rental/booking/[id]` or `/play/booking/[id]` |
+| Owner `booking.requested` | `/owner/requests/[venue]` |
+| Owner `booking.created` / `booking.cancelled` | `/owner/desk/[venue]?date=<Manila day of the booking>` |
+
+It opens **only when the signed-in account is the push's `recipient`**. Another account sees "This alert is
+for another account" and nothing opens. A signed-out phone goes to Account to sign in and keeps the link for
+10 minutes, then opens it if the right account signed in. Owner links wait for Owner mode's venue check,
+switch to Owner mode and open; with no managed venue, or when the check fails, a notice explains why
+instead. The screens and server reads still enforce access (a venue the owner no longer manages is refused
+there). URL deep links (`picklyph://…`) go through the same route gates.
 
 ## Device registration
 
@@ -97,12 +138,14 @@ from Vault (`not_configured` if either is missing). Latency is therefore up to a
   backend, account and token per app run.
 - Account → Settings → **Booking alerts**: shows the state; a tap asks for permission the first time, opens
   iOS Settings when denied, or retries a failed registration.
-- While the app is open, pushes show as a banner and in the list, without sound or badge.
+- While the app is open, pushes show as a banner and in the list, without sound or badge. Tapping one opens
+  the booking (see above).
 - Sign-out does not unregister yet (T45). Account deletion removes devices and rows through the Auth cascade.
 
 ## Rollout and operator steps
 
-1. `supabase db push` for `20261010090000_push_notifications.sql`.
+1. `supabase db push` for `20261010090000_push_notifications.sql` and `20261010120000_booking_reminders.sql`
+   (T44 needs no other operator step: the push-dispatch job sweeps reminders).
 2. Deploy `push-devices` and `push-dispatch` (both `verify_jwt = false` with the import map in
    `config.toml`; they reuse `DISCOVERY_SUPABASE_*`, `PICKLY_ENV` and the Upstash secrets).
 3. Set the function secret `PUSH_WORKER_SECRET` (a random value of at least 32 characters). Optionally set
@@ -116,11 +159,15 @@ from Vault (`not_configured` if either is missing). Latency is therefore up to a
 
 ## Tests
 
-- `npm run test:notifications`: the rollback-only PGlite suite (`supabase/tests/notifications.sql`) with
-  24 function mutations and 2 dropped triggers, push handler/Expo/worker tests and the mobile client tests.
+- `npm run test:notifications`: the rollback-only PGlite suites (`supabase/tests/notifications.sql` with
+  24 function mutations and 2 dropped triggers; `reminders.sql` with 16 mutations: window boundaries to the
+  millisecond, statuses and sources, the claim-time re-check, recipients in claims, the cron hook, pruning),
+  push handler/Expo/worker tests and the mobile client and link tests.
 - `npm run test:notifications:local`: Docker SQL suite; real GoTrue/PostgREST registration through the
   shipped client (forged JWT, direct RPC denial, racing registrations of one token, the device cap, Redis
   outage); real booking commands; two concurrent workers against a fake Expo server (each row and device
   once); Expo outage and `Retry-After`; `DeviceNotRegistered` from tickets and receipts; a dead worker's
-  expired lease; the cron hook and schedule; served Edge auth checks with nothing due. It never calls the
-  real Expo service. Run it alone: it replaces any running `functions serve` container.
+  expired lease; T44 reminders on the real clock (six concurrent sweeps, a cancelled and a pending rental, an
+  acceptance inside the hour, a cancellation after the reminder, the sent data read by the shipped link
+  logic); the cron hook and schedule; served Edge auth checks with nothing due. It never calls the real Expo
+  service. Run it alone: it replaces any running `functions serve` container.

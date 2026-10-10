@@ -87,7 +87,7 @@ test('sync registers once per account and token per app run, never prompts unles
 test('the Account row explains each state', () => {
   const label = client.bookingAlertsLabel;
   assert.equal(label(null), 'Checking…');
-  assert.equal(label({ permission: 'granted', status: 'registered' }), 'On · requests, confirmations and cancellations');
+  assert.equal(label({ permission: 'granted', status: 'registered' }), 'On · requests, confirmations, reminders and cancellations');
   assert.equal(label({ permission: 'undetermined', status: 'off' }), 'Off · tap to get booking updates on this phone');
   assert.equal(label({ permission: 'denied', status: 'off' }), 'Off · open Settings to allow notifications');
   assert.equal(label({ permission: 'unavailable', status: 'off' }), 'Not available in this version of the app');

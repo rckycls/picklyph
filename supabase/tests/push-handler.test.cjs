@@ -105,17 +105,20 @@ test('Expo send: tickets in order; DeviceNotRegistered invalid; permanent errors
 });
 
 test('claim parsing is strict',()=>{
-  const item={id:id,claim_id:'c4310000-0000-4000-8000-000000000002',kind:'booking.accepted',payload:{},devices:[{id:'c4310000-0000-4000-8000-000000000003',token}]};
+  const item={id:id,claim_id:'c4310000-0000-4000-8000-000000000002',kind:'booking.accepted',recipient:'c4310000-0000-4000-8000-000000000004',payload:{},
+    devices:[{id:'c4310000-0000-4000-8000-000000000003',token}]};
   assert.deepEqual(plain(readPushClaim({items:[item],more:false})),{more:false,items:[item]});
   for(const bad of [null,[],{items:[]},{items:{},more:false},{items:[{...item,kind:'booking.nope'}],more:false},{items:[{...item,devices:[]}],more:false},
-    {items:[{...item,devices:[{id:'x',token}]}],more:false},{items:[{...item,devices:[{id:item.devices[0].id,token:'abc'}]}],more:false},{items:[{...item,claim_id:'x'}],more:false}])
+    {items:[{...item,devices:[{id:'x',token}]}],more:false},{items:[{...item,devices:[{id:item.devices[0].id,token:'abc'}]}],more:false},{items:[{...item,claim_id:'x'}],more:false},
+    {items:[{...item,recipient:undefined}],more:false},{items:[{...item,recipient:'x'}],more:false}])
     assert.throws(()=>readPushClaim(bad),/Unexpected claim/,JSON.stringify(bad));
 });
 
 // Dispatcher with in-memory dependencies.
 const payload=(extra={})=>({audience:'player',booking_kind:'rental',booking_id:'c4320000-0000-4000-8000-000000000001',venue_id:'c4330000-0000-4000-8000-000000000001',
   venue_name:'Court Club',starts_at:'2026-10-12T10:00:00Z',...extra});
-const claimItem=(n,devices=1,extra={})=>({id:`c4340000-0000-4000-8000-${String(n).padStart(12,'0')}`,claim_id:`c4350000-0000-4000-8000-${String(n).padStart(12,'0')}`,
+const recipient='c4370000-0000-4000-8000-000000000001';
+const claimItem=(n,devices=1,extra={})=>({id:`c4340000-0000-4000-8000-${String(n).padStart(12,'0')}`,claim_id:`c4350000-0000-4000-8000-${String(n).padStart(12,'0')}`,recipient,
   kind:'booking.accepted',payload:payload(),devices:Array.from({length:devices},(_,i)=>({id:`c4360000-0000-4000-8${String(n).padStart(3,'0')}-${String(i).padStart(12,'0')}`,token:`ExponentPushToken[d${n}x${i}]`})),...extra});
 const worker=(claims,send,extra={})=>{
   const log={claims:0,completions:[],sent:[],receiptsRecorded:[]};
@@ -133,13 +136,26 @@ test('dispatch builds one message per device, records each outcome against its r
   assert.equal(log.sent.length,1);assert.equal(log.sent[0].length,3,'invalid payload is never sent');
   const {body,...first}=log.sent[0][0];
   assert.deepEqual(first,{to:'ExponentPushToken[d1x0]',title:'Booking confirmed',
-    sound:'default',data:{notification_id:items[0].id,kind:'booking.accepted',audience:'player',booking_kind:'rental',booking_id:payload().booking_id}});
+    sound:'default',data:{notification_id:items[0].id,kind:'booking.accepted',audience:'player',booking_kind:'rental',booking_id:payload().booking_id,
+      venue_id:payload().venue_id,starts_at:payload().starts_at,recipient}});
   assert.match(body,/^Court Club confirmed your court rental for Oct 12, 2026, 6:00\sPM\.$/u,'Manila time (UTC+8)');
   assert.match(log.sent[0][2].body,/recorded your ₱600\.00 payment/);
   assert.deepEqual(log.completions,[[
     {id:items[0].id,claim_id:items[0].claim_id,deliveries:[{device_id:items[0].devices[0].id,outcome:'ok',ticket_id:'T-1'},{device_id:items[0].devices[1].id,outcome:'invalid'}]},
     {id:items[1].id,claim_id:items[1].claim_id,deliveries:[{device_id:items[1].devices[0].id,outcome:'retry'}],retry_after_seconds:90},
     {id:items[2].id,claim_id:items[2].claim_id,deliveries:[{device_id:items[2].devices[0].id,outcome:'error',error:'invalid_payload'}]}]]);
+});
+
+test('reminders go out as “Starting soon” with data the app reads back; an owner reminder is never sent',async()=>{
+  const {readPushData}=require('../../packages/domain/src/notification.ts');
+  const items=[claimItem(1,1,{kind:'booking.reminder',payload:payload({booking_kind:'group'})}),claimItem(2,1,{kind:'booking.reminder',payload:payload({audience:'owner'})})];
+  const {log,deps}=worker([{items,more:false}],messages=>({outcomes:messages.map(()=>({outcome:'ok',ticket_id:'T-1'}))}));
+  assert.deepEqual(plain(await dispatchOnce(deps)),{claimed:2,sent:1,retried:0,invalid:0,failed:1,stale:0,receipts:0});
+  const [sent]=log.sent[0];assert.equal(log.sent[0].length,1);
+  assert.equal(sent.title,'Starting soon');assert.match(sent.body,/^Your open-play group at Court Club starts at Oct 12, 2026, 6:00\sPM\.$/u);
+  assert.deepEqual(plain(readPushData(sent.data)),sent.data,'the app parses exactly what the worker sends');
+  assert.equal(sent.data.recipient,recipient);assert.equal(sent.data.kind,'booking.reminder');
+  assert.deepEqual(log.completions[0][1].deliveries,[{device_id:items[1].devices[0].id,outcome:'error',error:'invalid_payload'}]);
 });
 
 test('dispatch chunks Expo calls at 100, drains several claims, stops calling Expo when out of time and retries a failed completion once',async()=>{

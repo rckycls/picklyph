@@ -1,7 +1,7 @@
 // T43: real local Docker/Auth/PostgREST, the shipped push-devices handler and mobile client, the push-dispatch worker against a
 // fake Expo server (never the real one), concurrent workers, retries, invalid tokens, leases, receipts and served Edge. No hosted/mobile env.
 const assert=require('node:assert/strict');const fs=require('node:fs');const os=require('node:os');const path=require('node:path');const http=require('node:http');
-const {randomUUID,randomBytes}=require('node:crypto');const {execFileSync,spawn}=require('node:child_process');const {createClient}=require('@supabase/supabase-js');
+const {randomUUID,randomBytes}=require('node:crypto');const {execFile,execFileSync,spawn}=require('node:child_process');const {createClient}=require('@supabase/supabase-js');
 const load=require('./load-ts.cjs');
 async function main(){
   const dockerPath=path.join(process.env.LOCALAPPDATA??'','Programs/DockerDesktop/resources/bin/docker.exe');const docker=fs.existsSync(dockerPath)?dockerPath:'docker';
@@ -11,15 +11,18 @@ async function main(){
   assert.equal(run(['inspect','supabase_db_picklyph','--format','{{index .Config.Labels "com.supabase.cli.project"}}']).trim(),'picklyph');
   const args=['exec','-i','supabase_db_picklyph','psql','-U','postgres','-d','postgres','-X','-q','-t','-A','-v','ON_ERROR_STOP=1'];
   const sql=query=>run(args,query).trim();
+  const sqlAsync=query=>new Promise((resolve,reject)=>{const child=execFile(docker,args,{encoding:'utf8',timeout:60000},(error,out)=>error?reject(error):resolve(out.trim()));child.stdin.end(query);});
   const cronInstalled=()=>sql(`select exists(select 1 from pg_extension where extname='pg_cron')`)==='t';
   const cronJobs=()=>cronInstalled()?sql(`select coalesce(jsonb_agg(jsonb_build_array(jobid,jobname,schedule,command,active) order by jobid),'[]') from cron.job`):'none';
   const inventory=()=>sql(`select jsonb_build_object('users',(select jsonb_agg(id order by id) from auth.users),'venues',(select jsonb_agg(id order by id) from public.venues),
     'devices',(select jsonb_agg(id order by id) from private.push_devices),'outbox',(select jsonb_agg(id order by id) from private.notification_outbox),
     'deliveries',(select count(*) from private.push_deliveries),'allocations',(select jsonb_agg(id order by id) from private.court_allocations),
+    'reminders',(select jsonb_agg(id order by id) from private.booking_reminders),
     'vault',(select jsonb_agg(name order by name) from vault.secrets),'extensions',(select jsonb_agg(extname order by extname) from pg_extension));`)+cronJobs();
   const beforeInventory=inventory();
   run([...args,'-o','/dev/null'],fs.readFileSync(path.join(__dirname,'notifications.sql'),'utf8'));
-  console.log('PASS: Docker notifications SQL: registration rules, event fan-out, actor exclusion, rollback, claim/complete/lease/retry/receipt rules, cascades.');
+  run([...args,'-o','/dev/null'],fs.readFileSync(path.join(__dirname,'reminders.sql'),'utf8'));
+  console.log('PASS: Docker notifications and reminders SQL: registration rules, event fan-out, actor exclusion, rollback, claim/complete/lease/retry/receipt rules, cascades; reminder window, once per booking, claim-time re-check, cron hook.');
   const cli=path.resolve('node_modules/@supabase/cli-windows-x64/bin/supabase.exe');const config=JSON.parse(execFileSync(cli,['status','-o','json'],{stdio:['ignore','pipe','pipe'],timeout:20000}));
   const api=new URL(config.API_URL);assert.ok(api.protocol==='http:'&&['localhost','127.0.0.1'].includes(api.hostname)&&api.port==='54321','Loopback required');
   const options={auth:{persistSession:false,autoRefreshToken:false},global:{fetch:(input,init)=>fetch(input,{...init,signal:AbortSignal.timeout(20000)})}};
@@ -35,6 +38,8 @@ async function main(){
   const {createRateGuard}=load(path.join(root,'supabase/functions/_shared/rate-limit.ts'));
   const mobile=load(path.join(root,'src/features/notifications/pushClient.ts'),{'@picklyph/domain':require(path.join(root,'packages/domain/src/notification.ts')),
     '../owner/venueClient':require(path.join(root,'src/features/owner/venueClient.ts'))});
+  const links=load(path.join(root,'src/features/notifications/links.ts'),{'@picklyph/domain':{...require(path.join(root,'packages/domain/src/booking.ts')),
+    ...require(path.join(root,'packages/domain/src/notification.ts'))}});
   const day=new Date(Date.now()+8*3600e3+2*86400e3).toISOString().slice(0,10);const at=m=>new Date(Date.parse(`${day}T00:00:00+08:00`)+m*60000).toISOString();
   const pushToken=name=>`ExponentPushToken[local-${name}]`;
   const rent=(user,court,a,b)=>JSON.parse(sql(`select public.rental_booking_request('${users[user]}','${court}','${randomUUID()}','${at(a)}','${at(b)}',
@@ -120,8 +125,8 @@ async function main(){
     assert.ok(outbox().every(r=>r.status==='sent'));
     const accepted=expoLog.sent.find(m=>m.data.kind==='booking.accepted');
     assert.equal(accepted.title,'Booking confirmed');assert.match(accepted.body,/^Local Push Fixture confirmed your court rental for /);
-    assert.deepEqual(Object.keys(accepted.data).sort(),['audience','booking_id','booking_kind','kind','notification_id']);
-    assert.equal(accepted.data.audience,'player');assert.ok(bookings.slice(0,6).includes(accepted.data.booking_id));
+    assert.deepEqual(Object.keys(accepted.data).sort(),['audience','booking_id','booking_kind','kind','notification_id','recipient','starts_at','venue_id']);
+    assert.equal(accepted.data.audience,'player');assert.equal(accepted.data.recipient,users[2]);assert.equal(accepted.data.venue_id,venue);assert.ok(bookings.slice(0,6).includes(accepted.data.booking_id));
     console.log('PASS: 12 real requests + 6 acceptances → 30 rows (24 owner, 6 player, none to the requester); two concurrent workers claimed 30 disjoint rows and sent 36 messages, each (row, device) once.');
 
     // Expo outage: rows back off (Retry-After 45 s) without tickets; when due again, DeviceNotRegistered disables phone a2, a1 still gets it.
@@ -149,6 +154,48 @@ async function main(){
     assert.deepEqual(late,{completed:0,stale:1});assert.equal(devices(2),'a1,a2!','late invalid ignored');
     assert.equal(sql(`select status||':'||attempts from private.notification_outbox where id='${dead.items[0].id}'`),'sent:2');
     console.log('PASS: a dead worker’s expired lease is reclaimed and sent once (attempt 2); its late “invalid” reply is stale and changes nothing.');
+
+    // T44 reminders on the real clock: rentals at the next half hour at least 2 minutes away, so inside the hour.
+    const base=(Math.floor((Date.now()+120000)/1800000)+1)*1800000;const startIso=new Date(base).toISOString();const endIso=new Date(base+3600000).toISOString();
+    const third=randomUUID();sql(`insert into public.courts(id,venue_id,name) values('${third}','${venue}','C');`);
+    const policy=mode=>sql(`insert into private.venue_policies(venue_id,confirmation,payment) values('${venue}','${mode}','arrival')
+      on conflict (venue_id) do update set confirmation=excluded.confirmation,revision=private.venue_policies.revision+1;`);
+    const rentNow=(user,court)=>JSON.parse(sql(`select public.rental_booking_request('${users[user]}','${court}','${randomUUID()}','${startIso}','${endIso}',
+      public.rental_booking_quote('${users[user]}','${court}','${startIso}','${endIso}')->'expected_quote')::text;`)).booking;
+    policy('instant');const r1=rentNow(2,courts[0]);const r2=rentNow(2,courts[1]);const r4=rentNow(2,third);
+    assert.deepEqual([r1.status,r2.status,r4.status],['confirmed','confirmed','confirmed']);assert.equal(change(2,r2.id,'cancel'),'cancelled');
+    policy('approval');const r3=rentNow(2,courts[1]);assert.equal(r3.status,'pending');
+    const sweep=()=>sqlAsync('select private.booking_reminders_enqueue(clock_timestamp(),200);').then(Number);
+    const reminded=()=>JSON.parse(sql(`select coalesce(jsonb_agg(r.rental_booking_id order by r.rental_booking_id),'[]') from private.booking_reminders r
+      join private.court_allocations a on a.id=r.rental_booking_id where a.venue_id='${venue}';`));
+    const made=await Promise.all(Array.from({length:6},sweep));
+    assert.equal(made.reduce((a,b)=>a+b,0),2,`six concurrent sweeps made ${made}`);assert.deepEqual(reminded(),[r1.id,r4.id].sort());
+    assert.equal(change(0,r3.id,'accept'),'confirmed');assert.equal(await sweep(),1,'confirmed inside the hour');assert.equal(await sweep(),0);
+    assert.deepEqual(reminded(),[r1.id,r3.id,r4.id].sort());
+    assert.equal(change(2,r4.id,'cancel'),'cancelled');
+    const reminderRows=()=>JSON.parse(sql(`select coalesce(jsonb_object_agg(payload->>'booking_id',status||':'||coalesce(last_error,'-')),'{}')
+      from private.notification_outbox where source='reminder' and payload->>'venue_id'='${venue}';`));
+    assert.deepEqual(reminderRows(),{[r1.id]:'pending:-',[r3.id]:'pending:-',[r4.id]:'pending:-'});
+    const sentBefore=expoLog.sent.length;await dispatch();
+    assert.deepEqual(reminderRows(),{[r1.id]:'sent:-',[r3.id]:'sent:-',[r4.id]:'dropped:obsolete'});
+    assert.ok(outbox().every(r=>r.status==='sent'||r.status==='dropped'),'nothing left pending');
+    const fresh=expoLog.sent.slice(sentBefore);const reminders=fresh.filter(m=>m.data.kind==='booking.reminder');
+    assert.deepEqual(reminders.map(m=>`${m.data.booking_id}|${m.to}`).sort(),[`${r1.id}|${pushToken('a1')}`,`${r3.id}|${pushToken('a1')}`].sort(),
+      'a1 only (a2 was disabled); the cancelled R4 is never sent');
+    const reminder=reminders.find(m=>m.data.booking_id===r1.id);
+    assert.equal(reminder.title,'Starting soon');assert.match(reminder.body,/^Your court rental at Local Push Fixture starts at /);
+    assert.deepEqual(reminder.data,{notification_id:reminder.data.notification_id,kind:'booking.reminder',audience:'player',booking_kind:'rental',
+      booking_id:r1.id,venue_id:venue,starts_at:startIso.replace('.000Z','Z'),recipient:users[2]});
+    // The shipped link logic opens the sent data only for its recipient.
+    const linkStore=links.createLinkStore();assert.equal(linkStore.offer(reminder.data,Date.now()),true);
+    const step=(user,count)=>JSON.parse(JSON.stringify(links.nextLinkStep(linkStore.get(),{status:'ready',user},{count,error:false},Date.now())));
+    assert.deepEqual(step(users[2],null),{kind:'open',target:{pathname:'/rental/booking/[id]',params:{id:r1.id}},owner:false});
+    assert.equal(step(users[0],1).kind,'other_account');
+    const request=fresh.find(m=>m.data.kind==='booking.requested'&&m.to===pushToken('owner'));assert.equal(linkStore.offer(request.data,Date.now()),true);
+    assert.deepEqual(step(users[0],1),{kind:'open',target:{pathname:'/owner/requests/[id]',params:{id:venue}},owner:true});
+    assert.equal(step(users[1],1).kind,'other_account','the co-owner’s copy is its own notification');
+    assert.equal(step(users[0],0).kind,'no_venue');
+    console.log('PASS: T44 reminders: 6 concurrent sweeps → R1 and R4 once; cancelled R2 and pending R3 none; R3 accepted inside the hour → once; R4 cancelled after its reminder → dropped (obsolete), never sent; R1/R3 sent to a1 with recipient data; shipped links open only for the recipient.');
 
     // Receipts: 15 minutes after sending, a DeviceNotRegistered receipt disables the owner's phone; the app registering again re-enables it.
     const ownerTicket=[...ticketToken].find(([,to])=>to===pushToken('owner'))[0];

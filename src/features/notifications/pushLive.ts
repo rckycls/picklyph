@@ -1,4 +1,5 @@
 import Constants from 'expo-constants';
+import type { NotificationResponse } from 'expo-notifications';
 import { Platform } from 'react-native';
 
 import { fetchWithDeadline } from '@/lib/fetchWithDeadline';
@@ -65,6 +66,25 @@ const ports: PushPorts = {
 export async function syncThisDevice(actor: string, ask: boolean): Promise<PushState> {
   if (!backend()) return { permission: 'unavailable', status: 'off' };
   return syncPushRegistration(ports, memo, actor, ask);
+}
+
+/**
+ * Calls `onTap` with the data of each push the user opens (T44): the one that launched the app, then
+ * later ones. The launch response is cleared once read, so it is not reported again.
+ */
+export async function watchNotificationTaps(onTap: (data: unknown) => void): Promise<{ remove: () => void } | null> {
+  const module = await notifications();
+  if (!module) return null;
+  try {
+    const take = (response: NotificationResponse | null) => {
+      if (!response || response.actionIdentifier !== module.DEFAULT_ACTION_IDENTIFIER) return;
+      onTap(response.notification.request.content.data);
+    };
+    const subscription = module.addNotificationResponseReceivedListener(take);
+    const launch = module.getLastNotificationResponse();
+    if (launch) { module.clearLastNotificationResponse(); take(launch); }
+    return subscription;
+  } catch { return null; }
 }
 
 /** Calls `onChange` when iOS hands the app a new push token, after forgetting earlier registrations. */

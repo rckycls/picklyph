@@ -1,6 +1,7 @@
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
-const { readPushDeviceCommand, readNotificationPayload, notificationMessage, isExpoPushToken, NotificationInputError, NOTIFICATION_KINDS } = require('../src/notification.ts');
+const { readPushDeviceCommand, readNotificationPayload, notificationMessage, isExpoPushToken, NotificationInputError, NOTIFICATION_KINDS, AUDIENCE_KINDS,
+  pushDataFor, readPushData } = require('../src/notification.ts');
 
 const token = 'ExponentPushToken[xXyZ09_-]';
 const payload = (patch = {}) => ({ audience: 'player', booking_kind: 'rental', booking_id: 'C4320000-0000-4000-8000-000000000001',
@@ -51,5 +52,37 @@ test('lock-screen text: Manila time, venue name, no participant names; owner and
   for (const kind of ['booking.accepted', 'booking.declined', 'booking.expired', 'payment.recorded']) assert.throws(() => owner(kind), NotificationInputError, kind);
   for (const kind of ['booking.requested', 'booking.created']) assert.throws(() => player(kind), NotificationInputError, kind);
   assert.throws(() => player('payment.recorded'), NotificationInputError, 'payment needs an amount');
-  assert.equal(NOTIFICATION_KINDS.length, 7);
+  assert.deepEqual(player('booking.reminder'), { title: 'Starting soon', body: player('booking.reminder').body });
+  assert.match(player('booking.reminder').body, /^Your court rental at Court Club starts at Oct 12, 2026, 6:00\sPM\.$/u);
+  assert.match(player('booking.reminder', 'group').body, /^Your open-play group at Court Club starts at /);
+  assert.throws(() => owner('booking.reminder'), NotificationInputError, 'owners get no reminders');
+  assert.equal(NOTIFICATION_KINDS.length, 8);
+  // Every kind an audience can receive has text, and nothing else does.
+  for (const kind of NOTIFICATION_KINDS) {
+    for (const audience of ['owner', 'player']) {
+      const text = () => notificationMessage(kind, readNotificationPayload(payload({ audience, amount_centavos: 100 })));
+      if (AUDIENCE_KINDS[audience].includes(kind)) assert.ok(text().title, `${audience} ${kind}`); else assert.throws(text, NotificationInputError, `${audience} ${kind}`);
+    }
+  }
+});
+
+const data = (patch = {}) => ({ notification_id: 'C4340000-0000-4000-8000-000000000001', kind: 'booking.reminder', audience: 'player', booking_kind: 'rental',
+  booking_id: 'c4320000-0000-4000-8000-000000000001', venue_id: 'c4330000-0000-4000-8000-000000000001', starts_at: '2026-10-12T10:00:00Z',
+  recipient: 'C4370000-0000-4000-8000-000000000001', ...patch });
+
+test('push data: built from the parsed payload plus row and recipient, read back strictly by the app', () => {
+  const built = pushDataFor('c4340000-0000-4000-8000-000000000001', 'booking.reminder', 'C4370000-0000-4000-8000-000000000001', readNotificationPayload(payload()));
+  assert.deepEqual(built, { notification_id: 'c4340000-0000-4000-8000-000000000001', kind: 'booking.reminder', audience: 'player', booking_kind: 'rental',
+    booking_id: 'c4320000-0000-4000-8000-000000000001', venue_id: 'c4330000-0000-4000-8000-000000000001', starts_at: '2026-10-12T10:00:00Z',
+    recipient: 'c4370000-0000-4000-8000-000000000001' });
+  assert.deepEqual(readPushData(built), built);
+  assert.deepEqual(readPushData(data()), { ...data(), notification_id: data().notification_id.toLowerCase(), recipient: data().recipient.toLowerCase() });
+  // Keys the push service adds are ignored.
+  assert.deepEqual(readPushData({ ...built, experienceId: '@x/y', scopeKey: '@x/y' }), built);
+  for (const bad of [null, [], 'x', data({ notification_id: 'x' }), data({ kind: 'booking.nope' }), data({ audience: 'admin' }), data({ booking_kind: 'session' }),
+    data({ booking_id: undefined }), data({ venue_id: 'x' }), data({ recipient: null }), data({ starts_at: '2026-10-12 10:00' }), data({ starts_at: '2026-13-40T10:00:00Z' }),
+    data({ audience: 'owner', kind: 'booking.reminder' }), data({ audience: 'owner', kind: 'booking.accepted' }), data({ audience: 'player', kind: 'booking.requested' })]) {
+    assert.equal(readPushData(bad), null, JSON.stringify(bad));
+  }
+  for (const kind of AUDIENCE_KINDS.owner) assert.ok(readPushData(data({ audience: 'owner', kind })), kind);
 });

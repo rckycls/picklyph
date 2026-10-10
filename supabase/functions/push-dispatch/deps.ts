@@ -15,8 +15,9 @@ export function readPushClaim(raw: unknown): PushClaim {
   return { more: claim.more, items: claim.items.map((value) => {
     const item = record(value);
     if (typeof item.id !== 'string' || !UUID.test(item.id) || typeof item.claim_id !== 'string' || !UUID.test(item.claim_id)
-      || !isNotificationKind(item.kind) || !Array.isArray(item.devices) || item.devices.length < 1 || item.devices.length > 10) throw new Error('Unexpected claim.');
-    return { id: item.id, claim_id: item.claim_id, kind: item.kind, payload: item.payload, devices: item.devices.map((entry) => {
+      || !isNotificationKind(item.kind) || typeof item.recipient !== 'string' || !UUID.test(item.recipient)
+      || !Array.isArray(item.devices) || item.devices.length < 1 || item.devices.length > 10) throw new Error('Unexpected claim.');
+    return { id: item.id, claim_id: item.claim_id, kind: item.kind, recipient: item.recipient, payload: item.payload, devices: item.devices.map((entry) => {
       const device = record(entry);
       if (typeof device.id !== 'string' || !UUID.test(device.id) || !isExpoPushToken(device.token)) throw new Error('Unexpected claim.');
       return { id: device.id, token: device.token };

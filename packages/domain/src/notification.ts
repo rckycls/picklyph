@@ -17,9 +17,14 @@ export type PushDeviceCommand = PushDeviceRegister | PushDeviceUnregister;
 export type PushDeviceResult = { status: 'registered' | 'removed' };
 
 export const NOTIFICATION_KINDS = ['booking.requested', 'booking.created', 'booking.accepted', 'booking.declined',
-  'booking.expired', 'booking.cancelled', 'payment.recorded'] as const;
+  'booking.expired', 'booking.cancelled', 'payment.recorded', 'booking.reminder'] as const;
 export type NotificationKind = typeof NOTIFICATION_KINDS[number];
 export type NotificationAudience = 'owner' | 'player';
+/** The kinds each audience can receive; the outbox never writes another pair. */
+export const AUDIENCE_KINDS: Record<NotificationAudience, readonly NotificationKind[]> = {
+  owner: ['booking.requested', 'booking.created', 'booking.cancelled'],
+  player: ['booking.accepted', 'booking.declined', 'booking.expired', 'booking.cancelled', 'payment.recorded', 'booking.reminder'],
+};
 /** What the outbox stores for a row: booking facts at event time, no names or contact details. */
 export type NotificationPayload = {
   audience: NotificationAudience;
@@ -30,12 +35,19 @@ export type NotificationPayload = {
   starts_at: string;
   amount_centavos?: number;
 };
-/** The data each push carries, for the app to route to the authoritative booking screen (T44). */
-export type PushData = { notification_id: string; kind: NotificationKind; audience: NotificationAudience; booking_kind: 'rental' | 'group'; booking_id: string };
+/**
+ * The data each push carries, for the app to open the authoritative booking screen (T44). IDs, start
+ * and kind only; `recipient` is the account it was sent to, so a phone now signed in to another
+ * account never opens it.
+ */
+export type PushData = {
+  notification_id: string; kind: NotificationKind; audience: NotificationAudience; booking_kind: 'rental' | 'group';
+  booking_id: string; venue_id: string; starts_at: string; recipient: string;
+};
 
 /** Worker contract with the service-only outbox commands (`push_outbox_claim|complete`, `push_receipts_due|record`). */
 export type PushClaimDevice = { id: string; token: string };
-export type PushClaimItem = { id: string; claim_id: string; kind: NotificationKind; payload: unknown; devices: PushClaimDevice[] };
+export type PushClaimItem = { id: string; claim_id: string; kind: NotificationKind; recipient: string; payload: unknown; devices: PushClaimDevice[] };
 export type PushClaim = { items: PushClaimItem[]; more: boolean };
 export type PushDeliveryOutcome =
   | { device_id: string; outcome: 'ok'; ticket_id: string | null }
@@ -49,7 +61,9 @@ export class NotificationInputError extends Error {
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const record = (raw: unknown): Record<string, unknown> => {
+const STARTS_AT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
+const isStartsAt = (value: unknown): value is string => typeof value === 'string' && STARTS_AT.test(value) && !Number.isNaN(Date.parse(value));
+const record =(raw: unknown): Record<string, unknown> => {
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) throw new NotificationInputError();
   return raw as Record<string, unknown>;
 };
@@ -80,8 +94,7 @@ export function readNotificationPayload(raw: unknown): NotificationPayload {
     || (input.audience !== 'owner' && input.audience !== 'player') || (input.booking_kind !== 'rental' && input.booking_kind !== 'group')
     || typeof input.booking_id !== 'string' || !UUID.test(input.booking_id) || typeof input.venue_id !== 'string' || !UUID.test(input.venue_id)
     || typeof input.venue_name !== 'string' || input.venue_name.trim().length === 0 || input.venue_name.length > 120
-    || typeof input.starts_at !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(input.starts_at) || Number.isNaN(Date.parse(input.starts_at))
-    || (payment && !isPhpCentavos(input.amount_centavos))) {
+    || !isStartsAt(input.starts_at) || (payment && !isPhpCentavos(input.amount_centavos))) {
     throw new NotificationInputError('Invalid notification payload.');
   }
   return { audience: input.audience, booking_kind: input.booking_kind, booking_id: input.booking_id.toLowerCase(), venue_id: input.venue_id.toLowerCase(),
@@ -90,6 +103,28 @@ export function readNotificationPayload(raw: unknown): NotificationPayload {
 
 export function isNotificationKind(value: unknown): value is NotificationKind {
   return (NOTIFICATION_KINDS as readonly unknown[]).includes(value);
+}
+
+/** What the worker attaches to each push: booking facts from the parsed payload plus the row and its recipient. */
+export function pushDataFor(notificationId: string, kind: NotificationKind, recipient: string, payload: NotificationPayload): PushData {
+  return { notification_id: notificationId, kind, audience: payload.audience, booking_kind: payload.booking_kind, booking_id: payload.booking_id,
+    venue_id: payload.venue_id, starts_at: payload.starts_at, recipient: recipient.toLowerCase() };
+}
+
+/**
+ * The app's view of a tapped push. Returns null for anything it should not act on: a missing field, an
+ * unknown kind, or a kind the audience never receives. Other keys are ignored, because the push service
+ * may add its own.
+ */
+export function readPushData(raw: unknown): PushData | null {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return null;
+  const data = raw as Record<string, unknown>;
+  const uuid = (value: unknown): value is string => typeof value === 'string' && UUID.test(value);
+  if (!uuid(data.notification_id) || !isNotificationKind(data.kind) || (data.audience !== 'owner' && data.audience !== 'player')
+    || !AUDIENCE_KINDS[data.audience].includes(data.kind) || (data.booking_kind !== 'rental' && data.booking_kind !== 'group')
+    || !uuid(data.booking_id) || !uuid(data.venue_id) || !uuid(data.recipient) || !isStartsAt(data.starts_at)) return null;
+  return { notification_id: data.notification_id.toLowerCase(), kind: data.kind, audience: data.audience, booking_kind: data.booking_kind,
+    booking_id: data.booking_id.toLowerCase(), venue_id: data.venue_id.toLowerCase(), starts_at: data.starts_at, recipient: data.recipient.toLowerCase() };
 }
 
 /**
@@ -122,6 +157,7 @@ export function notificationMessage(kind: NotificationKind, payload: Notificatio
         if (payload.amount_centavos === undefined) break;
         return { title: 'Payment recorded', body: `${venue} recorded your ${formatPhpCentavos(payload.amount_centavos)} payment for your ${what} on ${when}.` };
       }
+      case 'booking.reminder': return { title: 'Starting soon', body: `Your ${what} at ${venue} starts at ${when}.` };
       default: break;
     }
   }

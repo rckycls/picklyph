@@ -1,4 +1,4 @@
-import { isNotificationKind, notificationMessage, readNotificationPayload, type PushClaim, type PushCompletion, type PushReceiptOutcome } from '../../../packages/domain/src/notification.ts';
+import { isNotificationKind, notificationMessage, pushDataFor, readNotificationPayload, type PushClaim, type PushCompletion, type PushReceiptOutcome } from '../../../packages/domain/src/notification.ts';
 import { EXPO_RECEIPT_LIMIT, EXPO_SEND_LIMIT, type ExpoMessage, type ExpoReceipt, type ExpoSendResult } from './expo.ts';
 /** Rows per claim and their lease. A run stops starting Expo calls after RUN_BUDGET_MS, well inside the lease. */
 export const PUSH_BATCH = 25;
@@ -54,7 +54,7 @@ export async function dispatchOnce(deps: Dependencies): Promise<DispatchSummary>
         totals.failed += item.devices.length;
         continue;
       }
-      const data = { notification_id: item.id, kind: item.kind, audience: payload.audience, booking_kind: payload.booking_kind, booking_id: payload.booking_id };
+      const data = pushDataFor(item.id, item.kind, item.recipient, payload);
       for (const device of item.devices) {
         queue.push({ completion, device: device.id, message: { to: device.token, title: message.title, body: message.body, sound: 'default', data } });
       }

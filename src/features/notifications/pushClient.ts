@@ -75,7 +75,7 @@ export async function syncPushRegistration(ports: PushPorts, memo: RegistrationM
 /** Subtitle for the Account **Booking alerts** row. */
 export function bookingAlertsLabel(state: PushState | null): string {
   if (!state) return 'Checking…';
-  if (state.status === 'registered') return 'On · requests, confirmations and cancellations';
+  if (state.status === 'registered') return 'On · requests, confirmations, reminders and cancellations';
   if (state.status === 'failed') {
     if (state.failure?.kind === 'rate_limited') return `Couldn’t turn on · try again in ${state.failure.retryAfterSeconds} seconds`;
     if (state.failure?.kind === 'sign_in') return 'Couldn’t turn on · sign in again, then try again';
