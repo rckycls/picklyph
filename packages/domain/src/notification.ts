@@ -1,5 +1,6 @@
 import { formatManilaDateTime } from './booking.ts';
 import { formatPhpCentavos, isPhpCentavos } from './money.ts';
+import { isCancellationReason, playerCancellationReason, type CancellationReason } from './cancellation.ts';
 
 /** T43 push notifications: the push-devices body, outbox kinds and message text. See docs/notifications.md. */
 export const MAX_PUSH_DEVICE_BYTES = 1024;
@@ -57,6 +58,8 @@ export type NotificationPayload = {
   venue_name: string;
   starts_at: string;
   amount_centavos?: number;
+  /** T40a: why the venue cancelled, on a player's `booking.cancelled` only. */
+  reason?: CancellationReason;
 };
 /**
  * The data each push carries, for the app to open the authoritative booking screen (T44). IDs, start
@@ -132,8 +135,9 @@ export function readNotificationPreferences(raw: unknown): NotificationPreferenc
 /** Strict outbox payload, so the worker never sends text built from an unexpected row. */
 export function readNotificationPayload(raw: unknown): NotificationPayload {
   const input = record(raw);
-  const payment = 'amount_centavos' in input;
-  if (keys(input) !== (payment ? 'amount_centavos,audience,booking_id,booking_kind,starts_at,venue_id,venue_name' : 'audience,booking_id,booking_kind,starts_at,venue_id,venue_name')
+  const payment = 'amount_centavos' in input; const cancelled = 'reason' in input;
+  const expected = ['audience', 'booking_id', 'booking_kind', 'starts_at', 'venue_id', 'venue_name', ...(payment ? ['amount_centavos'] : []), ...(cancelled ? ['reason'] : [])];
+  if (keys(input) !== expected.sort().join(',') || (cancelled && (input.audience !== 'player' || !isCancellationReason(input.reason)))
     || (input.audience !== 'owner' && input.audience !== 'player') || (input.booking_kind !== 'rental' && input.booking_kind !== 'group')
     || typeof input.booking_id !== 'string' || !UUID.test(input.booking_id) || typeof input.venue_id !== 'string' || !UUID.test(input.venue_id)
     || typeof input.venue_name !== 'string' || input.venue_name.trim().length === 0 || input.venue_name.length > 120
@@ -141,7 +145,8 @@ export function readNotificationPayload(raw: unknown): NotificationPayload {
     throw new NotificationInputError('Invalid notification payload.');
   }
   return { audience: input.audience, booking_kind: input.booking_kind, booking_id: input.booking_id.toLowerCase(), venue_id: input.venue_id.toLowerCase(),
-    venue_name: input.venue_name.trim(), starts_at: input.starts_at, ...(payment ? { amount_centavos: input.amount_centavos as number } : {}) };
+    venue_name: input.venue_name.trim(), starts_at: input.starts_at, ...(payment ? { amount_centavos: input.amount_centavos as number } : {}),
+    ...(cancelled ? { reason: input.reason as CancellationReason } : {}) };
 }
 
 export function isNotificationKind(value: unknown): value is NotificationKind {
@@ -195,7 +200,10 @@ export function notificationMessage(kind: NotificationKind, payload: Notificatio
       case 'booking.accepted': return { title: 'Booking confirmed', body: `${venue} confirmed your ${what} for ${when}.` };
       case 'booking.declined': return { title: 'Request declined', body: `${venue} declined your ${what} request for ${when}.` };
       case 'booking.expired': return { title: 'Request expired', body: `${venue} didn’t answer your ${what} request for ${when} in time, so it was released.` };
-      case 'booking.cancelled': return { title: 'Booking cancelled', body: `${venue} cancelled your ${what} for ${when}.` };
+      case 'booking.cancelled': {
+        const why = payload.reason ? playerCancellationReason(payload.reason) : null;
+        return { title: 'Booking cancelled', body: `${venue} cancelled your ${what} for ${when}${why ? ` ${why}` : ''}.` };
+      }
       case 'payment.recorded': {
         if (payload.amount_centavos === undefined) break;
         return { title: 'Payment recorded', body: `${venue} recorded your ${formatPhpCentavos(payload.amount_centavos)} payment for your ${what} on ${when}.` };

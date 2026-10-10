@@ -3,6 +3,7 @@ import type { RateAction, RateDecision, RatePrincipal } from '../_shared/rate-li
 export const SESSION_STATUS: Record<string, number> = {
   invalid_input: 400, not_owner: 403, session_not_found: 404, court_unavailable: 404, venue_unavailable: 404,
   outside_hours: 409, allocation_conflict: 409, request_reused: 409, session_has_bookings: 409, session_started: 409,
+  payment_collected: 409,
 };
 export class SessionRejected extends Error {
   constructor(readonly reason: string) { super(reason); }

@@ -1,9 +1,9 @@
-import { readSessionCreate, toUtcIso, type OpenPlaySession, type SessionCreate, type SessionPage, type SessionResult, type SessionSnapshot } from '@picklyph/domain';
+import { isCancellationReason, readSessionCreate, toUtcIso, type CancellationReason, type OpenPlaySession, type SessionCreate, type SessionPage, type SessionResult, type SessionSnapshot } from '@picklyph/domain';
 import { parseAllocation } from './calendarClient';
 import { ownerRequest, type HttpFailure, type HttpOutcome, type OwnerHttpTransport } from './venueClient';
 
 export const SESSION_REJECTIONS = ['invalid_request', 'invalid_input', 'not_owner', 'session_not_found', 'court_unavailable',
-  'venue_unavailable', 'outside_hours', 'allocation_conflict', 'request_reused', 'session_has_bookings', 'session_started'] as const;
+  'venue_unavailable', 'outside_hours', 'allocation_conflict', 'request_reused', 'session_has_bookings', 'session_started', 'payment_collected'] as const;
 export type SessionFailure = HttpFailure<typeof SESSION_REJECTIONS[number]>;
 export type SessionOutcome<T> = HttpOutcome<T, typeof SESSION_REJECTIONS[number]>;
 const unexpected = (): never => { throw new Error('Unexpected session response.'); };
@@ -24,6 +24,7 @@ export function parseSession(raw: unknown): OpenPlaySession {
     || !['instant', 'approval'].includes(p.confirmation as string) || !['arrival', 'online', 'both'].includes(p.payment as string)
     || typeof p.merchant_active !== 'boolean' || (!p.merchant_active && p.payment !== 'arrival')
     || !['scheduled', 'cancelled'].includes(s.status as string) || (s.status === 'cancelled') !== (s.cancelled_at !== null)
+    || (s.cancel_reason !== undefined && s.cancel_reason !== null && (s.status !== 'cancelled' || !isCancellationReason(s.cancel_reason)))
     || !Number.isInteger(s.reserved_spots) || (s.reserved_spots as number) < 0 || (s.reserved_spots as number) > input.capacity
     || !Array.isArray(s.allocations) || s.allocations.length !== input.court_ids.length
     || !Array.isArray(snap.court_hours_revisions) || snap.court_hours_revisions.length !== input.court_ids.length) return unexpected();
@@ -40,7 +41,7 @@ export function parseSession(raw: unknown): OpenPlaySession {
     policy_revision: revision(snap.policy_revision), schedule_revision: nullableRevision(snap.schedule_revision), court_hours_revisions: revisions,
     approval_hold_minutes: 120, payment_hold_minutes: 15, refund_cutoff_hours: 24 };
   return { id: id(s.id), venue_id: input.venue_id, status: s.status as OpenPlaySession['status'], created_at: instant(s.created_at),
-    cancelled_at: s.cancelled_at === null ? null : instant(s.cancelled_at), snapshot, reserved_spots: s.reserved_spots as number, allocations };
+    cancelled_at: s.cancelled_at === null ? null : instant(s.cancelled_at), cancel_reason: (s.cancel_reason ?? null) as CancellationReason | null, snapshot, reserved_spots: s.reserved_spots as number, allocations };
 }
 export function parseSessionPage(raw: unknown, venueId: string): SessionPage {
   const p = record(raw);
@@ -71,8 +72,10 @@ export function createSession(transport: OwnerHttpTransport, command: SessionCre
     return parsed;
   }, SESSION_REJECTIONS);
 }
-export function cancelSession(transport: OwnerHttpTransport, sessionId: string): Promise<SessionOutcome<SessionResult>> {
-  return ownerRequest(transport, transport.endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: 'cancel', session_id: sessionId }) }, body => {
+/** T40a: an occupied session needs a reason; it cancels every group and walk-in and alerts each player group. */
+export function cancelSession(transport: OwnerHttpTransport, sessionId: string, reason: CancellationReason | null = null): Promise<SessionOutcome<SessionResult>> {
+  const command = reason === null ? { kind: 'cancel', session_id: sessionId } : { kind: 'cancel', session_id: sessionId, reason };
+  return ownerRequest(transport, transport.endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(command) }, body => {
     const parsed = result(body);
     return parsed.session.id === sessionId.toLowerCase() && parsed.session.status === 'cancelled' && parsed.outcome !== 'created' ? parsed : unexpected();
   }, SESSION_REJECTIONS);
@@ -84,7 +87,8 @@ export function sessionFailureMessage(f: SessionFailure): string {
       court_unavailable: 'Choose active courts at this venue.', session_not_found: 'This session is no longer available. Reload the list.',
       outside_hours: 'Every selected court must be open for the full session.', allocation_conflict: 'A selected court already has a booking, block or session at that time.',
       request_reused: 'This request key belongs to different session details. Resolve the original session first.',
-      session_has_bookings: 'This session has participants. Cancellation with bookings is not available here yet.', session_started: 'This session has already started.',
+      session_has_bookings: 'People hold spots in this session. Choose a reason so they’re told why it was cancelled.', session_started: 'This session has already started.',
+      payment_collected: 'The front desk already recorded attendance or a payment in this session, so it can’t be cancelled here.',
       invalid_input: 'Check the title, capacity, group limit, price and future times.', invalid_request: 'Check the session details and try again.',
     }; return messages[f.reason];
   }

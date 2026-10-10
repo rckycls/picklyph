@@ -4,14 +4,14 @@ import {
   type RentalQuote, type RentalRequest, type RentalSnapshot, type VenuePolicy,
 } from '@picklyph/domain';
 
-import { parseOperations } from '../owner/operationsModel';
+import { parseOperations, parseVenueCancellation } from '../owner/operationsModel';
 import { ownerRequest, type HttpFailure, type HttpOutcome, type OwnerHttpTransport } from '../owner/venueClient';
 
 export type RentalTransport = OwnerHttpTransport;
 const REASONS = ['invalid_request', 'invalid_input', 'invalid_time', 'minimum_duration', 'duration_increment', 'maximum_duration',
   'slot_alignment', 'player_required', 'not_player', 'not_owner', 'booking_not_found', 'court_unavailable', 'venue_unavailable',
   'start_not_future', 'outside_horizon', 'outside_hours', 'allocation_conflict', 'request_reused', 'stale_quote',
-  'arrival_unavailable', 'invalid_transition', 'allocation_ended', 'price_overflow', 'not_started', 'payment_recorded', 'amount_mismatch'] as const;
+  'arrival_unavailable', 'invalid_transition', 'allocation_ended', 'price_overflow', 'not_started', 'payment_recorded', 'amount_mismatch', 'payment_collected'] as const;
 export type RentalReason = typeof REASONS[number];
 export type RentalFailure = HttpFailure<RentalReason>;
 export type RentalOutcome<T> = HttpOutcome<T, RentalReason>;
@@ -74,7 +74,8 @@ export function parseBooking(raw: unknown): RentalBooking {
   if (guest_name !== null && guest_name !== b.guest_name) return fail();
   const operations = parseOperations(b.operations, b.payment_status, snapshot.total_centavos);
   return { id: bookingId, source: b.source as RentalBooking['source'], guest_name, status: b.status as RentalBooking['status'], payment_method: 'arrival',
-    payment_status: operations.payment ? 'paid' : 'unpaid', operations, created_at: instant(b.created_at), updated_at: instant(b.updated_at), snapshot,
+    payment_status: operations.payment ? 'paid' : 'unpaid', operations, venue_cancellation: parseVenueCancellation(b.venue_cancellation, b.status),
+    created_at: instant(b.created_at), updated_at: instant(b.updated_at), snapshot,
     allocation: { id: bookingId, venue_id: venueId, court_id: courtId, kind: 'rental', starts_at, ends_at,
       expires_at, state: a.state as RentalBooking['allocation']['state'], ended_at: a.ended_at === null ? null : instant(a.ended_at) } };
 }

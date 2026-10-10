@@ -6,7 +6,7 @@ export const RENTAL_STATUS: Record<string, number> = {
   player_required: 403, not_player: 403, not_owner: 403, booking_not_found: 404, court_unavailable: 404, venue_unavailable: 404,
   start_not_future: 409, outside_horizon: 409, outside_hours: 409, allocation_conflict: 409, request_reused: 409,
   stale_quote: 409, arrival_unavailable: 409, invalid_transition: 409, allocation_ended: 409, price_overflow: 409,
-  not_started: 409, payment_recorded: 409, amount_mismatch: 409,
+  not_started: 409, payment_recorded: 409, amount_mismatch: 409, payment_collected: 409,
 };
 export class RentalRejected extends Error {
   constructor(readonly reason: string) { super(reason); }
@@ -51,6 +51,7 @@ export function createRentalHandler(deps: Dependencies) {
     } catch { return respond(400, { error: 'invalid_request' }); }
     // Bounded parsing selects a release bucket without preventing cancellation in outages.
     // Outside rentals take inventory, so like acceptance they need an enforced owner allowance; front-desk records continue.
+    // Venue cancellations (T40a) release inventory, so like player cancellations they use the cancel bucket.
     const action = query ? 'owner-read' : command?.kind === 'request' ? 'hold-create'
       : command?.kind === 'accept' || command?.kind === 'owner_entry' ? 'owner-edit' : isOperationKind(command?.kind) ? 'owner-ops' : 'cancel';
     let decision: RateDecision;

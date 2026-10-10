@@ -1,5 +1,5 @@
-import { ARRIVAL_PAYMENT_METHODS, formatPhpCentavos, toManilaDateTime,
-  type ArrivalPaymentMethod, type BookingOperationCommand, type BookingOperations, type CalendarView } from '@picklyph/domain';
+import { ARRIVAL_PAYMENT_METHODS, CANCELLATION_REASON_LABELS, CANCELLATION_REASONS, formatPhpCentavos, toManilaDateTime,
+  type ArrivalPaymentMethod, type BookingOperationCommand, type BookingOperations, type CalendarView, type CancellationReason } from '@picklyph/domain';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, StyleSheet, Text, View } from 'react-native';
@@ -20,12 +20,12 @@ import { fonts } from '@/theme/typography';
 import { usePages } from '../openPlay/usePages';
 import { calendarMarks, courtDay, weekSpan } from './calendarModel';
 import { deskEntries, deskSummary, entryTone, type DeskEntry } from './deskCalendar';
-import { deskFailureMessage, deskStart, deskTotal, loadDay, mergeDesk, operate, shortReference,
+import { deskFailureMessage, deskStart, deskTotal, loadDay, mergeDesk, operate, shortReference, venueCancel,
   type DeskBooking, type DeskFailure, type DeskKind, type DeskPage, type DeskReason } from './deskClient';
 import { deskServices } from './deskLive';
 import { Choice } from './FormControls';
 import { liveCalendar } from './liveOwner';
-import { availableOperations, PAYMENT_METHOD_LABELS } from './operationsModel';
+import { availableOperations, canVenueCancel, PAYMENT_METHOD_LABELS } from './operationsModel';
 import { OwnerScreen } from './OwnerScreen';
 
 const LEGEND = [
@@ -57,13 +57,15 @@ const entryTimes = (entry: DeskEntry) =>
 /**
  * The day's confirmed bookings on a court timeline under a week strip. Tap a booking to check
  * players in, record their payment or mark a no-show. Records open at each booking's start by
- * the server's clock and never change a booking's status, snapshot or inventory.
+ * the server's clock and never change a booking's status, snapshot or inventory. Before the start,
+ * a confirmed player booking can be cancelled for a reason the player is told (T40a).
  */
 export function FrontDesk({ actor, venueId, initialDate }: { actor: string; venueId: string; initialDate: string | null }) {
   const { transports } = useMemo(() => deskServices(actor), [actor]);
   const [deviceToday] = useState(() => toManilaDateTime(new Date()).date);
   const [date, setDate] = useState(initialDate ?? deviceToday); const [at, setAt] = useState<string | null>(null);
   const [venue, setVenue] = useState<VenueDetail | null>(null); const [paying, setPaying] = useState<string | null>(null);
+  const [cancelling, setCancelling] = useState<string | null>(null);
   const [calendar, setCalendar] = useState<CalendarView | null>(null); const [calendarRevision, setCalendarRevision] = useState(0);
   const [busy, setBusy] = useState<string | null>(null); const [failure, setFailure] = useState<DeskFailure | null>(null);
   const [message, setMessage] = useState<string | null>(null); const lock = useRef(false); const alive = useRef(false);
@@ -92,7 +94,7 @@ export function FrontDesk({ actor, venueId, initialDate }: { actor: string; venu
     return () => abort.abort();
   }, [venueId, week.start, week.days, calendarRevision]));
 
-  const move = (next: string) => { setPaying(null); setFailure(null); setMessage(null); setAt(null); setVisible(false); setDate(next); };
+  const move = (next: string) => { setPaying(null); setCancelling(null); setFailure(null); setMessage(null); setAt(null); setVisible(false); setDate(next); };
   const refresh = () => { rentals.refresh(); groups.refresh(); setCalendarRevision((v) => v + 1); };
   const run = async (item: DeskBooking, command: BookingOperationCommand, done: string) => {
     if (lock.current) return;
@@ -104,6 +106,23 @@ export function FrontDesk({ actor, venueId, initialDate }: { actor: string; venu
       (item.kind === 'rental' ? rentals : groups).refresh();
     } finally { lock.current = false; if (alive.current) setBusy(null); }
   };
+  // A retry of the same cancellation returns the stored one, so an uncertain reply is checked by sending it again.
+  const cancelBooking = async (item: DeskBooking, reason: CancellationReason) => {
+    if (lock.current) return;
+    lock.current = true; setBusy(item.booking.id); setFailure(null); setMessage(null);
+    try {
+      const result = await venueCancel(transports, item.kind, item.booking.id, reason);
+      if (!alive.current) return;
+      if (result.ok) {
+        setCancelling(null); setVisible(false);
+        setMessage(result.value.outcome === 'existing' ? 'This booking was already cancelled by the venue.' : 'Booking cancelled. The player was told why, and the time is free again.');
+      } else setFailure(result.failure);
+      (item.kind === 'rental' ? rentals : groups).refresh(); setCalendarRevision((v) => v + 1);
+    } finally { lock.current = false; if (alive.current) setBusy(null); }
+  };
+  const confirmCancel = (item: DeskBooking, reason: CancellationReason) => Alert.alert('Cancel this booking?',
+    `Reason: ${CANCELLATION_REASON_LABELS[reason]}. The player gets an alert with it, and ${item.kind === 'rental' ? 'the court opens' : 'their spots open'} for others straight away. This can’t be undone.`,
+    [{ text: 'Keep booking', style: 'cancel' }, { text: 'Cancel booking', style: 'destructive', onPress: () => void cancelBooking(item, reason) }]);
   const confirmNoShow = (item: DeskBooking) => Alert.alert('Mark as no-show?', 'This can’t be undone. The booking stays confirmed and no payment is recorded.',
     [{ text: 'Cancel', style: 'cancel' }, { text: 'Mark no-show', style: 'destructive',
       onPress: () => void run(item, { kind: 'no_show', booking_id: item.booking.id }, 'Marked as no-show.') }]);
@@ -130,7 +149,7 @@ export function FrontDesk({ actor, venueId, initialDate }: { actor: string; venu
     key: `${entry.key}:${courtId}`, column: courtId, start: entry.start, end: entry.end, title: entryTitle(entry), detail: entryDetail(entry),
     tone: entryTone(entry), continuesBefore: entry.continuesBefore, continuesAfter: entry.continuesAfter,
     accessibilityLabel: `${courtName(courtId)}: ${entryTitle(entry)}, ${entryTimes(entry)}, ${entryDetail(entry)}`,
-    onPress: () => { setPaying(null); setFailure(null); setMessage(null); setOpen(entry.key); setVisible(true); },
+    onPress: () => { setPaying(null); setCancelling(null); setFailure(null); setMessage(null); setOpen(entry.key); setVisible(true); },
   })));
   const range = timelineRange([...columns.flatMap((column) => column.open ?? []), ...entries], { start: 480, end: 1200 });
   const entry = entries.find((e) => e.key === open) ?? null;
@@ -139,6 +158,7 @@ export function FrontDesk({ actor, venueId, initialDate }: { actor: string; venu
   const panel = (item: DeskBooking) => {
     const ops = item.booking.operations; const started = at !== null && at >= deskStart(item);
     const can = availableOperations(ops, started); const working = busy === item.booking.id; const total = formatPhpCentavos(deskTotal(item));
+    const cancellable = canVenueCancel(item.booking, started);
     return <View key={item.booking.id} style={styles.panel}>
       {item.kind === 'group' && <>
         <Text style={screenText.label}>{item.booking.source === 'walk_in' ? 'Walk-in' : 'Player group'} · {item.booking.spots} {item.booking.spots === 1 ? 'person' : 'people'}</Text>
@@ -167,6 +187,17 @@ export function FrontDesk({ actor, venueId, initialDate }: { actor: string; venu
             disabled={Boolean(busy)} onPress={() => confirmPayment(item, method)} />)}
         </View>
         <Button label="Not now" variant="secondary" onPress={() => setPaying(null)} />
+      </View>}
+      {cancellable && cancelling !== item.booking.id && <Button label="Cancel booking" variant="secondary" disabled={Boolean(busy)}
+        accessibilityLabel={`Cancel this ${item.kind === 'rental' ? 'rental' : 'group'}`} onPress={() => { setPaying(null); setCancelling(item.booking.id); }} />}
+      {cancellable && cancelling === item.booking.id && <View style={styles.methods}>
+        <Text style={screenText.label}>Why is the venue cancelling?</Text>
+        <Text style={styles.caption}>The player gets an alert with this reason. Nothing was charged, so there is nothing to refund.</Text>
+        <View style={styles.choices}>
+          {CANCELLATION_REASONS.map((reason) => <Choice key={reason} label={CANCELLATION_REASON_LABELS[reason]} selected={false}
+            disabled={Boolean(busy)} onPress={() => confirmCancel(item, reason)} />)}
+        </View>
+        <Button label="Keep booking" variant="secondary" loading={working} onPress={() => setCancelling(null)} />
       </View>}
     </View>;
   };

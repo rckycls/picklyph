@@ -24,7 +24,7 @@ const {loadVenueDetail}=require(path.join(root,'src/features/discovery/venueDeta
 const rental=require(path.join(root,'src/features/rental/__tests__/helpers.cjs'));
 const play=require(path.join(root,'src/features/openPlay/__tests__/helpers.cjs'));
 const {desk}=require(path.join(root,'src/features/owner/__tests__/deskHelpers.cjs'));
-const ownerImports={'@picklyph/domain':domain('session','booking','calendar','schedule'),'./venueClient':venueClient};
+const ownerImports={'@picklyph/domain':domain('session','booking','calendar','schedule','cancellation'),'./venueClient':venueClient};
 const calendar=ownerImports['./calendarClient']=load(path.join(root,'src/features/owner/calendarClient.ts'),ownerImports);
 const sessions=load(path.join(root,'src/features/owner/sessionClient.ts'),ownerImports);
 const reports=load(path.join(root,'src/features/discovery/reportClient.ts'),{'@picklyph/domain':domain('moderation','booking'),'../owner/venueClient':venueClient});

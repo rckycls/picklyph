@@ -3,6 +3,7 @@ import type { CourtAllocation } from './allocation.ts';
 import type { RentalPrice, RentalSnapshot } from './rental.ts';
 import type { VenuePolicy } from './policy.ts';
 import { isPhpCentavos } from './money.ts';
+import { readVenueCancel, type VenueCancelCommand, type VenueCancellation } from './cancellation.ts';
 import { isOperationKind, readBookingOperation, readGuestName, readOperationsDayQuery,
   type BookingOperationCommand, type BookingOperations, type OperationsDayQuery } from './operations.ts';
 
@@ -12,13 +13,13 @@ export type RentalQuote = RentalPrice & { court_id: string; venue_id: string; st
 /** `owner` rentals are outside bookings a current owner recorded (T31); only owners read them, with their guest label. */
 export type RentalBooking = { id: string; source: 'player' | 'owner'; guest_name: string | null; status: 'pending' | 'confirmed' | 'declined' | 'cancelled' | 'expired';
   payment_method: 'arrival'; payment_status: 'unpaid' | 'paid'; created_at: string; updated_at: string; allocation: CourtAllocation; snapshot: RentalSnapshot;
-  operations: BookingOperations };
+  operations: BookingOperations; venue_cancellation: VenueCancellation | null };
 export type RentalBookingResult = { outcome: 'created' | 'existing' | 'changed' | 'expired'; booking: RentalBooking };
 export type RentalBookingPage = { bookings: RentalBooking[]; next_cursor: string | null };
 export type RentalRequest = { kind: 'request'; court_id: string; request_id: string; starts_at: string; ends_at: string; expected_quote: RentalQuoteVersion };
 export type RentalOwnerEntry = Omit<RentalRequest, 'kind'> & { kind: 'owner_entry'; guest_name: string };
 export type RentalChange = { kind: 'accept' | 'decline' | 'cancel' | 'expire'; booking_id: string };
-export type RentalCommand = RentalRequest | RentalOwnerEntry | RentalChange | BookingOperationCommand;
+export type RentalCommand = RentalRequest | RentalOwnerEntry | RentalChange | BookingOperationCommand | VenueCancelCommand;
 export type RentalQuery = { section: 'quote'; court_id: string; starts_at: string; ends_at: string }
   | { section: 'booking'; booking_id: string }
   | { section: 'history'; after_id: string | null }
@@ -65,6 +66,9 @@ export function readRentalCommand(raw: unknown): RentalCommand {
   }
   if (isOperationKind(kind)) {
     try { return readBookingOperation(raw); } catch { throw new RentalInputError(); }
+  }
+  if (kind === 'venue_cancel') {
+    try { return readVenueCancel(raw); } catch { throw new RentalInputError(); }
   }
   if (!['accept', 'decline', 'cancel', 'expire'].includes(String(kind))) throw new RentalInputError();
   const r = fields(raw, 'booking_id,kind');

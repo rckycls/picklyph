@@ -1,7 +1,7 @@
 import { readSessionBookingCommand, sessionGroupTotal, toUtcIso,
   type SessionBooking, type SessionBookingPage, type SessionBookingResult, type SessionWalkIn } from '@picklyph/domain';
 import type { AttemptStore } from '../rental/attempt';
-import { parseOperations } from './operationsModel';
+import { parseOperations, parseVenueCancellation } from './operationsModel';
 import { ownerRequest, type HttpFailure, type HttpOutcome, type OwnerHttpTransport } from './venueClient';
 
 export const WALK_IN_REJECTIONS = ['invalid_request', 'invalid_input', 'not_owner', 'booking_not_found', 'session_not_found',
@@ -33,7 +33,8 @@ export function parseSessionBooking(raw: unknown): SessionBooking {
     return unexpected();
   const operations = parseOperations(b.operations, b.payment_status, body.expected_total_centavos);
   return { id: id(b.id), session_id: body.session_id, source: b.source as SessionBooking['source'], status: b.status as SessionBooking['status'],
-    payment_method: 'arrival', payment_status: operations.payment ? 'paid' : 'unpaid', operations, participants: body.participants, spots: body.participants.length,
+    payment_method: 'arrival', payment_status: operations.payment ? 'paid' : 'unpaid', operations, venue_cancellation: parseVenueCancellation(b.venue_cancellation, b.status),
+    participants: body.participants, spots: body.participants.length,
     expires_at: b.expires_at === null ? null : instant(b.expires_at), created_at: instant(b.created_at), updated_at: instant(b.updated_at),
     snapshot: { venue_id: id(snap.venue_id), title: snap.title, court_ids: snap.court_ids.map(id), starts_at: instant(snap.starts_at), ends_at: instant(snap.ends_at),
       price_centavos: snap.price_centavos, spots: body.participants.length, total_centavos: body.expected_total_centavos, currency: 'PHP', timezone: 'Asia/Manila',

@@ -18,7 +18,7 @@ notification, and a committed one always has its rows.
 | Owner accepts / declines | the player | `booking.accepted` / `booking.declined` |
 | Hold expires (T32 sweep, no actor) | the player | `booking.expired` |
 | Player cancels | the venue's current owners | `booking.cancelled` (owner wording) |
-| Anyone else cancels (future T40a) | the player | `booking.cancelled` (player wording) |
+| The venue cancels (T40a) | the player | `booking.cancelled` (player wording, with the reason) |
 | Owner records the arrival payment (T31) | the player | `payment.recorded` |
 | A confirmed booking starts within the hour (T44) | the player | `booking.reminder` |
 | Owner entries, walk-ins, check-in, no-show, complete | nobody | — |
@@ -30,7 +30,8 @@ active device, no account deletion in progress and the notification's topic swit
 at the same moment is skipped.
 
 The payload is fixed booking facts at event time: `audience`, `booking_kind` (`rental`/`group`),
-`booking_id`, `venue_id`, `venue_name`, `starts_at` (UTC) and, for payments, `amount_centavos`. No
+`booking_id`, `venue_id`, `venue_name`, `starts_at` (UTC), for payments `amount_centavos` and, for a
+venue cancellation (T40a, player audience only), its fixed `reason` (see docs/venue-cancellations.md). No
 participant names, phone numbers or emails. The worker builds the lock-screen text with
 `notificationMessage()` in `packages/domain/src/notification.ts` (Manila time, PHP amounts). Each push
 carries `data = {notification_id, kind, audience, booking_kind, booking_id, venue_id, starts_at, recipient}`

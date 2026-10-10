@@ -1,5 +1,6 @@
 import { readAllocationBlock, type CourtAllocation } from './allocation.ts';
 import type { VenuePolicy } from './policy.ts';
+import { isCancellationReason, type CancellationReason } from './cancellation.ts';
 
 export const MAX_SESSION_CAPACITY = 200;
 export const DEFAULT_GROUP_LIMIT = 4;
@@ -14,11 +15,14 @@ export type SessionSnapshot = Omit<SessionCreate, 'venue_id' | 'request_id'> & {
 };
 export type OpenPlaySession = {
   id: string; venue_id: string; status: 'scheduled' | 'cancelled'; created_at: string; cancelled_at: string | null;
+  /** T40a: why the venue cancelled it; null for a scheduled session or an empty one cancelled without a reason. */
+  cancel_reason: CancellationReason | null;
   snapshot: SessionSnapshot; reserved_spots: number; allocations: CourtAllocation[];
 };
 export type SessionResult = { outcome: 'created' | 'existing' | 'cancelled'; session: OpenPlaySession };
 export type SessionPage = { venue_id: string; at: string; sessions: OpenPlaySession[]; next_cursor: string | null };
-export type SessionCommand = { kind: 'create'; command: SessionCreate } | { kind: 'cancel'; session_id: string };
+/** A reason is required by the server once anyone holds a spot (T40a). */
+export type SessionCommand = { kind: 'create'; command: SessionCreate } | { kind: 'cancel'; session_id: string; reason: CancellationReason | null };
 export type SessionQuery = { venue_id: string; after_id: string | null };
 export class SessionInputError extends Error { constructor() { super('Check the session details, courts and times.'); } }
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -49,7 +53,11 @@ export function readSessionCommand(raw: unknown): SessionCommand {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new SessionInputError();
   const { kind, ...rest } = raw as Record<string, unknown>;
   if (kind === 'create') return { kind, command: readSessionCreate(rest) };
-  if (kind === 'cancel') return { kind, session_id: uuid(object(rest, 'session_id').session_id) };
+  if (kind === 'cancel') {
+    const r = object(rest, 'reason' in rest ? 'reason,session_id' : 'session_id');
+    if (r.reason !== undefined && !isCancellationReason(r.reason)) throw new SessionInputError();
+    return { kind, session_id: uuid(r.session_id), reason: r.reason === undefined ? null : r.reason as CancellationReason };
+  }
   throw new SessionInputError();
 }
 export function readSessionQuery(params: URLSearchParams): SessionQuery {

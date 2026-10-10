@@ -1,16 +1,16 @@
-import { DEFAULT_GROUP_LIMIT, formatManilaDateTime, formatPhpCentavos,
-  type OwnerVenue, type SessionCreate, type SessionPage, type SessionWalkIn } from '@picklyph/domain';
+import { CANCELLATION_REASON_LABELS, CANCELLATION_REASONS, DEFAULT_GROUP_LIMIT, formatManilaDateTime, formatPhpCentavos,
+  type CancellationReason, type OwnerVenue, type SessionCreate, type SessionPage, type SessionWalkIn } from '@picklyph/domain';
 import { randomUUID } from 'expo-crypto';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, AppState, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, AppState, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { screenText } from '@/components/ui/Screen';
 import { colors } from '@/theme/colors';
 import { fonts } from '@/theme/typography';
 import { addDays, clockLabel, dayTitle, manilaDate } from './calendarModel';
-import { OptionStepper } from './FormControls';
+import { Choice, OptionStepper } from './FormControls';
 import { liveOwnedVenue } from './liveOwner';
 import { OwnerScreen } from './OwnerScreen';
 import { cancelSession, createSession, listSessions, sessionFailureMessage } from './sessionClient';
@@ -76,13 +76,16 @@ export function SessionScheduler({ venueId, actor }: { venueId: string; actor: s
     } catch { if (alive.current) setMessage('Couldn’t confirm this session. Keep the original request and retry.'); }
     finally { working.current = false; if (alive.current) { setBusy(false); load(); } }
   };
-  const cancel = async (id: string) => {
+  // T40a: an occupied session needs a reason; every group and walk-in is cancelled and each player group is told why.
+  const cancel = async (id: string, reason: CancellationReason | null) => {
     if (!services || working.current || wait || !fresh) return;
     working.current = true; setBusy(true); setMessage(null);
     try {
-      const outcome = await cancelSession(services.transport, id);
+      const outcome = await cancelSession(services.transport, id, reason);
       if (!alive.current) return;
-      setMessage(outcome.ok ? 'Session cancelled. Its courts are available again.' : sessionFailureMessage(outcome.failure));
+      setMessage(outcome.ok ? (outcome.value.outcome === 'existing' ? 'This session was already cancelled.'
+        : reason ? 'Session cancelled. Every booking in it was cancelled, players were told why, and its courts are free again.'
+          : 'Session cancelled. Its courts are available again.') : sessionFailureMessage(outcome.failure));
       if (!outcome.ok) { setRetryAt(Date.now() + (outcome.failure.retryAfterSeconds ?? 0) * 1000); setNow(Date.now()); }
     } finally { working.current = false; if (alive.current) { setBusy(false); setConfirmCancel(null); load(); } }
   };
@@ -115,6 +118,9 @@ export function SessionScheduler({ venueId, actor }: { venueId: string; actor: s
       if (!outcome.ok) { setRetryAt(Date.now() + (outcome.failure.retryAfterSeconds ?? 0) * 1000); setNow(Date.now()); }
     } finally { working.current = false; if (alive.current) { setBusy(false); load(); } }
   };
+  const confirmOccupied = (id: string, spots: number, reason: CancellationReason) => Alert.alert('Cancel this session?',
+    `${spots} ${spots === 1 ? 'spot is' : 'spots are'} booked. Every group and walk-in is cancelled. Reason: ${CANCELLATION_REASON_LABELS[reason]}; players with spots get an alert with it. This can’t be undone.`,
+    [{ text: 'Keep session', style: 'cancel' }, { text: 'Cancel session', style: 'destructive', onPress: () => void cancel(id, reason) }]);
   const canCreate = venue?.publication_status === 'approved' && venue.claim_status === 'verified';
   const walkInPendingSession = walkInPending && page?.sessions.find(s => s.id === walkInPending.session_id);
   return <OwnerScreen>
@@ -161,7 +167,7 @@ export function SessionScheduler({ venueId, actor }: { venueId: string; actor: s
       {[...page.sessions].sort((a, b) => Date.parse(b.snapshot.starts_at) - Date.parse(a.snapshot.starts_at)).map(s => <Card key={s.id}>
         <Text accessibilityRole="header" style={screenText.title}>{s.snapshot.title}</Text>
         <Text style={screenText.body}>{formatManilaDateTime(s.snapshot.starts_at)} → {formatManilaDateTime(s.snapshot.ends_at)}</Text>
-        <Text style={screenText.body}>{s.status === 'cancelled' ? 'Cancelled' : 'Scheduled'} · {s.snapshot.court_ids.length} courts · Capacity {s.snapshot.capacity} · Group limit {s.snapshot.group_limit}</Text>
+        <Text style={screenText.body}>{s.status === 'cancelled' ? `Cancelled${s.cancel_reason ? ` · ${CANCELLATION_REASON_LABELS[s.cancel_reason]}` : ''}` : 'Scheduled'} · {s.snapshot.court_ids.length} courts · Capacity {s.snapshot.capacity} · Group limit {s.snapshot.group_limit}</Text>
         <Text style={screenText.body}>Courts: {s.snapshot.court_ids.map(id => venue?.courts.find(c => c.id === id)?.name ?? id).join(', ')}</Text>
         <Text style={screenText.body}>{formatPhpCentavos(s.snapshot.price_centavos)} per person · {s.snapshot.policy.confirmation === 'approval' ? 'Owner approval' : 'Instant confirmation'} · {s.snapshot.policy.payment === 'arrival' ? 'Pay on arrival' : s.snapshot.policy.payment === 'online' ? 'Online payment' : 'Online or arrival'}</Text>
         <Text style={screenText.body}>Spots taken: {s.reserved_spots} of {s.snapshot.capacity}</Text>
@@ -171,12 +177,21 @@ export function SessionScheduler({ venueId, actor }: { venueId: string; actor: s
           {walkInsFor === s.id && services && <SessionWalkIns session={s} transport={services.walkIns.transport} refreshKey={page.at}
             disabled={busy || loading || !fresh || !!wait || walkInPending !== null} onAdd={command => sendWalkIn(command)} onRemove={removeWalk} />}
         </>}
-        {s.status === 'scheduled' && s.reserved_spots === 0 && Date.parse(s.snapshot.starts_at) > Date.parse(page.at) && <>
-          {confirmCancel === s.id ? <>
-            <Text style={screenText.body}>Cancel this session and release every assigned court?</Text>
-            <Button label="Confirm cancellation" disabled={busy || loading || !!wait || !fresh} onPress={() => void cancel(s.id)} />
-            <Button label="Keep session" variant="secondary" disabled={busy} onPress={() => setConfirmCancel(null)} />
-          </> : <Button label="Cancel empty session" variant="secondary" disabled={busy || loading || !fresh} onPress={() => setConfirmCancel(s.id)} />}
+        {s.status === 'scheduled' && Date.parse(s.snapshot.starts_at) > Date.parse(page.at) && <>
+          {confirmCancel !== s.id ? <Button label="Cancel session" variant="secondary" disabled={busy || loading || !fresh} onPress={() => setConfirmCancel(s.id)} />
+            : s.reserved_spots === 0 ? <>
+              <Text style={screenText.body}>Cancel this session and release every assigned court?</Text>
+              <Button label="Confirm cancellation" disabled={busy || loading || !!wait || !fresh} onPress={() => void cancel(s.id, null)} />
+              <Button label="Keep session" variant="secondary" disabled={busy} onPress={() => setConfirmCancel(null)} />
+            </> : <>
+              <Text style={screenText.label}>Why is the venue cancelling?</Text>
+              <Text style={screenText.body}>Every group and walk-in is cancelled. Players with spots get an alert with this reason; nothing was charged, so there is nothing to refund.</Text>
+              <View style={styles.choices}>
+                {CANCELLATION_REASONS.map((reason) => <Choice key={reason} label={CANCELLATION_REASON_LABELS[reason]} selected={false}
+                  disabled={busy || loading || !!wait || !fresh} onPress={() => confirmOccupied(s.id, s.reserved_spots, reason)} />)}
+              </View>
+              <Button label="Keep session" variant="secondary" disabled={busy} onPress={() => setConfirmCancel(null)} />
+            </>}
         </>}
       </Card>)}
       {page.next_cursor && page.sessions.length < 200 && <Button label="Load more sessions" variant="secondary" disabled={loading || busy} onPress={() => load(page.next_cursor)} />}
@@ -195,4 +210,5 @@ const styles = StyleSheet.create({
     color: colors.text, backgroundColor: colors.surface, fontFamily: fonts.medium, fontSize: 16 },
   court: { minHeight: 44, padding: 12, borderWidth: 2, borderColor: colors.border, borderRadius: 12 },
   selected: { borderColor: colors.primary, backgroundColor: colors.selectedBackground },
+  choices: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
 });

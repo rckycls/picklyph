@@ -27,7 +27,8 @@ async function main(){
     worker.stdout.on('data',d=>out+=d);worker.stderr.on('data',d=>err+=d);
     worker.on('error',()=>resolve({code:-1,out,err}));worker.on('close',code=>{workers.delete(worker);resolve({code,out:out.trim(),err});});worker.stdin.end(query);
   });
-  const domain={...require('../../packages/domain/src/session.ts'),...require('../../packages/domain/src/booking.ts'),...require('../../packages/domain/src/calendar.ts')};
+  const domain={...require('../../packages/domain/src/session.ts'),...require('../../packages/domain/src/booking.ts'),...require('../../packages/domain/src/calendar.ts'),
+    ...require('../../packages/domain/src/cancellation.ts')};
   const imports={'@picklyph/domain':domain,'./venueClient':require('../../src/features/owner/venueClient.ts')};
   imports['./calendarClient']=load(path.resolve('src/features/owner/calendarClient.ts'),imports);
   const mobile=load(path.resolve('src/features/owner/sessionClient.ts'),imports);const {createSessionJournal}=load(path.resolve('src/features/owner/sessionAttempt.ts'),imports);

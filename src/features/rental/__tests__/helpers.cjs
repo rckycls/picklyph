@@ -2,7 +2,7 @@ const path = require('node:path');
 const load = require('../../../../supabase/tests/load-ts.cjs');
 const here = path.dirname(module.filename);
 const root = path.resolve(here, '../../../..');
-const domain = Object.assign({}, ...['booking', 'money', 'rental', 'rentalBooking', 'operations'].map(name => require(path.join(root, `packages/domain/src/${name}.ts`))));
+const domain = Object.assign({}, ...['booking', 'money', 'rental', 'rentalBooking', 'operations', 'cancellation'].map(name => require(path.join(root, `packages/domain/src/${name}.ts`))));
 const imports = { '@picklyph/domain': domain, '../owner/venueClient': require('../../owner/venueClient.ts') };
 imports['../owner/operationsModel'] = load(path.join(root, 'src/features/owner/operationsModel.ts'), imports, { Intl });
 const client = load(path.join(here, '../client.ts'), imports, { Intl });

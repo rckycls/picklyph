@@ -26,7 +26,7 @@ export function createSupabaseSessionDeps(verifier: () => SupabaseClient<Databas
     command: async (actor: string, command: SessionCommand) => {
       const { data, error } = command.kind === 'create'
         ? await server().rpc('owner_session_create', { actor_user_id: actor, session_input: command.command })
-        : await server().rpc('owner_session_cancel', { actor_user_id: actor, target_session_id: command.session_id });
+        : await server().rpc('owner_session_cancel', { actor_user_id: actor, target_session_id: command.session_id, reason: command.reason });
       if (error || !data) return rejected(error);
       return data;
     },

@@ -1,5 +1,5 @@
-import { readBookingOperation, readOperationsDate, readRentalCommand, toManilaDateTime, toUtcIso,
-  type BookingOperationCommand, type RentalBooking, type RentalBookingResult, type RentalOwnerEntry, type SessionBooking } from '@picklyph/domain';
+import { readBookingOperation, readOperationsDate, readRentalCommand, readVenueCancel, toManilaDateTime, toUtcIso,
+  type BookingOperationCommand, type CancellationReason, type RentalBooking, type RentalBookingResult, type RentalOwnerEntry, type SessionBooking } from '@picklyph/domain';
 import type { AttemptStore } from '../rental/attempt';
 import { parseBooking as parseRental } from '../rental/client';
 import { ownerRequest, type HttpFailure, type HttpOutcome, type OwnerHttpTransport } from './venueClient';
@@ -9,7 +9,7 @@ import { parseSessionBooking } from './walkInClient';
 export const DESK_REJECTIONS = ['invalid_request', 'invalid_input', 'invalid_time', 'minimum_duration', 'duration_increment', 'maximum_duration',
   'slot_alignment', 'player_required', 'not_player', 'not_owner', 'booking_not_found', 'court_unavailable', 'venue_unavailable', 'session_not_found', 'start_not_future',
   'outside_horizon', 'outside_hours', 'allocation_conflict', 'request_reused', 'stale_quote', 'arrival_unavailable', 'invalid_transition',
-  'allocation_ended', 'price_overflow', 'not_started', 'payment_recorded', 'amount_mismatch'] as const;
+  'allocation_ended', 'price_overflow', 'not_started', 'payment_recorded', 'amount_mismatch', 'payment_collected'] as const;
 export type DeskReason = typeof DESK_REJECTIONS[number];
 export type DeskFailure = HttpFailure<DeskReason>;
 export type DeskOutcome<T> = HttpOutcome<T, DeskReason>;
@@ -95,6 +95,17 @@ export function operate(t: DeskTransports, kind: DeskKind, command: BookingOpera
     return done ? r : fail();
   });
 }
+/**
+ * T40a: cancel a confirmed player booking for a fixed reason. Repeating it returns the stored cancellation (the first
+ * reason stands), so an uncertain reply is resolved by sending the same request again.
+ */
+export function venueCancel(t: DeskTransports, kind: DeskKind, bookingId: string, reason: CancellationReason): Promise<DeskOutcome<Result>> {
+  const original = readVenueCancel({ kind: 'venue_cancel', booking_id: bookingId, reason });
+  return post(t[kind], original, (body) => {
+    const r = result(kind, body); const b = r.booking.booking;
+    return b.id === original.booking_id && ['changed', 'existing'].includes(r.outcome) && b.status === 'cancelled' && b.venue_cancellation ? r : fail();
+  });
+}
 export function enterOutsideRental(t: DeskTransports, command: RentalOwnerEntry): Promise<DeskOutcome<RentalBookingResult>> {
   const original = readRentalCommand(command);
   if (original.kind !== 'owner_entry') throw new Error('Outside rental required');
@@ -138,9 +149,10 @@ export function deskFailureMessage(f: DeskFailure): string {
   const messages: Partial<Record<DeskReason, string>> = {
     not_owner: 'You no longer manage this venue.', venue_unavailable: 'This venue isn’t taking new bookings right now (it must be published with verified ownership).',
     booking_not_found: 'This booking is no longer available. Reload the list.', session_not_found: 'This session is no longer available. Reload the list.',
-    invalid_transition: 'This booking changed and that step no longer applies. Reload to see its current state.',
+    invalid_transition: 'This booking changed and that step no longer applies (cancelling closes at the start). Reload to see its current state.',
     not_started: 'Check-in, no-shows and payments open at the booking’s start time.',
     payment_recorded: 'A different payment is already recorded for this booking. Reload to see it.',
+    payment_collected: 'The front desk already recorded attendance or a payment for this booking, so it can’t be cancelled here.',
     amount_mismatch: 'The amount must equal the booking total. Reload the booking and try again.',
     allocation_conflict: 'That time overlaps another booking, block or session on this court.',
     outside_hours: 'That time isn’t fully inside this court’s hours and rates.', stale_quote: 'Rates or policy changed. Get a fresh price and review it again.',

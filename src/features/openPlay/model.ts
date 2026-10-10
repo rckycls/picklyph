@@ -1,6 +1,7 @@
 import { formatPhpCentavos, readParticipantNames, readSessionBookingCommand, sessionGroupTotal,
   type SessionBooking, type SessionBookingRequest, type SessionOffer } from '@picklyph/domain';
 import type { GroupFailure } from './client';
+import { venueCancellationText } from '../owner/operationsModel';
 
 /** Only a definitive transaction rejection permits a new key. Transport/401/429/503 failures keep the original. */
 export const canForgetGroupAttempt = (f: GroupFailure): boolean => f.kind === 'rejected' && f.reason !== 'request_reused';
@@ -52,6 +53,8 @@ export const groupStatus = (b: SessionBooking): { label: string; tone: 'success'
     case 'confirmed': return { label: 'Confirmed', tone: 'success', text: 'Your group’s spots are confirmed. Payment is still due at the venue.' };
     case 'expired': return { label: 'Expired', tone: 'neutral', text: 'The approval hold ended. This group no longer holds spots.' };
     case 'declined': return { label: 'Declined', tone: 'error', text: 'The venue declined this request. This group no longer holds spots.' };
-    case 'cancelled': return { label: 'Cancelled', tone: 'neutral', text: 'This group is cancelled and no longer holds spots.' };
+    case 'cancelled': return b.venue_cancellation
+      ? { label: 'Cancelled by the venue', tone: 'error', text: venueCancellationText(b.venue_cancellation, 'group booking') }
+      : { label: 'Cancelled', tone: 'neutral', text: 'This group is cancelled and no longer holds spots.' };
   }
 };

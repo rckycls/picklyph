@@ -8,13 +8,13 @@ Choose a title, Manila date/time, active courts, participant capacity, group lim
 
 The server captures immutable title/time/courts/capacity/group limit/price, effective confirmation/payment policy and merchant state, policy/schedule/court-hours revisions, 120-minute approval hold, 15-minute payment hold and 24-hour refund cutoff. Later venue edits cannot alter an existing session. Court-hour/schedule/deactivation guards already protect its allocations. T35 must check current merchant activation again before any checkout.
 
-Sessions are immutable after creation: cancel an empty future session, then create a new one. Cancellation releases every assigned court and records one audit event. Started sessions and sessions with `reserved_spots > 0` cannot be cancelled through this command; T40 adds cancellation with participant bookings/refunds. Suspension blocks new creation but permits current owners to read history and cancel empty future sessions. A revoked owner cannot read, cancel or retry the session. Admin/moderator roles alone grant no session access.
+Sessions are immutable after creation: cancel a future session, then create a new one. Cancellation releases every assigned court and records one audit event. Started sessions cannot be cancelled. Since T40a a session with `reserved_spots > 0` can be cancelled with a fixed reason, which cancels every group and walk-in in it and alerts each player group (docs/venue-cancellations.md); without a reason it is still refused with `session_has_bookings`. Suspension blocks new creation but permits current owners to read history and cancel empty future sessions. A revoked owner cannot read, cancel or retry the session. Admin/moderator roles alone grant no session access.
 
 `owner-sessions` independently verifies every bearer with `getUser`; callers never supply the actor. GET and POST responses are private/no-store, without CORS. URL limit is 2048 characters and streamed JSON body limit is 4096 bytes. Strict contracts reject extra body fields and duplicate query keys.
 
 - `GET ?venue_id=UUID[&after_id=UUID]` → `{venue_id,at,sessions,next_cursor}`. UUID keyset pages contain at most 25 sessions, including cancelled/history records. The owner UI loads at most 200, sorts loaded records by start time and refreshes page one after changes/focus/foreground return. UUID paging is not chronological completeness.
 - `POST {kind:"create",venue_id,request_id,court_ids,title,starts_at,ends_at,capacity,group_limit,price_centavos}` → `{outcome:"created"|"existing",session}`.
-- `POST {kind:"cancel",session_id}` → `{outcome:"cancelled"|"existing",session}`.
+- `POST {kind:"cancel",session_id[,reason]}` → `{outcome:"cancelled"|"existing",session}`; sessions now carry `cancel_reason` (T40a).
 
 Known refusals include `not_owner`403, unavailable venue/court/session404 and conflict/reused-request/outside-hours/occupied-session/started-session409. Invalid input is400. Transient infrastructure errors return sanitized503 with Retry-After; rate limits return429. Creation uses the fail-closed `hold-create` guard, requiring an enforced allowance. Cancellation uses `cancel`, reads use `owner-read`; both continue under Redis outage/SDK timeout.
 
@@ -32,7 +32,9 @@ The mobile creation journal persists the exact normalized request **before** dis
 
 Each scheduled session that has not ended shows its spots taken and a **Walk-ins** panel: one name per line, a live count/total preview against the group limit and open spots, the list of current walk-ins and a confirmed **Remove walk-in** action. The add request (key and names) is saved in device-only storage under backend/account identity **before** dispatch, exactly like session creation. An uncertain reply keeps a top-level "Check your saved walk-in" card that retries the original unchanged and blocks further walk-ins until it resolves. Account deletion clears `.walk-in-attempt` too. Walk-ins block the empty-session cancellation below until they are removed. Physical iPhone checks remain for the panel: name entry and preview, add/remove confirmation, restart recovery after an uncertain add, large text and VoiceOver.
 
-## For T40 (occupied-session cancellation)
+## Occupied-session cancellation (T40a)
+
+Done by T40a: see docs/venue-cancellations.md. The notes below describe the inventory it relies on.
 
 T28 implements participant inventory: `reserved_spots` counts live pending and confirmed groups (player bookings and T29 walk-ins), changes only under the venue → session lock, and elapsed holds are released on access (including before this empty-session cancellation check). Owner reads report the effective count. Each group snapshots the immutable session price/policy; current schedules do not reprice it. Read/cancel T27 wrappers reveal no participant names. Extend occupied-session cancellation only alongside audited participant release/refund handling. Court allocations remain firm for the entire session independent of the number of spots sold.
 

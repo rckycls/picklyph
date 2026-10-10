@@ -16,6 +16,7 @@ import type { SessionBooking, SessionBookingPage, SessionBookingResult, SessionO
 import type { AllocationRange, AllocationResult } from './allocation.ts';
 import type { CalendarView, CourtHours, CourtHoursView } from './calendar.ts';
 import type { RentalBooking, RentalBookingPage, RentalBookingResult, RentalQuote, RentalQuoteVersion } from './rentalBooking.ts';
+import type { CancellationReason } from './cancellation.ts';
 
 // Schema-maintained PostgREST contract for the directory, authorization, owner-submission, ownership-review and owner-venue migrations.
 // Only the exposed public schema belongs in mobile code. PostGIS geometry is
@@ -70,7 +71,7 @@ export interface Database {
     Views: { [_ in never]: never };
     Functions: {
       owner_session_create: { Args: { actor_user_id: string; session_input: SessionCreate }; Returns: SessionResult };
-      owner_session_cancel: { Args: { actor_user_id: string; target_session_id: string }; Returns: SessionResult };
+      owner_session_cancel: { Args: { actor_user_id: string; target_session_id: string; reason?: CancellationReason | null }; Returns: SessionResult };
       owner_session_read: { Args: { actor_user_id: string; target_venue_id: string; after_id?: string | null }; Returns: SessionPage };
       session_booking_request: { Args: { actor_user_id: string; booking_input: { session_id: string; request_id: string; participants: string[]; expected_total_centavos: number } }; Returns: SessionBookingResult };
       session_walk_in: { Args: { actor_user_id: string; walk_in_input: { session_id: string; request_id: string; participants: string[]; expected_total_centavos: number } }; Returns: SessionBookingResult };
@@ -85,6 +86,8 @@ export interface Database {
       booking_operations_read: { Args: { actor_user_id: string; target_kind: 'rental' | 'session'; target_venue_id: string; target_day: string; after_id?: string | null };
         Returns: { venue_id: string; date: string; at: string; bookings: RentalBooking[] | SessionBooking[]; next_cursor: string | null } };
       rental_booking_change: { Args: { actor_user_id: string; target_booking_id: string; command: string }; Returns: RentalBookingResult };
+      owner_booking_cancel: { Args: { actor_user_id: string; target_kind: 'rental' | 'session'; target_booking_id: string; reason: CancellationReason };
+        Returns: RentalBookingResult | SessionBookingResult };
       rental_booking_read: { Args: { actor_user_id: string; target_booking_id?: string | null; target_venue_id?: string | null; after_id?: string | null }; Returns: RentalBookingPage | { booking: RentalBooking } };
       venues_in_bounds: { Args: MapBounds; Returns: VenueMapPin[] };
       directory_search: { Args: { search: VenueSearch }; Returns: VenueSearchPage };

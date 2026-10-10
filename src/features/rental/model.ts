@@ -1,5 +1,6 @@
 import { fromManilaDateTime, readRentalCommand, toManilaDateTime, type RentalBooking, type RentalQuote, type RentalRequest } from '@picklyph/domain';
 import type { RentalFailure } from './client';
+import { venueCancellationText } from '../owner/operationsModel';
 
 export function rentalWindow(courtId: string, date: string, time: string, duration: string) {
   if (!/^\d{2,4}$/.test(duration)) throw new Error('Use a duration in minutes.');
@@ -22,7 +23,9 @@ export const bookingStatus = (b: RentalBooking): { label: string; tone: 'success
     case 'confirmed': return { label: 'Confirmed', tone: 'success', text: 'Your court reservation is confirmed. Payment is still due at the venue.' };
     case 'expired': return { label: 'Expired', tone: 'neutral', text: 'The approval hold ended. This booking no longer reserves the court.' };
     case 'declined': return { label: 'Declined', tone: 'error', text: 'The venue declined this request. This booking no longer reserves the court.' };
-    case 'cancelled': return { label: 'Cancelled', tone: 'neutral', text: 'This booking is cancelled and no longer reserves the court.' };
+    case 'cancelled': return b.venue_cancellation
+      ? { label: 'Cancelled by the venue', tone: 'error', text: venueCancellationText(b.venue_cancellation, 'rental') }
+      : { label: 'Cancelled', tone: 'neutral', text: 'This booking is cancelled and no longer reserves the court.' };
   }
 };
 export function mergeHistory<B extends { id: string; created_at: string }>(existing: B[], page: { bookings: B[] }, after: string | null): B[] {

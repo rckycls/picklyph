@@ -1,6 +1,6 @@
 const assert=require('node:assert/strict');const {test}=require('node:test');const path=require('node:path');
 const load=require('../../../../supabase/tests/load-ts.cjs');
-const domain={...require('../../../../packages/domain/src/session.ts'),...require('../../../../packages/domain/src/booking.ts'),...require('../../../../packages/domain/src/money.ts'),
+const domain={...require('../../../../packages/domain/src/session.ts'),...require('../../../../packages/domain/src/cancellation.ts'),...require('../../../../packages/domain/src/booking.ts'),...require('../../../../packages/domain/src/money.ts'),
   ...require('../../../../packages/domain/src/calendar.ts'),...require('../../../../packages/domain/src/schedule.ts')};
 const here=path.dirname(module.filename);const imports={'@picklyph/domain':domain};
 imports['./calendarModel']=load(path.join(here,'../calendarModel.ts'),imports,{Intl});
@@ -56,4 +56,18 @@ test('session recovery serializes taps and retains uncertain auth/rate/outage/re
   }
   await journal.run(command(),async()=>({ok:false,failure:{kind:'rejected',reason:'allocation_conflict',retryAfterSeconds:null}}));
   assert.equal(await journal.read(),null);
+});
+test('occupied-session cancellation sends its reason; reads carry the reason only once cancelled',async()=>{
+  const cancelled=(reason)=>({...session(),status:'cancelled',cancelled_at:'2026-10-08T01:00:00Z',cancel_reason:reason,reserved_spots:0,
+    allocations:[{...session().allocations[0],state:'released',ended_at:'2026-10-08T01:00:00Z'}]});
+  let reply={outcome:'cancelled',session:cancelled('weather')};const sent=[];
+  const transport={endpoint:'https://sessions.local',apiKey:'public',accessToken:async()=>'token',fetch:async(_url,init)=>{sent.push(JSON.parse(init.body));return new Response(JSON.stringify(reply));}};
+  const done=await client.cancelSession(transport,id,'weather');assert.equal(done.ok,true);assert.equal(done.value.session.cancel_reason,'weather');
+  reply={outcome:'cancelled',session:cancelled(null)};assert.equal((await client.cancelSession(transport,id)).value.session.cancel_reason,null);
+  assert.deepEqual(sent,[{kind:'cancel',session_id:id,reason:'weather'},{kind:'cancel',session_id:id}]);
+  assert.equal(client.parseSession(session()).cancel_reason,null,'older servers omit the key');
+  for(const bad of [{...session(),cancel_reason:'weather'},cancelled('rain')]) assert.throws(()=>client.parseSession(bad));
+  transport.fetch=async()=>new Response(JSON.stringify({error:'session_has_bookings'}),{status:409});
+  const refused=await client.cancelSession(transport,id);assert.equal(refused.failure.reason,'session_has_bookings');
+  assert.match(client.sessionFailureMessage(refused.failure),/Choose a reason/);
 });

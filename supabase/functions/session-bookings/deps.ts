@@ -48,6 +48,12 @@ export function createSupabaseSessionBookingDeps(verifier: () => SupabaseClient<
         if (error || !data) return rejected(error);
         return data;
       }
+      if (command.kind === 'venue_cancel') {
+        const { data, error } = await server().rpc('owner_booking_cancel', { actor_user_id: actor, target_kind: 'session', target_booking_id: command.booking_id,
+          reason: command.reason });
+        if (error || !data) return rejected(error);
+        return data;
+      }
       const { data, error } = await server().rpc('session_booking_change', { actor_user_id: actor, target_booking_id: command.booking_id, command: command.kind });
       if (error || !data) return rejected(error);
       return data;
