@@ -210,12 +210,14 @@ from Vault (`not_configured` if either is missing). Latency is therefore up to a
 ## Tests
 
 - `npm run test:notifications`: the rollback-only PGlite suites (`supabase/tests/notifications.sql` with
-  24 function mutations and 2 dropped triggers; `reminders.sql` with 16 mutations: window boundaries to the
-  millisecond, statuses and sources, the claim-time re-check, recipients in claims, the cron hook, pruning;
+  24 function mutations and 2 dropped triggers; `reminders.sql` with 18 mutations: window boundaries to the
+  millisecond, statuses and sources, the claim-time re-check, recipients in claims, the cron hook, pruning
+  (kept at exactly two days, gone after);
   `alert-preferences.sql` with 14 mutations and the dropped deletion guard: the topic map, strict saves,
   muted owners/co-owners/players/reminders/payments, deletion and cascade), push handler/Expo/worker tests
   and the mobile client tests (preferences, the one-at-a-time writer, sign-out release and its races, the
-  in-app recipient filter, the nudge) and link tests.
+  in-app recipient filter, the nudge) and link tests. The reminder and preference suites book for tomorrow
+  (Manila): reminders are stamped with the real clock, so a sweep more than two days ahead would prune them.
 - `npm run test:notifications:local`: Docker SQL suite; real GoTrue/PostgREST registration through the
   shipped client (forged JWT, direct RPC denial, racing registrations of one token, the device cap, Redis
   outage); real booking commands; two concurrent workers against a fake Expo server (each row and device

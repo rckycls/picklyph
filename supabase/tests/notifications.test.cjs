@@ -51,6 +51,8 @@ const reminderMutations = [
   [enqueue, "and g.status = 'confirmed' and g.source = 'player'", "and g.source = 'player'"],
   [enqueue, "and g.status = 'confirmed' and g.source = 'player'", "and g.status = 'confirmed'"],
   [enqueue, "x.created_at < at_time - interval '2 days'", "x.created_at < at_time - interval '4 days'"],
+  [enqueue, "x.created_at < at_time - interval '2 days'", "x.created_at < at_time - interval '1 day'"],
+  [enqueue, "x.created_at < at_time - interval '2 days'", "x.created_at <= at_time - interval '2 days'"],
   [due, "b.status = 'confirmed' and a.state = 'active' and a.starts_at > at_time", "a.starts_at > at_time"],
   [due, "b.status = 'confirmed' and a.state = 'active' and a.starts_at > at_time", "b.status = 'confirmed' and a.state = 'active' and a.starts_at >= at_time"],
   [due, "g.status = 'confirmed' and s.status = 'scheduled' and s.starts_at > at_time", "s.status = 'scheduled' and s.starts_at > at_time"],

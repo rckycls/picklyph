@@ -14,8 +14,10 @@ begin
   end;
   raise exception 'Expected failure: %',statement;
 end; $$;
+-- Tomorrow in Manila: every sweep below stays within two days of the real clock that stamps
+-- reminders, so the two-day prune never fires by time of day.
 create function rm.at(minute integer) returns timestamptz language sql stable as $$
-select (((now() at time zone 'Asia/Manila')::date+2)::timestamp + minute*interval '1 minute') at time zone 'Asia/Manila'; $$;
+select (((now() at time zone 'Asia/Manila')::date+1)::timestamp + minute*interval '1 minute') at time zone 'Asia/Manila'; $$;
 create function rm.u(n text) returns uuid language sql immutable as $$ select ('c4a10000-0000-4000-8000-00000000000'||n)::uuid; $$;
 create function rm.v() returns uuid language sql immutable as $$ select 'c4a20000-0000-4000-8000-000000000001'::uuid; $$;
 create function rm.c(n text) returns uuid language sql immutable as $$ select ('c4a30000-0000-4000-8000-00000000000'||n)::uuid; $$;
@@ -79,6 +81,8 @@ create function rm.row(name text) returns jsonb language sql security definer se
 select to_jsonb(o) from private.notification_outbox o where o.source='reminder' and o.payload->>'booking_id'=rm.id(name)::text; $$;
 create function rm.state(name text) returns text language sql security definer set search_path='' as $$
 select o.status||':'||coalesce(o.last_error,'-') from private.notification_outbox o where o.source='reminder' and o.payload->>'booking_id'=rm.id(name)::text; $$;
+create function rm.first_made() returns timestamptz language sql security definer set search_path='' as $$
+select min(created_at) from private.booking_reminders; $$;
 create table rm.claims(item jsonb not null);
 create function rm.claimed(name text) returns jsonb language sql as $$
 select item from rm.claims where item->>'id'=rm.row(name)->>'id'; $$;
@@ -173,6 +177,7 @@ select rm.assert_that(rm.claimed('H')->>'kind'='booking.reminder' and rm.claimed
   and rm.claimed('H')->'devices'->0->>'token'='ExponentPushToken[reminder-5]','claim names the recipient');
 select rm.assert_that((select bool_and(item ? 'recipient') from rm.claims),'every claimed item names its recipient');
 
--- Reminders two days old are pruned; their bookings have long started.
+-- Reminders more than two days old are pruned; their bookings have long started.
+select rm.assert_that(rm.sweep(rm.first_made()+interval '2 days')=0 and rm.reminded()='A,B,F,G,G1,G4,H,K','exactly two days old: kept');
 select rm.assert_that(rm.sweep(now()+interval '3 days')=0 and rm.reminded()='','pruned');
 rollback;

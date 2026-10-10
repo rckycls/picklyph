@@ -15,8 +15,9 @@ begin
   end;
   raise exception 'Expected failure: %',statement;
 end; $$;
+-- Tomorrow in Manila, so the reminder sweeps stay within the two-day prune of the real clock.
 create function ap.at(minute integer) returns timestamptz language sql stable as $$
-select (((now() at time zone 'Asia/Manila')::date+2)::timestamp + minute*interval '1 minute') at time zone 'Asia/Manila'; $$;
+select (((now() at time zone 'Asia/Manila')::date+1)::timestamp + minute*interval '1 minute') at time zone 'Asia/Manila'; $$;
 create function ap.u(n text) returns uuid language sql immutable as $$ select ('c4b10000-0000-4000-8000-00000000000'||n)::uuid; $$;
 create function ap.v() returns uuid language sql immutable as $$ select 'c4b20000-0000-4000-8000-000000000001'::uuid; $$;
 create function ap.c(n text) returns uuid language sql immutable as $$ select ('c4b30000-0000-4000-8000-00000000000'||n)::uuid; $$;
