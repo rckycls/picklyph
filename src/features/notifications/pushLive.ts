@@ -5,10 +5,15 @@ import { Platform } from 'react-native';
 import { fetchWithDeadline } from '@/lib/fetchWithDeadline';
 import { getSupabase } from '@/lib/supabase';
 
-import { createRegistrationMemo, syncPushRegistration, type AlertPermission, type PushPorts, type PushState } from './pushClient';
+import type { NotificationTopic } from '@picklyph/domain';
+
+import { createRegistrationMemo, readAlertPreferences, releasePushRegistration, saveAlertPreferences, shouldPresent, syncPushRegistration,
+  type AlertPermission, type PushPorts, type PushState, type ReleaseOutcome } from './pushClient';
 
 type Notifications = typeof import('expo-notifications');
 let loaded: Promise<Notifications | null> | null = null;
+/** The signed-in account, kept by `PushRegistration`; null while signed out. */
+let signedIn: string | null = null;
 
 /**
  * expo-notifications needs native code that older development builds lack, and its modules throw
@@ -16,11 +21,19 @@ let loaded: Promise<Notifications | null> | null = null;
  */
 function notifications(): Promise<Notifications | null> {
   loaded ??= import('expo-notifications').then((module) => {
-    // Push is supplementary: while the app is open, show the banner and list entry quietly.
-    module.setNotificationHandler({ handleNotification: async () => ({ shouldShowBanner: true, shouldShowList: true, shouldPlaySound: false, shouldSetBadge: false }) });
+    // Push is supplementary: while the app is open, show the banner and list entry quietly, and only
+    // for the signed-in account (T45), so a phone that changed accounts never shows another one's.
+    module.setNotificationHandler({ handleNotification: async (notification) => {
+      const show = shouldPresent(notification.request.content.data, signedIn);
+      return { shouldShowBanner: show, shouldShowList: show, shouldPlaySound: false, shouldSetBadge: false };
+    } });
     return module;
   }).catch(() => null);
   return loaded;
+}
+
+export function setAlertRecipient(actor: string | null) {
+  signedIn = actor;
 }
 
 const readPermission = (status: { granted: boolean; status: string; ios?: { status?: number } }): AlertPermission => {
@@ -66,6 +79,29 @@ const ports: PushPorts = {
 export async function syncThisDevice(actor: string, ask: boolean): Promise<PushState> {
   if (!backend()) return { permission: 'unavailable', status: 'off' };
   return syncPushRegistration(ports, memo, actor, ask);
+}
+
+/** Reads the notification permission only: no prompt, no registration. */
+export function alertPermission(): Promise<AlertPermission> {
+  return backend() ? ports.permission() : Promise.resolve('unavailable');
+}
+
+/** Sign-out, step one: removes this phone from `actor`'s alerts and holds registration until `endRelease`. */
+export async function releaseThisDevice(actor: string): Promise<ReleaseOutcome> {
+  if (!backend()) return { status: 'none' };
+  return releasePushRegistration(ports, memo, actor);
+}
+
+/** After sign-out finished or was abandoned; an abandoned one registers again on the next check. */
+export function endRelease(actor: string) {
+  memo.unhold(backend(), actor);
+}
+
+export function alertPreferences(actor: string) {
+  return {
+    read: (signal?: AbortSignal) => readAlertPreferences(ports.transport(actor), signal),
+    save: (muted: NotificationTopic[]) => saveAlertPreferences(ports.transport(actor), muted),
+  };
 }
 
 /**

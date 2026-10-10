@@ -1,9 +1,9 @@
-# Booking notifications (T43, T44)
+# Booking notifications (T43, T44, T45)
 
 Push is supplementary: the booking screens stay the source of truth. T43 adds push device registration, a
 transactional outbox fed by booking events, and a worker that delivers through the Expo push service. T44
-adds one-hour reminders and opening the right screen from a tapped push. Per-kind preferences, a
-pre-permission explanation and sign-out unregistration are T45.
+adds one-hour reminders and opening the right screen from a tapped push. T45 adds account-wide alert
+switches, an explanation before iOS asks for permission, and sign-out that removes the phone first.
 
 ## Who hears about what
 
@@ -25,8 +25,9 @@ notification, and a committed one always has its rows.
 
 Rentals and open-play groups behave the same. The actor never hears about their own action (an owner who
 books their own venue is not told about it; a co-owner is). A row is written only for a recipient with an
-active device and no account deletion in progress. A notification never blocks a booking: a recipient
-deleted at the same moment is skipped.
+active device, no account deletion in progress and the notification's topic switched on (see
+[Alert preferences](#alert-preferences-t45)). A notification never blocks a booking: a recipient deleted
+at the same moment is skipped.
 
 The payload is fixed booking facts at event time: `audience`, `booking_kind` (`rental`/`group`),
 `booking_id`, `venue_id`, `venue_name`, `starts_at` (UTC) and, for payments, `amount_centavos`. No
@@ -74,6 +75,31 @@ switch to Owner mode and open; with no managed venue, or when the check fails, a
 instead. The screens and server reads still enforce access (a venue the owner no longer manages is refused
 there). URL deep links (`picklyph://…`) go through the same route gates.
 
+## Alert preferences (T45)
+
+Each account has five switches, all on until changed. Every (audience, kind) pair belongs to exactly one
+topic (`notificationTopic()` in the domain package, `private.notification_topic()` on the server):
+
+| Topic | Audience | Kinds |
+| --- | --- | --- |
+| `requests` | owner | `booking.requested` (needs an answer) |
+| `bookings` | owner | `booking.created`, `booking.cancelled` |
+| `updates` | player | `booking.accepted`, `booking.declined`, `booking.expired`, `booking.cancelled` |
+| `payments` | player | `payment.recorded` |
+| `reminders` | player | `booking.reminder` |
+
+`private.notification_preferences` keeps the muted topics per account (sorted, distinct; no row means
+nothing muted). `notification_enqueue` skips a recipient who muted the row's topic, so a co-owner who kept
+the topic still gets theirs. The switches are **account-wide** (every phone of the account follows them)
+and apply to rows written after the change; a row already queued still goes out. The T44 sweep records its
+decision before the outbox check, so a muted reminder is decided once and unmuting never resends it.
+
+Service-only `notification_preferences_read(actor)` and `notification_preferences_save(actor, {muted})`
+(the whole set is replaced, so retries and late duplicates land on the same answer). Unknown topics,
+duplicates and other keys are `invalid_request`. The T47 insert trigger refuses a save once account
+deletion has started (it runs before the upsert's conflict check, so it covers changes too), and the row
+goes with the Auth user.
+
 ## Device registration
 
 `POST /functions/v1/push-devices` with the signed-in bearer (verified through GoTrue) and one of:
@@ -81,11 +107,15 @@ there). URL deep links (`picklyph://…`) go through the same route gates.
 ```json
 { "kind": "register", "token": "ExponentPushToken[…]", "platform": "ios" }
 { "kind": "unregister", "token": "ExponentPushToken[…]" }
+{ "kind": "preferences", "muted": ["reminders"] }
 ```
 
-Replies: `200 {"status":"registered"}` or `{"status":"removed"}`; `400 invalid_request`; `401`
-`sign_in_required`/`invalid_auth`; `403 account_deleted`; `405`; `413` (1 KiB body cap); `415`; `429`;
-`503`. The body never names an account. Service-only `push_device_register(actor, input)`:
+`GET /functions/v1/push-devices?section=preferences` reads the switches. Replies: `200
+{"status":"registered"}`, `{"status":"removed"}` or `{"muted":[…]}`; `400 invalid_request` (also any other
+query, or a GET without it); `401` `sign_in_required`/`invalid_auth`; `403 account_deleted`; `405` (only
+GET and POST); `413` (1 KiB body cap); `415`; `429`; `503`. The body never names an account. Preferences
+use the `push-preferences` bucket (30/min per user, continues in a Redis outage: self-only, no inventory).
+Service-only `push_device_register(actor, input)`:
 
 - idempotent: the same token again refreshes `seen_at` and re-enables a disabled token;
 - a token registered from another account **moves** (new row, so the old account's deliveries never follow it);
@@ -136,16 +166,31 @@ from Vault (`not_configured` if either is missing). Latency is therefore up to a
 - `PushRegistration` (root layout) registers the phone for the signed-in account on sign-in, on return to
   the app and when iOS issues a new token. It never shows the permission prompt. One registration per
   backend, account and token per app run.
-- Account → Settings → **Booking alerts**: shows the state; a tap asks for permission the first time, opens
-  iOS Settings when denied, or retries a failed registration.
-- While the app is open, pushes show as a banner and in the list, without sound or badge. Tapping one opens
-  the booking (see above).
-- Sign-out does not unregister yet (T45). Account deletion removes devices and rows through the Auth cascade.
+- Account → Settings → **Booking alerts** shows the state and opens `/notifications` (T45): **This phone**
+  explains alerts before the iOS prompt (the prompt appears only after **Turn on booking alerts**), sends a
+  denied phone to iPhone Settings instead of asking again, and says booking works the same without alerts;
+  **What to send** holds the account's switches (owner topics appear when the account manages a venue or
+  has muted one). Switch changes go out one at a time and only the newest waiting set follows; a failure
+  puts the switches back to the last saved set.
+- `AlertsNudge` on player booking detail (pending or confirmed rentals and groups) and owner Booking
+  requests: the same explanation and **Turn on alerts**, only while iOS has never asked. **Not now** hides it
+  on this phone (`pickly.alerts.nudge.v1`). Denied, unavailable or on: nothing shows. Booking screens never
+  depend on alerts.
+- While the app is open, pushes show as a banner and in the list, without sound or badge, and **only when
+  their `recipient` is the signed-in account** (`shouldPresent`). Tapping one opens the booking (see above).
+- **Sign-out** (`useAlertSignOut`) first holds registration for the account (a foreground return cannot
+  re-register it), waits for a registration already in flight, and removes this phone's token while the
+  session still exists. If that cannot be confirmed (offline, rate limited), the person chooses **Try
+  again**, **Sign out anyway** or **Stay signed in**. After "sign out anyway" the account keeps the token
+  until the next sign-in on the phone moves it (registration moves tokens between accounts); there is no
+  unauthenticated release. Without permission (or in a build without push) there is nothing to remove.
+- Account deletion removes devices, rows and preferences through the Auth cascade.
 
 ## Rollout and operator steps
 
-1. `supabase db push` for `20261010090000_push_notifications.sql` and `20261010120000_booking_reminders.sql`
-   (T44 needs no other operator step: the push-dispatch job sweeps reminders).
+1. `supabase db push` for `20261010090000_push_notifications.sql`, `20261010120000_booking_reminders.sql`
+   and `20261010150000_notification_preferences.sql` (T44 and T45 need no other operator step: the
+   push-dispatch job sweeps reminders, and preferences are read inside the outbox write).
 2. Deploy `push-devices` and `push-dispatch` (both `verify_jwt = false` with the import map in
    `config.toml`; they reuse `DISCOVERY_SUPABASE_*`, `PICKLY_ENV` and the Upstash secrets).
 3. Set the function secret `PUSH_WORKER_SECRET` (a random value of at least 32 characters). Optionally set
@@ -155,19 +200,29 @@ from Vault (`not_configured` if either is missing). Latency is therefore up to a
    `select vault.create_secret('<worker secret>', 'push_worker_secret');`. Then run
    `select private.push_dispatch_schedule();` (pg_cron is already enabled on staging).
 5. Build a new EAS development binary: the push capability is synced by EAS, and Expo needs an APNs key
-   (`eas credentials`). H10 then checks delivery, permission denial and background behaviour on the iPhone.
+   (`eas credentials`). H10 then checks delivery, permission denial and background behaviour on the iPhone,
+   plus T45: Booking alerts explains before iOS asks; after a denial it offers Settings and booking still
+   works; a muted topic stops that alert on every phone of the account; the nudge shows once per phone and
+   **Not now** hides it; signing out with alerts on stops that account's pushes on the phone (and offline
+   asks first); another account's push never shows while the app is open.
 
 ## Tests
 
 - `npm run test:notifications`: the rollback-only PGlite suites (`supabase/tests/notifications.sql` with
   24 function mutations and 2 dropped triggers; `reminders.sql` with 16 mutations: window boundaries to the
-  millisecond, statuses and sources, the claim-time re-check, recipients in claims, the cron hook, pruning),
-  push handler/Expo/worker tests and the mobile client and link tests.
+  millisecond, statuses and sources, the claim-time re-check, recipients in claims, the cron hook, pruning;
+  `alert-preferences.sql` with 14 mutations and the dropped deletion guard: the topic map, strict saves,
+  muted owners/co-owners/players/reminders/payments, deletion and cascade), push handler/Expo/worker tests
+  and the mobile client tests (preferences, the one-at-a-time writer, sign-out release and its races, the
+  in-app recipient filter, the nudge) and link tests.
 - `npm run test:notifications:local`: Docker SQL suite; real GoTrue/PostgREST registration through the
   shipped client (forged JWT, direct RPC denial, racing registrations of one token, the device cap, Redis
   outage); real booking commands; two concurrent workers against a fake Expo server (each row and device
   once); Expo outage and `Retry-After`; `DeviceNotRegistered` from tickets and receipts; a dead worker's
   expired lease; T44 reminders on the real clock (six concurrent sweeps, a cancelled and a pending rental, an
   acceptance inside the hour, a cancellation after the reminder, the sent data read by the shipped link
-  logic); the cron hook and schedule; served Edge auth checks with nothing due. It never calls the real Expo
-  service. Run it alone: it replaces any running `functions serve` container.
+  logic); the cron hook and schedule; T45 preferences through the shipped client (racing saves, direct RPC
+  denial, muted co-owner and player, deletion refusal) and sign-out release (offline failure keeps the
+  token, retry removes it, the player's next alert is not queued); served Edge auth and preference checks
+  with nothing due. It never calls the real Expo service. Run it alone: it replaces any running
+  `functions serve` container.

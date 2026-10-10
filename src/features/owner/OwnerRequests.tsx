@@ -12,6 +12,7 @@ import { Notice } from '@/components/ui/Notice';
 import { screenText } from '@/components/ui/Screen';
 import { loadLiveVenueDetail } from '@/features/discovery/liveDirectory';
 import type { VenueDetail } from '@/features/discovery/venueDetail';
+import { AlertsNudge } from '@/features/notifications/AlertsNudge';
 import { colors } from '@/theme/colors';
 import { fonts } from '@/theme/typography';
 import { usePages } from '../openPlay/usePages';
@@ -95,6 +96,7 @@ export function OwnerRequests({ actor, venueId }: { actor: string; venueId: stri
       <Text accessibilityRole="header" style={screenText.title}>{venue?.name ?? 'Booking requests'}</Text>
       <Text style={styles.caption}>Requests hold the court or spots for up to 2 hours, capped at the start time. Accepting confirms the booking; payment stays due at the venue.</Text>
     </View>
+    <AlertsNudge actor={actor} audience="owner" />
     <View style={styles.toolbar}>
       <IconPill icon="refresh" label={rentals.busy || groups.busy ? 'Checking…' : 'Refresh'} accessibilityLabel="Refresh requests"
         loading={rentals.busy || groups.busy} onPress={() => { rentals.refresh(); groups.refresh(); }} />

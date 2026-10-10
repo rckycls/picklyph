@@ -14,6 +14,7 @@ import { BookingSummary, PriceReview, RentalError } from './ui';
 import { useRentalRead } from './useRentalRead';
 import { useRetryWait } from './useRetryWait';
 import { BookingMascot } from './BookingMascot';
+import { AlertsNudge } from '@/features/notifications/AlertsNudge';
 
 export function RentalDetail({ actor, bookingId }: { actor: string; bookingId: string }) {
   const services = useMemo(() => rentalServices(actor), [actor]);
@@ -55,6 +56,7 @@ export function RentalDetail({ actor, bookingId }: { actor: string; bookingId: s
         disabled={state.busy || wait > 0 || Boolean(state.failure)} onPress={cancelUncertain ? () => void cancel() : confirmCancel} />}
       {!canCancel && <Button label="Choose another rental" variant="accent" onPress={() => router.push({ pathname: '/rental/venue/[id]', params: { id: b.allocation.venue_id } })} />}
     </>}
+    {canCancel && <AlertsNudge actor={actor} audience="player" />}
     {cancelUncertain && <Card><Text style={screenText.body}>Cancellation has no confirmed reply. Refresh this booking or retry the same cancellation to check; avoid making a replacement reservation until its status is clear.</Text></Card>}
     <Button label="Your bookings" variant="secondary" onPress={() => router.navigate('/bookings')} />
   </OwnerScreen>;

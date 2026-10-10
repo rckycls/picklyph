@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { readPushDeviceCommand, readNotificationPayload, notificationMessage, isExpoPushToken, NotificationInputError, NOTIFICATION_KINDS, AUDIENCE_KINDS,
-  pushDataFor, readPushData } = require('../src/notification.ts');
+  pushDataFor, readPushData, NOTIFICATION_TOPICS, AUDIENCE_TOPICS, notificationTopic, readNotificationPreferences } = require('../src/notification.ts');
 
 const token = 'ExponentPushToken[xXyZ09_-]';
 const payload = (patch = {}) => ({ audience: 'player', booking_kind: 'rental', booking_id: 'C4320000-0000-4000-8000-000000000001',
@@ -85,4 +85,37 @@ test('push data: built from the parsed payload plus row and recipient, read back
     assert.equal(readPushData(bad), null, JSON.stringify(bad));
   }
   for (const kind of AUDIENCE_KINDS.owner) assert.ok(readPushData(data({ audience: 'owner', kind })), kind);
+});
+
+test('alert topics (T45): every audience/kind pair the outbox writes has exactly one, and each audience shows its own', () => {
+  const plain = (value) => JSON.parse(JSON.stringify(value));
+  const map = {};
+  for (const audience of ['owner', 'player']) for (const kind of NOTIFICATION_KINDS) map[`${audience} ${kind}`] = notificationTopic(audience, kind);
+  assert.deepEqual(map, {
+    'owner booking.requested': 'requests', 'owner booking.created': 'bookings', 'owner booking.cancelled': 'bookings',
+    'owner booking.accepted': null, 'owner booking.declined': null, 'owner booking.expired': null, 'owner payment.recorded': null, 'owner booking.reminder': null,
+    'player booking.accepted': 'updates', 'player booking.declined': 'updates', 'player booking.expired': 'updates', 'player booking.cancelled': 'updates',
+    'player payment.recorded': 'payments', 'player booking.reminder': 'reminders', 'player booking.requested': null, 'player booking.created': null,
+  });
+  assert.deepEqual(plain(NOTIFICATION_TOPICS), [...NOTIFICATION_TOPICS].sort(), 'stored order is sorted, like the server');
+  assert.deepEqual([...AUDIENCE_TOPICS.owner, ...AUDIENCE_TOPICS.player].sort(), [...NOTIFICATION_TOPICS]);
+  for (const audience of ['owner', 'player']) {
+    assert.deepEqual([...new Set(AUDIENCE_KINDS[audience].map((kind) => notificationTopic(audience, kind)))].sort(), [...AUDIENCE_TOPICS[audience]].sort(), audience);
+  }
+});
+
+test('preferences bodies and replies are strict: known topics, each once, returned in stored order', () => {
+  assert.deepEqual(readPushDeviceCommand({ kind: 'preferences', muted: [] }), { kind: 'preferences', muted: [] });
+  assert.deepEqual(readPushDeviceCommand({ muted: ['updates', 'reminders', 'bookings'], kind: 'preferences' }), { kind: 'preferences', muted: ['bookings', 'reminders', 'updates'] });
+  assert.deepEqual(readPushDeviceCommand({ kind: 'preferences', muted: [...NOTIFICATION_TOPICS].reverse() }).muted, [...NOTIFICATION_TOPICS]);
+  for (const bad of [{ kind: 'preferences' }, { kind: 'preferences', muted: 'reminders' }, { kind: 'preferences', muted: ['reminders', 'reminders'] },
+    { kind: 'preferences', muted: ['sms'] }, { kind: 'preferences', muted: [null] }, { kind: 'preferences', muted: ['Reminders'] },
+    { kind: 'preferences', muted: [], user_id: 'x' }, { kind: 'preferences', muted: [], token }, { kind: 'preferences', muted: [...NOTIFICATION_TOPICS, 'requests'] }]) {
+    assert.throws(() => readPushDeviceCommand(bad), NotificationInputError, JSON.stringify(bad));
+  }
+  assert.deepEqual(readNotificationPreferences({ muted: ['updates', 'payments'] }), { muted: ['payments', 'updates'] });
+  assert.deepEqual(readNotificationPreferences({ muted: [] }), { muted: [] });
+  for (const bad of [null, [], {}, { muted: null }, { muted: ['x'] }, { muted: ['payments', 'payments'] }, { muted: [], user_id: 'x' }]) {
+    assert.throws(() => readNotificationPreferences(bad), NotificationInputError, JSON.stringify(bad));
+  }
 });

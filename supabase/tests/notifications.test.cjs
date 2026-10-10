@@ -60,6 +60,25 @@ const reminderMutations = [
   ['private.push_dispatch_kick()', 'perform private.booking_reminders_enqueue(at_time, 200);', ''],
 ];
 
+// T45: each mutation weakens one alert-preference rule; alert-preferences.sql must then fail.
+const topic = 'private.notification_topic(text,text)';
+const save = 'public.notification_preferences_save(uuid,jsonb)';
+const preferenceMutations = [
+  ['private.notification_enqueue(text,bigint,text,uuid[],jsonb)', "and private.notification_topic(body->>'audience', event_kind) = any(p.muted))", 'and false)'],
+  ['private.notification_enqueue(text,bigint,text,uuid[],jsonb)', 'where p.user_id = r.id', 'where p.user_id is not null'],
+  ['private.notification_enqueue(text,bigint,text,uuid[],jsonb)', "private.notification_topic(body->>'audience', event_kind)", "private.notification_topic('player', event_kind)"],
+  [topic, "kind = 'booking.requested' then 'requests'", "kind = 'booking.requested' then 'bookings'"],
+  [topic, "kind in ('booking.created','booking.cancelled') then 'bookings'", "kind in ('booking.created') then 'bookings'"],
+  [topic, "'booking.expired','booking.cancelled') then 'updates'", "'booking.expired') then 'updates'"],
+  [topic, "kind = 'payment.recorded' then 'payments'", "kind = 'payment.recorded' then 'updates'"],
+  [topic, "kind = 'booking.reminder' then 'reminders'", "kind = 'booking.reminder' then 'updates'"],
+  [save, "(select count(distinct e.value) from jsonb_array_elements(preferences_input->'muted') e) <> jsonb_array_length(preferences_input->'muted')", 'false'],
+  [save, "(e.value #>> '{}') not in ('bookings','payments','reminders','requests','updates')", 'false'],
+  [save, 'is distinct from array[\'muted\']', "is null"],
+  [save, 'order by 1);', 'order by 1 desc);'],
+  [save, 'on conflict (user_id) do update set muted = excluded.muted, updated_at = excluded.updated_at;', 'on conflict (user_id) do nothing;'],
+  ['public.notification_preferences_read(uuid)', 'coalesce((select to_jsonb(p.muted)', 'coalesce((select null::jsonb'],
+];
 let ready;
 // One PGlite database with every migration, shared by both suites.
 function database() {
@@ -100,12 +119,14 @@ test('push notifications: registration, booking-event outbox, leases, retries, i
       where n.nspname in ('public', 'private') and (p.proname like 'push\\_%' or p.proname like 'notification\\_%' or p.proname like '%\\_event\\_notify'
           or p.proname like 'booking\\_reminder%')
         and has_function_privilege(r.rolname, p.oid, 'execute') order by 1, 2`)).rows.map((row) => `${row.proname}:${row.rolname}`);
-    assert.deepEqual(grants, ['push_device_register:service_role', 'push_device_unregister:service_role', 'push_outbox_claim:service_role',
+    assert.deepEqual(grants, ['notification_preferences_read:service_role', 'notification_preferences_save:service_role',
+      'push_device_register:service_role', 'push_device_unregister:service_role', 'push_outbox_claim:service_role',
       'push_outbox_complete:service_role', 'push_receipts_due:service_role', 'push_receipts_record:service_role']);
-    const tables = (await db.query(`select t, r.rolname from (values ('private.push_devices'), ('private.notification_outbox'), ('private.push_deliveries'), ('private.booking_reminders')) x(t)
+    const tables = (await db.query(`select t, r.rolname from (values ('private.push_devices'), ('private.notification_outbox'), ('private.push_deliveries'), ('private.booking_reminders'),
+      ('private.notification_preferences')) x(t)
       cross join (values ('anon'), ('authenticated'), ('service_role')) r(rolname)
       where has_table_privilege(r.rolname, x.t, 'select,insert,update,delete')`)).rows;
-    assert.deepEqual(tables, [], 'no API role can read or change devices, the outbox, deliveries or reminders');
+    assert.deepEqual(tables, [], 'no API role can read or change devices, the outbox, deliveries, reminders or alert preferences');
 
     for (const [fn, from, to] of mutations) {
       const def = (await db.query('select pg_get_functiondef($1::regprocedure) d', [fn])).rows[0].d;
@@ -140,4 +161,26 @@ test('booking reminders: the one-hour window, once per booking, confirmed player
     }
     await db.exec(suite);
   } catch (e) { throw sqlError(e, 'Reminders'); }
+});
+
+test('alert preferences: strict self-only switches, one topic per pair, muted recipients skipped, deletion guards and cascade; every mutation is caught', async () => {
+  const db = await database();
+  try {
+    const suite = fs.readFileSync(path.join(__dirname, 'alert-preferences.sql'), 'utf8');
+    await db.exec(suite);
+    for (const table of ['auth.users', 'public.venues', 'private.notification_preferences', 'private.notification_outbox', 'private.booking_reminders']) {
+      assert.equal((await db.query(`select count(*)::integer as n from ${table}`)).rows[0].n, 0, `${table} fixtures roll back`);
+    }
+    for (const [fn, from, to] of preferenceMutations) {
+      const def = (await db.query('select pg_get_functiondef($1::regprocedure) d', [fn])).rows[0].d;
+      assert.equal(def.split(from).length, 2, `${fn} contains the mutated text once: ${from}`);
+      await db.exec('begin;'); await db.exec(def.split(from).join(to));
+      await assert.rejects(db.exec(suite), /assertion failed|Expected/i, `${fn}: ${to}`);
+      await db.exec('rollback;');
+    }
+    await db.exec('begin;'); await db.exec('drop trigger notification_preferences_account_deleting on private.notification_preferences;');
+    await assert.rejects(db.exec(suite), /Expected/, 'dropped the deletion insert guard');
+    await db.exec('rollback;');
+    await db.exec(suite);
+  } catch (e) { throw sqlError(e, 'Alert preferences'); }
 });

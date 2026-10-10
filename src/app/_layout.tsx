@@ -60,6 +60,7 @@ export default function RootLayout() {
             <Stack.Screen name="play/session/[id]" options={ownerHeader('Join open play')} />
             <Stack.Screen name="play/booking/[id]" options={ownerHeader('Open-play group')} />
             <Stack.Screen name="preferences" options={ownerHeader('Preferences')} />
+            <Stack.Screen name="notifications" options={ownerHeader('Booking alerts')} />
             <Stack.Screen name="delete-account" options={ownerHeader('Delete account')} />
             <Stack.Screen name="report/[id]" options={ownerHeader('Report a listing')} />
             <Stack.Screen name="owner/submit" options={ownerHeader('Add your venue')} />

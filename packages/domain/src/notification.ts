@@ -10,12 +10,6 @@ export const EXPO_PUSH_TOKEN = /^Expo(nent)?PushToken\[[!-Z^-~]{1,200}\]$/;
 export const PUSH_PLATFORMS = ['ios', 'android'] as const;
 export type PushPlatform = typeof PUSH_PLATFORMS[number];
 
-/** Never carries an account: the server registers the verified caller's own device. */
-export type PushDeviceRegister = { kind: 'register'; token: string; platform: PushPlatform };
-export type PushDeviceUnregister = { kind: 'unregister'; token: string };
-export type PushDeviceCommand = PushDeviceRegister | PushDeviceUnregister;
-export type PushDeviceResult = { status: 'registered' | 'removed' };
-
 export const NOTIFICATION_KINDS = ['booking.requested', 'booking.created', 'booking.accepted', 'booking.declined',
   'booking.expired', 'booking.cancelled', 'payment.recorded', 'booking.reminder'] as const;
 export type NotificationKind = typeof NOTIFICATION_KINDS[number];
@@ -25,6 +19,35 @@ export const AUDIENCE_KINDS: Record<NotificationAudience, readonly NotificationK
   owner: ['booking.requested', 'booking.created', 'booking.cancelled'],
   player: ['booking.accepted', 'booking.declined', 'booking.expired', 'booking.cancelled', 'payment.recorded', 'booking.reminder'],
 };
+
+/**
+ * T45 account-wide alert switches, in stored (sorted) order. Each audience/kind pair belongs to exactly
+ * one; `private.notification_topic` is the server's copy of `notificationTopic`.
+ */
+export const NOTIFICATION_TOPICS = ['bookings', 'payments', 'reminders', 'requests', 'updates'] as const;
+export type NotificationTopic = typeof NOTIFICATION_TOPICS[number];
+/** The switches each audience sees, in display order. */
+export const AUDIENCE_TOPICS: Record<NotificationAudience, readonly NotificationTopic[]> = {
+  owner: ['requests', 'bookings'],
+  player: ['updates', 'reminders', 'payments'],
+};
+/** Account-wide: the topics this account has turned off. Nothing muted means every alert is on. */
+export type NotificationPreferences = { muted: NotificationTopic[] };
+
+export function notificationTopic(audience: NotificationAudience, kind: NotificationKind): NotificationTopic | null {
+  if (!AUDIENCE_KINDS[audience].includes(kind)) return null;
+  if (audience === 'owner') return kind === 'booking.requested' ? 'requests' : 'bookings';
+  if (kind === 'payment.recorded') return 'payments';
+  return kind === 'booking.reminder' ? 'reminders' : 'updates';
+}
+
+/** Never carries an account: the server registers the verified caller's own device. */
+export type PushDeviceRegister = { kind: 'register'; token: string; platform: PushPlatform };
+export type PushDeviceUnregister = { kind: 'unregister'; token: string };
+/** Replaces the caller's whole muted set (T45). */
+export type PushPreferencesSave = { kind: 'preferences'; muted: NotificationTopic[] };
+export type PushDeviceCommand = PushDeviceRegister | PushDeviceUnregister | PushPreferencesSave;
+export type PushDeviceResult = { status: 'registered' | 'removed' };
 /** What the outbox stores for a row: booking facts at event time, no names or contact details. */
 export type NotificationPayload = {
   audience: NotificationAudience;
@@ -73,7 +96,17 @@ export function isExpoPushToken(value: unknown): value is string {
   return typeof value === 'string' && EXPO_PUSH_TOKEN.test(value);
 }
 
-/** Strict body: `{kind:'register', token, platform}` or `{kind:'unregister', token}` and nothing else. */
+/** Known topics, each at most once, returned in stored (sorted) order; null for anything else. */
+function readTopics(raw: unknown): NotificationTopic[] | null {
+  if (!Array.isArray(raw) || raw.length > NOTIFICATION_TOPICS.length || new Set(raw).size !== raw.length
+    || !raw.every((topic) => (NOTIFICATION_TOPICS as readonly unknown[]).includes(topic))) return null;
+  return NOTIFICATION_TOPICS.filter((topic) => raw.includes(topic));
+}
+
+/**
+ * Strict body: `{kind:'register', token, platform}`, `{kind:'unregister', token}` or
+ * `{kind:'preferences', muted}` and nothing else.
+ */
 export function readPushDeviceCommand(raw: unknown): PushDeviceCommand {
   const input = record(raw);
   if (input.kind === 'register' && keys(input) === 'kind,platform,token' && isExpoPushToken(input.token)
@@ -83,7 +116,17 @@ export function readPushDeviceCommand(raw: unknown): PushDeviceCommand {
   if (input.kind === 'unregister' && keys(input) === 'kind,token' && isExpoPushToken(input.token)) {
     return { kind: 'unregister', token: input.token };
   }
+  const muted = input.kind === 'preferences' && keys(input) === 'kind,muted' ? readTopics(input.muted) : null;
+  if (muted) return { kind: 'preferences', muted };
   throw new NotificationInputError();
+}
+
+/** Strict `{muted}` from the server, in stored order. */
+export function readNotificationPreferences(raw: unknown): NotificationPreferences {
+  const input = record(raw);
+  const muted = keys(input) === 'muted' ? readTopics(input.muted) : null;
+  if (!muted) throw new NotificationInputError('Invalid notification preferences.');
+  return { muted };
 }
 
 /** Strict outbox payload, so the worker never sends text built from an unexpected row. */

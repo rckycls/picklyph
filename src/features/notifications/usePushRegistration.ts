@@ -3,16 +3,18 @@ import { AppState } from 'react-native';
 
 import { useAuth } from '@/features/auth/AuthProvider';
 
-import { syncThisDevice, watchPushToken } from './pushLive';
+import { setAlertRecipient, syncThisDevice, watchPushToken } from './pushLive';
 
 /**
  * Keeps this phone registered for the signed-in account (T43): on sign-in, on return to the app and
- * when the push token changes. It never shows the permission prompt; the Account row asks.
+ * when the push token changes. It never shows the permission prompt; the Booking alerts screen and the
+ * booking-screen nudge ask, after explaining (T45). Pushes shown in the app follow the same account.
  */
 export function usePushRegistration() {
   const { session } = useAuth();
   const actor = session?.user.id ?? null;
   useEffect(() => {
+    setAlertRecipient(actor);
     if (!actor) return;
     let active = true;
     const run = () => { if (active) void syncThisDevice(actor, false).catch(() => undefined); };

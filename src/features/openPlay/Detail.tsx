@@ -9,6 +9,7 @@ import { loadLiveVenueDetail } from '@/features/discovery/liveDirectory';
 import type { VenueDetail } from '@/features/discovery/venueDetail';
 import { OwnerScreen } from '@/features/owner/OwnerScreen';
 import { BookingMascot } from '../rental/BookingMascot';
+import { AlertsNudge } from '@/features/notifications/AlertsNudge';
 import { useRentalRead } from '../rental/useRentalRead';
 import { useRetryWait } from '../rental/useRetryWait';
 import { cancelGroup, loadGroupBooking, type GroupFailure, type GroupReason } from './client';
@@ -57,6 +58,7 @@ export function GroupDetail({ actor, bookingId }: { actor: string; bookingId: st
         disabled={state.busy || wait > 0 || Boolean(state.failure)} onPress={cancelUncertain ? () => void cancel() : confirmCancel} />}
       {!canCancel && <Button label="Find another session" variant="accent" onPress={() => router.push({ pathname: '/play/venue/[id]', params: { id: b.snapshot.venue_id } })} />}
     </>}
+    {canCancel && <AlertsNudge actor={actor} audience="player" />}
     {cancelUncertain && <Card><Text style={screenText.body}>Cancellation has no confirmed reply. Refresh this booking or retry the same cancellation to check; avoid reserving a replacement group until its status is clear.</Text></Card>}
     <Button label="Your open-play bookings" variant="secondary" onPress={() => router.navigate({ pathname: '/bookings', params: { view: 'play' } })} />
   </OwnerScreen>;

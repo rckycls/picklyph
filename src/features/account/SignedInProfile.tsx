@@ -4,8 +4,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Linking, StyleSheet, Text, View } from 'react-native';
 
 import { StatusBadge } from '@/components/ui/StatusBadge';
-import { useAuth } from '@/features/auth/AuthProvider';
 import { BookingAlertsRow } from '@/features/notifications/BookingAlertsRow';
+import { useAlertSignOut } from '@/features/notifications/useAlertSignOut';
 import { useOwnerMode } from '@/features/owner/OwnerMode';
 import { submissionBadge } from '@/features/owner/ownerForm';
 import { useMySubmissions } from '@/features/owner/useMySubmissions';
@@ -28,7 +28,6 @@ const EMPTY: ProfileDetails = { display_name: null, first_name: null, last_name:
  * and submissions live in Owner mode only; `startInOwnerMode` comes from the welcome screen's owner choice.
  */
 export function SignedInProfile({ session, startInOwnerMode = false }: { session: Session; startInOwnerMode?: boolean }) {
-  const auth = useAuth();
   const user = session.user;
   const { count, mode, error: accessError, refresh, setMode } = useOwnerMode();
   const ownerMode = mode === 'owner';
@@ -45,7 +44,7 @@ export function SignedInProfile({ session, startInOwnerMode = false }: { session
   const [emailShown, setEmailShown] = useState(false);
   const [phoneShown, setPhoneShown] = useState(false);
   const [editing, setEditing] = useState(false);
-  const [signOutError, setSignOutError] = useState<string | null>(null);
+  const signOut = useAlertSignOut(user.id);
   // Access is re-checked on every navigation; keep the last answer so the page doesn't jump.
   const [venues, setVenues] = useState<number | null>(count);
   if (count !== null && count !== venues) setVenues(count);
@@ -163,14 +162,11 @@ export function SignedInProfile({ session, startInOwnerMode = false }: { session
 
       <View style={styles.signOut}>
         <MenuGroup>
-          <MenuRow icon="leave" destructive title="Sign out of this phone" loading={auth.busy} onPress={() => {
-            setSignOutError(null);
-            void auth.signOut().catch(() => setSignOutError('We couldn’t sign out. Please try again.'));
-          }} />
+          <MenuRow icon="leave" destructive title="Sign out of this phone" loading={signOut.busy} onPress={() => void signOut.signOut()} />
           <MenuRow icon="user" destructive title="Delete account" subtitle="Remove your profile and cancel upcoming bookings"
             onPress={() => router.push('/delete-account')} />
         </MenuGroup>
-        {signOutError && <Text accessibilityRole="alert" style={styles.error}>{signOutError}</Text>}
+        {signOut.error && <Text accessibilityRole="alert" style={styles.error}>{signOut.error}</Text>}
       </View>
 
       <EditProfileSheet visible={editing} profile={details} email={user.email} photoUri={photoUri} onClose={() => setEditing(false)}

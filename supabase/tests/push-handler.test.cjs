@@ -11,7 +11,8 @@ const plain=value=>JSON.parse(JSON.stringify(value));
 const id='c4310000-0000-4000-8000-000000000001';const token='ExponentPushToken[abcDEF123-_]';
 const allowed={allowed:true,status:200,state:'enforced',headers:{'X-RateLimit-Remaining':'9'}};
 const base=(steps=[])=>({steps,verifyUser:async t=>t==='valid'?id:null,limit:async()=>allowed,
-  register:async(actor,command)=>{steps.push(['register',actor,plain(command)]);},unregister:async(actor,command)=>{steps.push(['unregister',actor,plain(command)]);}});
+  register:async(actor,command)=>{steps.push(['register',actor,plain(command)]);},unregister:async(actor,command)=>{steps.push(['unregister',actor,plain(command)]);},
+  readPreferences:async(actor)=>{steps.push(['read',actor]);return {muted:['reminders']};},savePreferences:async(actor,muted)=>{steps.push(['save',actor,plain(muted)]);return {muted};}});
 const post=(input,headers={})=>new Request('https://push.local',{method:'POST',headers:{authorization:'Bearer valid','content-type':'application/json',...headers},
   body:typeof input==='string'?input:JSON.stringify(input)});
 
@@ -20,7 +21,8 @@ test('push-devices takes the verified actor and a strict body, registers or remo
   const handler=createPushDevicesHandler(deps);
   assert.equal((await handler(post({kind:'register',token,platform:'ios'},{authorization:'Bearer forged'}))).status,401);
   assert.equal((await handler(new Request('https://push.local',{method:'POST',body:'{}'}))).status,401);
-  assert.equal((await handler(new Request('https://push.local',{headers:{authorization:'Bearer valid'}}))).status,405);
+  assert.equal((await handler(new Request('https://push.local',{method:'PUT',headers:{authorization:'Bearer valid'}}))).status,405);
+  assert.equal((await handler(new Request('https://push.local',{headers:{authorization:'Bearer valid'}}))).status,400,'GET needs section=preferences');
   assert.equal((await handler(new Request('https://push.local?user=x',{method:'POST',headers:{authorization:'Bearer valid','content-type':'application/json'},
     body:JSON.stringify({kind:'register',token,platform:'ios'})}))).status,400);
   assert.equal((await handler(post({kind:'register',token,platform:'ios'},{'content-type':'text/plain'}))).status,415);
@@ -70,6 +72,48 @@ test('push-devices deps pass only the verified actor and map database hints',asy
   await assert.rejects(createSupabasePushDeviceDeps(verifier,server({data:{status:'removed'},error:null})).register(id,{kind:'register',token,platform:'ios'}),/unavailable/);
   await createSupabasePushDeviceDeps(verifier,server({data:{status:'removed'},error:null})).unregister(id,{kind:'unregister',token});
   assert.deepEqual(calls.at(-1),['push_device_unregister',{actor_user_id:id,device_input:{token}}]);
+});
+
+test('push-devices preferences (T45): GET reads and POST replaces the verified caller switches in their own bucket',async()=>{
+  const deps=base();const seen=[];deps.limit=async(action,p)=>{seen.push([action,plain(p)]);return allowed;};
+  const handler=createPushDevicesHandler(deps);
+  const get=(query='?section=preferences',bearer='valid')=>handler(new Request(`https://push.local${query}`,{headers:{authorization:`Bearer ${bearer}`}}));
+  assert.equal((await get('?section=preferences','forged')).status,401);
+  for(const query of ['','?section=devices','?section=preferences&user=x','?user_id=x'])assert.equal((await get(query)).status,400,query);
+  const read=await get();assert.equal(read.status,200);assert.deepEqual(await read.json(),{muted:['reminders']});
+  assert.equal(read.headers.get('cache-control'),'private, no-store');
+  for(const input of [{kind:'preferences'},{kind:'preferences',muted:['sms']},{kind:'preferences',muted:['updates','updates']},{kind:'preferences',muted:[],user_id:id},
+    {kind:'preferences',muted:'updates'}])assert.equal((await handler(post(input))).status,400,JSON.stringify(input));
+  const saved=await handler(post({kind:'preferences',muted:['updates','bookings']}));
+  assert.equal(saved.status,200);assert.deepEqual(await saved.json(),{muted:['bookings','updates']});
+  assert.deepEqual(deps.steps,[['read',id],['save',id,['bookings','updates']]]);
+  assert.deepEqual(seen,[['push-preferences',{kind:'user',id}],['push-preferences',{kind:'user',id}]]);
+  const deleted=base();deleted.savePreferences=async()=>{throw new PushDeviceRejected('account_deleted');};
+  assert.equal((await createPushDevicesHandler(deleted)(post({kind:'preferences',muted:[]}))).status,403);
+  const down=base();down.readPreferences=async()=>{throw new Error('db');};
+  const failed=await createPushDevicesHandler(down)(new Request('https://push.local?section=preferences',{headers:{authorization:'Bearer valid'}}));
+  assert.equal(failed.status,503);assert.equal(failed.headers.get('retry-after'),'5');
+  // Like registration, the caller's own switches keep working in a Redis outage.
+  for(const backend of [async()=>{throw new Error('Outage');},()=>new Promise(()=>{})]){
+    const outage=base();outage.limit=createRateGuard({backend,identifier:async()=>id,timeoutMs:5});
+    assert.equal((await createPushDevicesHandler(outage)(post({kind:'preferences',muted:['payments']}))).status,200);assert.equal(outage.steps.length,1);
+  }
+});
+
+test('push-devices preference deps pass only the verified actor, parse the reply strictly and map database hints',async()=>{
+  const calls=[];const server=reply=>()=>({rpc:async(name,args)=>{calls.push([name,plain(args)]);return reply;}});
+  const verifier=()=>({auth:{getUser:async()=>({data:{user:{id}},error:null})}});
+  assert.deepEqual(plain(await createSupabasePushDeviceDeps(verifier,server({data:{muted:['updates']},error:null})).readPreferences(id)),{muted:['updates']});
+  assert.deepEqual(calls.at(-1),['notification_preferences_read',{actor_user_id:id}]);
+  assert.deepEqual(plain(await createSupabasePushDeviceDeps(verifier,server({data:{muted:['updates','bookings']},error:null})).savePreferences(id,['bookings','updates'])),
+    {muted:['bookings','updates']});
+  assert.deepEqual(calls.at(-1),['notification_preferences_save',{actor_user_id:id,preferences_input:{muted:['bookings','updates']}}]);
+  await assert.rejects(createSupabasePushDeviceDeps(verifier,server({data:{muted:['sms']},error:null})).readPreferences(id),/Invalid notification preferences/);
+  await assert.rejects(createSupabasePushDeviceDeps(verifier,server({data:{muted:[],user:id},error:null})).savePreferences(id,[]),/Invalid notification preferences/);
+  await assert.rejects(createSupabasePushDeviceDeps(verifier,server({data:null,error:{hint:'account_deleted'}})).savePreferences(id,[]),
+    e=>e instanceof PushDeviceRejected&&e.reason==='account_deleted');
+  await assert.rejects(createSupabasePushDeviceDeps(verifier,server({data:null,error:{hint:'account_required'}})).savePreferences(id,[]),/unavailable/);
+  await assert.rejects(createSupabasePushDeviceDeps(verifier,server({data:null,error:{message:'x'}})).readPreferences(id),/unavailable/);
 });
 
 // Expo client: a fetch double records requests and replays scripted responses.

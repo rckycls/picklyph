@@ -7,7 +7,7 @@ import type { OwnerDuplicate, OwnerSubmission, OwnerSubmitResult, OwnerVenueInpu
 import type { OwnershipDecisionResult, OwnershipQueuePage, OwnershipReview, ReviewRejectionReason } from './review.ts';
 import type { ModerationQueuePage, ModerationResult, ModerationVenue, ReportReason, RevocationReason, VenueReportRequest, VenueReportResult } from './moderation.ts';
 import type { AccountDeletionBegin, AccountDeletionStatus } from './privacy.ts';
-import type { PushCompletion, PushPlatform, PushReceiptOutcome } from './notification.ts';
+import type { NotificationPreferences, PushCompletion, PushPlatform, PushReceiptOutcome } from './notification.ts';
 import type { OwnedVenueSummary, OwnerPhotoAddResult, OwnerPhotoRemoveResult, OwnerVenue, OwnerVenueDetails, OwnerVenuePhoto } from './ownerVenues.ts';
 import type { ScheduleView, VenueSchedule } from './schedule.ts';
 import type { VenuePolicy, VenuePolicyView } from './policy.ts';
@@ -168,6 +168,8 @@ export interface Database {
       account_deletion_status: { Args: { target_user_id: string }; Returns: AccountDeletionStatus };
       push_device_register: { Args: { actor_user_id: string; device_input: { token: string; platform: PushPlatform } }; Returns: { status: 'registered' } };
       push_device_unregister: { Args: { actor_user_id: string; device_input: { token: string } }; Returns: { status: 'removed' } };
+      notification_preferences_read: { Args: { actor_user_id: string }; Returns: NotificationPreferences };
+      notification_preferences_save: { Args: { actor_user_id: string; preferences_input: NotificationPreferences }; Returns: NotificationPreferences };
       // The worker parses the claim strictly, so it is typed as unknown here.
       push_outbox_claim: { Args: { batch_limit?: number; lease_seconds?: number }; Returns: unknown };
       push_outbox_complete: { Args: { results: PushCompletion[] }; Returns: { completed: number; stale: number } };

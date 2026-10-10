@@ -18,11 +18,13 @@ async function main(){
     'devices',(select jsonb_agg(id order by id) from private.push_devices),'outbox',(select jsonb_agg(id order by id) from private.notification_outbox),
     'deliveries',(select count(*) from private.push_deliveries),'allocations',(select jsonb_agg(id order by id) from private.court_allocations),
     'reminders',(select jsonb_agg(id order by id) from private.booking_reminders),
+    'preferences',(select jsonb_agg(user_id order by user_id) from private.notification_preferences),
     'vault',(select jsonb_agg(name order by name) from vault.secrets),'extensions',(select jsonb_agg(extname order by extname) from pg_extension));`)+cronJobs();
   const beforeInventory=inventory();
   run([...args,'-o','/dev/null'],fs.readFileSync(path.join(__dirname,'notifications.sql'),'utf8'));
   run([...args,'-o','/dev/null'],fs.readFileSync(path.join(__dirname,'reminders.sql'),'utf8'));
-  console.log('PASS: Docker notifications and reminders SQL: registration rules, event fan-out, actor exclusion, rollback, claim/complete/lease/retry/receipt rules, cascades; reminder window, once per booking, claim-time re-check, cron hook.');
+  run([...args,'-o','/dev/null'],fs.readFileSync(path.join(__dirname,'alert-preferences.sql'),'utf8'));
+  console.log('PASS: Docker notifications, reminders and alert-preferences SQL: registration rules, event fan-out, actor exclusion, rollback, claim/complete/lease/retry/receipt rules, cascades; reminder window, once per booking, claim-time re-check, cron hook; topic map, strict self-only switches, muted recipients skipped, deletion guard.');
   const cli=path.resolve('node_modules/@supabase/cli-windows-x64/bin/supabase.exe');const config=JSON.parse(execFileSync(cli,['status','-o','json'],{stdio:['ignore','pipe','pipe'],timeout:20000}));
   const api=new URL(config.API_URL);assert.ok(api.protocol==='http:'&&['localhost','127.0.0.1'].includes(api.hostname)&&api.port==='54321','Loopback required');
   const options={auth:{persistSession:false,autoRefreshToken:false},global:{fetch:(input,init)=>fetch(input,{...init,signal:AbortSignal.timeout(20000)})}};
@@ -221,6 +223,47 @@ async function main(){
     if(!hadJob)sql(`select cron.unschedule('push-dispatch');`);
     console.log('PASS: kick is a no-op with nothing due and refuses (not_configured) without Vault secrets; pg_cron push-dispatch job (every minute) is idempotent.');
 
+    // T45 alert preferences through the shipped client, handler and real PostgREST: racing saves keep one row; a muted topic skips only that account.
+    const plainJson=value=>JSON.parse(JSON.stringify(value));
+    assert.deepEqual(plainJson(await mobile.readAlertPreferences(transport(2))),{ok:true,value:{muted:[]}});
+    const sets=[['updates'],['reminders','updates'],['payments'],['bookings','updates'],['updates'],[]];
+    const raced=await Promise.all(sets.map(set=>mobile.saveAlertPreferences(transport(2),set)));
+    assert.ok(raced.every(r=>r.ok),'every racing save answered with the set it sent');
+    assert.equal(sql(`select count(*) from private.notification_preferences where user_id='${users[2]}'`),'1');
+    assert.ok(sets.map(set=>[...set].sort().join()).includes(sql(`select array_to_string(muted,',') from private.notification_preferences where user_id='${users[2]}'`)),'one whole set won');
+    assert.equal((await mobile.saveAlertPreferences(transport(2),['updates'])).ok,true);assert.equal((await mobile.saveAlertPreferences(transport(1),['requests'])).ok,true);
+    assert.deepEqual(plainJson(await mobile.readAlertPreferences(transport(2))),{ok:true,value:{muted:['updates']}});
+    const directSave=await clients[2].rpc('notification_preferences_save',{actor_user_id:users[1],preferences_input:{muted:[]}});
+    assert.equal(directSave.error?.code,'42501');assert.equal((await clients[2].rpc('notification_preferences_read',{actor_user_id:users[1]})).error?.code,'42501');
+    assert.equal(sql(`select array_to_string(muted,',') from private.notification_preferences where user_id='${users[1]}'`),'requests','direct calls changed nothing');
+    const mutedBooking=rent(2,courts[0],1200,1260);assert.equal(change(0,mutedBooking,'accept'),'confirmed');
+    const bookingRows=id=>outbox(`and o.payload->>'booking_id'='${id}'`).map(r=>`${r.kind}>${r.to}`);
+    assert.deepEqual(bookingRows(mutedBooking),[`booking.requested>${users[0]}`],'co-owner muted requests and player A muted updates: only the owner hears');
+    sql(`insert into private.account_deletions(user_id) values('${users[1]}');`);
+    const refused=await mobile.saveAlertPreferences(transport(1),[]);
+    sql(`delete from private.account_deletions where user_id='${users[1]}';`);
+    assert.deepEqual(plainJson(refused.failure),{kind:'rejected',reason:'account_deleted',retryAfterSeconds:null});
+    console.log('PASS: T45 preferences: shipped client + real GoTrue/PostgREST; 6 racing saves → 1 row holding one whole set; direct RPCs 42501; muted co-owner (requests) and player (updates) skipped while the owner hears; deleting account refused.');
+
+    // Sign-out: the shipped release removes this phone from the account while the session exists. Offline it reports the failure and keeps the
+    // registration, registration stays held, and the retry removes it. With no active phone left, the player's next alert is not queued.
+    const phone=fetchOverride=>({backend:'https://local.test',platform:'ios',permission:async()=>'granted',request:async()=>'granted',token:async()=>pushToken('a1'),
+      transport:()=>fetchOverride?{...transport(2),fetch:fetchOverride}:transport(2)});
+    const memo=mobile.createRegistrationMemo();
+    assert.equal((await mobile.syncPushRegistration(phone(),memo,users[2],false)).status,'registered');
+    const offlineRelease=await mobile.releasePushRegistration(phone(async()=>{throw new Error('offline');}),memo,users[2]);
+    assert.equal(offlineRelease.status,'failed');assert.equal(offlineRelease.failure.kind,'network');assert.equal(devices(2),'a1,a2!','offline: registration kept');
+    assert.equal((await mobile.syncPushRegistration(phone(),memo,users[2],true)).status,'paused','held while signing out');
+    assert.deepEqual(plainJson(await mobile.releasePushRegistration(phone(),memo,users[2])),{status:'released'});assert.equal(devices(2),'a2!','a1 left the account');
+    assert.equal((await mobile.saveAlertPreferences(transport(2),[])).ok,true);
+    const afterSignOut=rent(2,courts[1],1200,1260);assert.equal(change(0,afterSignOut,'accept'),'confirmed');
+    assert.deepEqual(bookingRows(afterSignOut),[`booking.requested>${users[0]}`],'no acceptance queued for a phone that signed out');
+    // Send what is due and read its receipts, so nothing is left for the served worker (which would call the real Expo).
+    receiptPlan=()=>({status:'ok'});const flushed=await dispatch();assert.equal(flushed.claimed,2);assert.equal(flushed.sent,2);
+    sql(`update private.push_deliveries set sent_at=clock_timestamp()-interval '16 minutes' where receipt is null;`);assert.ok((await dispatch()).receipts>=2);
+    assert.ok(!expoLog.sent.some(m=>[mutedBooking,afterSignOut].includes(m.data.booking_id)&&m.to!==pushToken('owner')),'only the owner phone got these');
+    console.log('PASS: T45 sign-out: offline release failed (network) and kept a1; registration held meanwhile; retry removed a1; the next acceptance queued nothing for player A; due rows and receipts flushed.');
+
     // Account deletion through Auth removes the account's devices and pending rows.
     check(await service.auth.admin.deleteUser(users[3]),'Delete racer');assert.equal(sql(`select count(*) from private.push_devices where user_id='${users[3]}'`),'0');
 
@@ -238,16 +281,22 @@ async function main(){
       await new Promise(r=>setTimeout(r,500));}
     assert.ok(ready,'Fresh Edge ready');
     const body=JSON.stringify({kind:'register',token:pushToken('served'),platform:'ios'});
-    assert.equal((await invoke('push-devices',forged,{body})).status,401);assert.equal((await invoke('push-devices',tokens[5],{method:'GET',body:undefined})).status,405);
+    assert.equal((await invoke('push-devices',forged,{body})).status,401);assert.equal((await invoke('push-devices',tokens[5],{method:'PUT'})).status,405);
+    assert.equal((await invoke('push-devices',tokens[5],{method:'GET',body:undefined})).status,400,'GET needs section=preferences');
     const served=await invoke('push-devices',tokens[5],{body});assert.equal(served.status,200,'Redis absent: registration continues');assert.deepEqual(await served.json(),{status:'registered'});
     assert.equal(devices(5),'served');
+    const servedSave=await invoke('push-devices',tokens[5],{body:JSON.stringify({kind:'preferences',muted:['reminders','payments']})});
+    assert.equal(servedSave.status,200,'Redis absent: preferences continue');assert.deepEqual(await servedSave.json(),{muted:['payments','reminders']});
+    const servedRead=await invoke('push-devices?section=preferences',tokens[5],{method:'GET',body:undefined});
+    assert.equal(servedRead.status,200);assert.deepEqual(await servedRead.json(),{muted:['payments','reminders']});
+    assert.equal((await invoke('push-devices?section=preferences',forged,{method:'GET',body:undefined})).status,401);
     assert.equal((await invoke('push-dispatch',null,{body:'{}'})).status,401);assert.equal((await invoke('push-dispatch',tokens[5],{body:'{}'})).status,401);
     assert.equal((await invoke('push-dispatch',secret,{method:'GET',body:undefined})).status,405);
     assert.equal(sql(`select count(*) from private.notification_outbox where status in ('pending','sending')`),'0','nothing due before the served worker');
     assert.equal(sql(`select count(*) from private.push_deliveries where receipt is null`),'0','no receipts due before the served worker');
     const servedRun=await invoke('push-dispatch',secret,{body:'{}'});assert.equal(servedRun.status,200);
     assert.deepEqual(await servedRun.json(),{claimed:0,sent:0,retried:0,invalid:0,failed:0,stale:0,receipts:0});
-    console.log('PASS: actual served Edge: push-devices forged 401, GET 405, register 200 with Redis absent; push-dispatch no/user bearer 401, GET 405, worker secret 200 with nothing due.');
+    console.log('PASS: actual served Edge: push-devices forged 401, PUT 405, bare GET 400, register and preferences save/read 200 with Redis absent; push-dispatch no/user bearer 401, GET 405, worker secret 200 with nothing due.');
   }finally{
     if(child&&child.exitCode===null)child.kill();if(fake)fake.close();let clean=true;const steps=[];
     if(cronCreated)steps.push(()=>sql('drop extension pg_cron;'));
