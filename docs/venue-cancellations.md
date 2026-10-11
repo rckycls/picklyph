@@ -36,6 +36,8 @@ Each cancel event goes through the T43 trigger: the actor is an owner, so the pl
 
 ## Rollout
 
+**Staging (2026-10-11):** step 1 done in that order (`push-dispatch` deployed, migration applied, the three booking functions redeployed). Player alerts for venue cancellations wait for the push worker setup in docs/notifications.md.
+
 1. Deploy `push-dispatch` first (its payload parser now accepts `reason`; the old one would drop such rows), then `supabase db push` for `20261011090000_venue_cancellations.sql`, then redeploy `rental-bookings`, `session-bookings` and `owner-sessions`. Until the three are redeployed, the new commands are simply unavailable; existing calls keep working.
 2. Reload Metro; no native module or new EAS build is needed beyond T43's push build.
 3. iPhone checks (H08/H10): cancel a rental and a group from the front desk with each kind of reason; cancel an occupied session; confirm the player's detail, history and push text; confirm the slot is bookable again; check large text and VoiceOver on the reason chips.

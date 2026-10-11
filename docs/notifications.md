@@ -189,6 +189,8 @@ from Vault (`not_configured` if either is missing). Latency is therefore up to a
 
 ## Rollout and operator steps
 
+**Staging (2026-10-11):** steps 1–2 done (all three migrations applied; both functions ACTIVE). Steps 3–5 are pending, so `push-dispatch` answers 503 `not_configured` and no push is sent yet.
+
 1. `supabase db push` for `20261010090000_push_notifications.sql`, `20261010120000_booking_reminders.sql`
    and `20261010150000_notification_preferences.sql` (T44 and T45 need no other operator step: the
    push-dispatch job sweeps reminders, and preferences are read inside the outbox write).
