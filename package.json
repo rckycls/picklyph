@@ -73,7 +73,9 @@
     "test:notifications:local": "node supabase/tests/notifications-local.cjs",
     "test:cancellations": "node --test supabase/tests/venue-cancellations.test.cjs supabase/tests/venue-cancel-handler.test.cjs",
     "test:cancellations:local": "node supabase/tests/venue-cancellations-local.cjs",
-    "test:acceptance:local": "node supabase/tests/acceptance-local.cjs"
+    "test:acceptance:local": "node supabase/tests/acceptance-local.cjs",
+    "release:check": "node scripts/release-check.cjs",
+    "test:release": "node --test scripts/__tests__/*.test.cjs"
   },
   "dependencies": {
     "@expo-google-fonts/bricolage-grotesque": "0.4.1",

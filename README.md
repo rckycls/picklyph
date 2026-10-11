@@ -101,6 +101,8 @@ If PowerShell blocks the npm scripts, use `npm.cmd`/`npx.cmd` for these commands
 | `npm run test:admin:local` | Test production console/email/session/page/API access against local Supabase/Mailpit; requires a built admin and removes its own fixtures. |
 | `npm run check:dependencies` | Check the installed versions against the Expo SDK. |
 | `npm run bundle:ios` | Export an iOS Hermes bundle to ignored `dist/ios`; does not create an installable `.ipa`. |
+| `npm run release:check -- --variant <v> …` | Offline release check of pulled EAS values, an export or `.ipa`, function secret digests and the linked project; see [docs/release.md](docs/release.md). |
+| `npm run test:release` | Check the release environment rules, the release check and the real app config as an EAS worker evaluates it. |
 | `npx expo-doctor` | Check Expo project health; not a package script. |
 
 Use `npm ci` for a clean install and `npx expo install <package>` when adding
@@ -118,7 +120,7 @@ Only the placeholder `.env.example` is allowed back into version control.
 | --- | --- | --- |
 | `EXPO_PUBLIC_SUPABASE_URL` | Mobile `.env`; EAS environment for cloud builds. | Directory client, T05. |
 | `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Same staging project as the URL; mobile `.env`/EAS. | Directory client, T05. |
-| `GOOGLE_MAPS_IOS_API_KEY` | Local native-build `.env` and EAS development environment. | Maps config plugin, T04. |
+| `GOOGLE_MAPS_IOS_API_KEY` | Local native-build `.env` and each EAS environment (development, preview, production). | Maps config plugin, T04. |
 | `IOS_BUNDLE_IDENTIFIER` (optional) | Local/EAS build configuration; defaults to `com.rckycls.picklyph`. | Must match the Maps key restriction and Apple signing. |
 | `EAS_PROJECT_ID` (optional) | Local/EAS build configuration; default project already linked in app config. | Use when intentionally changing the EAS project. |
 | `SUPABASE_URL`, `SUPABASE_SECRET_KEYS` | Automatically injected in Supabase-hosted functions; do not set/override them. | Privileged server handlers; never the mobile app. |
@@ -154,7 +156,9 @@ guarded backend APIs rather than Redis directly.
 [Upstash REST client configuration](https://upstash.com/docs/redis/howto/connect-with-upstash-redis)
 
 Keep staging and production Supabase projects/Upstash databases separate and
-match each deployment's URL/key/token set. Supabase remains authoritative for
+match each deployment's URL/key/token set. EAS `preview` builds use staging and
+`production` builds use production; builds and `npm run release:check` enforce
+this ([release environments](docs/release.md)). Supabase remains authoritative for
 inventory, holds, bookings, payments, and scheduled jobs; Redis is for server
 request limits. Payment variables and provider activation gates are finalized
 in T06 before checkout implementation.

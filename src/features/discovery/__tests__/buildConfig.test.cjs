@@ -1,5 +1,6 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const { createRequire } = require('node:module');
 const path = require('node:path');
 const { test } = require('node:test');
 const vm = require('node:vm');
@@ -7,11 +8,12 @@ const ts = require('typescript');
 
 const root = path.resolve(path.dirname(module.filename), '../../../..');
 const source = fs.readFileSync(path.join(root, 'app.config.ts'), 'utf8');
-const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;
+const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, esModuleInterop: true } }).outputText;
+const configRequire = createRequire(path.join(root, 'app.config.ts'));
 
 function config(env) {
   const module = { exports: {} };
-  vm.runInNewContext(compiled, { module, exports: module.exports, process: { env } });
+  vm.runInNewContext(compiled, { module, exports: module.exports, process: { env }, require: configRequire });
   return module.exports.default;
 }
 

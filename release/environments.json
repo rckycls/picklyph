@@ -1,0 +1,13 @@
+{
+  "_note": "Release environments (T50b). Project refs are public: they ship in the app. Record production's ref at T50; until then production builds fail. See docs/release.md.",
+  "backends": {
+    "staging": { "projectRef": "fkdusdurzdgbfwwigrqw" },
+    "production": { "projectRef": null }
+  },
+  "variants": {
+    "development": "staging",
+    "preview": "staging",
+    "production": "production"
+  },
+  "iosBundleIdentifier": "com.rckycls.picklyph"
+}
