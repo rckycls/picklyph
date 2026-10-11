@@ -18,13 +18,15 @@ const REQUIRED_SECRETS = [
   'UPSTASH_REDIS_REST_URL', 'UPSTASH_REDIS_REST_TOKEN', 'RATE_LIMIT_KEY_SECRET', 'PICKLY_ENV',
   'PUSH_WORKER_SECRET', 'GOOGLE_MAPS_SERVER_API_KEY',
   'APPLE_TEAM_ID', 'APPLE_KEY_ID', 'APPLE_CLIENT_ID', 'APPLE_PRIVATE_KEY',
+  'OPS_MONITOR_SECRET', 'OPS_ALERT_WEBHOOK_URL',
 ];
 // Settings that must never be shared between staging and production. The Apple key, the
-// Maps server key and the Expo access token may be shared.
+// Maps server key, the Expo access token and the alert webhook (messages name the environment)
+// may be shared. A shared heartbeat would let one environment's runs hide the other's silence.
 const ENVIRONMENT_SECRETS = [
   'DISCOVERY_SUPABASE_URL', 'DISCOVERY_SUPABASE_PUBLISHABLE_KEY', 'DISCOVERY_SUPABASE_SECRET_KEY',
   'UPSTASH_REDIS_REST_URL', 'UPSTASH_REDIS_REST_TOKEN', 'RATE_LIMIT_KEY_SECRET', 'PICKLY_ENV',
-  'PUSH_WORKER_SECRET',
+  'PUSH_WORKER_SECRET', 'OPS_MONITOR_SECRET', 'OPS_HEARTBEAT_URL',
 ];
 // Server setting names that have no reason to appear in a shipped app bundle.
 const SERVER_SETTING_NAMES = [
@@ -32,6 +34,7 @@ const SERVER_SETTING_NAMES = [
   'RATE_LIMIT_KEY_SECRET', 'PUSH_WORKER_SECRET', 'APPLE_PRIVATE_KEY', 'APPLE_KEY_ID',
   'GOOGLE_MAPS_SERVER_API_KEY', 'EXPO_ACCESS_TOKEN', 'ADMIN_SUPABASE_SECRET_KEY',
   'SUPABASE_SERVICE_ROLE_KEY', 'SUPABASE_SECRET_KEYS', 'PAYMONGO_SECRET_KEY', 'PAYMONGO_WEBHOOK_SECRET',
+  'OPS_MONITOR_SECRET', 'OPS_ALERT_WEBHOOK_URL', 'OPS_HEARTBEAT_URL',
 ];
 
 const sha256 = (text) => crypto.createHash('sha256').update(text, 'utf8').digest('hex');

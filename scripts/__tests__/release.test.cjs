@@ -175,6 +175,16 @@ test('function secrets must be complete, point at their own project and differ f
   assert.match(reused, /PUSH_WORKER_SECRET is the same in production and staging/);
   // Shared Apple and Maps settings are allowed across environments.
   assert.deepEqual(check('production', { ...production, APPLE_PRIVATE_KEY: staging.APPLE_PRIVATE_KEY, GOOGLE_MAPS_SERVER_API_KEY: staging.GOOGLE_MAPS_SERVER_API_KEY }, staging), []);
+  // T51a: the monitor secret and alert webhook are required; one Discord webhook may serve both, a heartbeat may not.
+  const unmonitored = { ...production };
+  delete unmonitored.OPS_MONITOR_SECRET;
+  delete unmonitored.OPS_ALERT_WEBHOOK_URL;
+  assert.match(check('production', unmonitored).join('\n'), /OPS_MONITOR_SECRET is not set[\s\S]*OPS_ALERT_WEBHOOK_URL is not set/);
+  assert.deepEqual(check('production', { ...production, OPS_ALERT_WEBHOOK_URL: staging.OPS_ALERT_WEBHOOK_URL }, staging), []);
+  const sharedOps = check('production', { ...production, OPS_MONITOR_SECRET: staging.OPS_MONITOR_SECRET, OPS_HEARTBEAT_URL: 'https://hc.example/x' },
+    { ...staging, OPS_HEARTBEAT_URL: 'https://hc.example/x' }).join('\n');
+  assert.match(sharedOps, /OPS_MONITOR_SECRET is the same in production and staging/);
+  assert.match(sharedOps, /OPS_HEARTBEAT_URL is the same in production and staging/);
   assert.match(check('production', production, production).join('\n'), /both secrets lists come from the same project/);
   assert.match(check('production', production, undefined, committed).join('\n'), /record the production project ref/);
   assert.match(release.checkFunctionSecrets({ backendName: 'staging', secrets: new Map(), environments: committed }).join('\n'), /empty or unreadable/);

@@ -103,6 +103,7 @@ If PowerShell blocks the npm scripts, use `npm.cmd`/`npx.cmd` for these commands
 | `npm run bundle:ios` | Export an iOS Hermes bundle to ignored `dist/ios`; does not create an installable `.ipa`. |
 | `npm run release:check -- --variant <v> …` | Offline release check of pulled EAS values, an export or `.ipa`, function secret digests and the linked project; see [docs/release.md](docs/release.md). |
 | `npm run test:release` | Check the release environment rules, the release check and the real app config as an EAS worker evaluates it. |
+| `npm run test:ops` / `npm run test:ops:local` | Check the backend health checks and Discord operator alerts; the local run drives real pg_cron/pg_net and a fake Discord ([docs/monitoring.md](docs/monitoring.md)). |
 | `npx expo-doctor` | Check Expo project health; not a package script. |
 
 Use `npm ci` for a clean install and `npx expo install <package>` when adding

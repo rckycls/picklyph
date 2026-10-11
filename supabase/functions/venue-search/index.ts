@@ -3,9 +3,9 @@ import type { Database } from '../../../packages/domain/src/database.ts';
 import { buildUpstashGuard } from '../_shared/upstash.ts';
 import { guestSource } from '../_shared/rate-limit.ts';
 import { createSearchHandler } from './handler.ts';
+import { createSignalReporter, observeGuard, observeHandler, supabaseSignalWriter } from '../_shared/ops.ts';
 
 const env = (name: string) => Deno.env.get(name);
-const guard = buildUpstashGuard(env);
 // Explicit custom names avoid platform-specific automatic/legacy key injection.
 // The service client is stateless and never inherits caller Authorization.
 const supabaseUrl = env('DISCOVERY_SUPABASE_URL') ?? '';
@@ -16,8 +16,11 @@ const options = { auth: { persistSession: false, autoRefreshToken: false, detect
 // Lazy initialization lets a missing configuration return a sanitized503.
 const verifier = () => createClient<Database>(supabaseUrl, publicKey, options);
 const server = () => createClient<Database>(supabaseUrl, secretKey, options);
+// T51a: 5xx answers and rate-limiter outages feed the ops monitor (docs/monitoring.md).
+const note = createSignalReporter('venue-search', supabaseSignalWriter(server));
+const guard = observeGuard(buildUpstashGuard(env), note);
 let lastDegradedLog = 0;
-Deno.serve(createSearchHandler({
+Deno.serve(observeHandler(createSearchHandler({
   verifyUser: async (token) => {
     const { data, error } = await verifier().auth.getUser(token);
     if (error) {
@@ -39,4 +42,4 @@ Deno.serve(createSearchHandler({
       lastDegradedLog = Date.now();
     }
   },
-}));
+}), note));

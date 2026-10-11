@@ -17,6 +17,7 @@ import type { AllocationRange, AllocationResult } from './allocation.ts';
 import type { CalendarView, CourtHours, CourtHoursView } from './calendar.ts';
 import type { RentalBooking, RentalBookingPage, RentalBookingResult, RentalQuote, RentalQuoteVersion } from './rentalBooking.ts';
 import type { CancellationReason } from './cancellation.ts';
+import type { OpsAlert, OpsCheck, OpsSignalKind, OpsSignalSource } from './ops.ts';
 
 // Schema-maintained PostgREST contract for the directory, authorization, owner-submission, ownership-review and owner-venue migrations.
 // Only the exposed public schema belongs in mobile code. PostGIS geometry is
@@ -178,6 +179,10 @@ export interface Database {
       push_outbox_complete: { Args: { results: PushCompletion[] }; Returns: { completed: number; stale: number } };
       push_receipts_due: { Args: { batch_limit?: number }; Returns: { tickets: string[] } };
       push_receipts_record: { Args: { results: PushReceiptOutcome[] }; Returns: { recorded: number } };
+      ops_signal_record: { Args: { signal_source: OpsSignalSource; signal_kind: OpsSignalKind; occurrences: number }; Returns: undefined };
+      // The monitor parses the run strictly (readOpsRun), so it is typed as unknown here.
+      ops_monitor_run: { Args: { external_checks?: OpsCheck[] }; Returns: unknown };
+      ops_alerts_confirm: { Args: { alerts: Pick<OpsAlert, 'check' | 'status'>[] }; Returns: { confirmed: number } };
       authorize_venue_management: {
         Args: { actor_user_id: string; target_venue_id: string };
         Returns: undefined;

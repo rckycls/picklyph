@@ -3,11 +3,14 @@ import type { Database } from '../../../packages/domain/src/database.ts';
 import { buildUpstashGuard } from '../_shared/upstash.ts';
 import { createSupabaseRentalDeps } from './deps.ts';
 import { createRentalHandler } from './handler.ts';
+import { createSignalReporter, observeGuard, observeHandler, supabaseSignalWriter } from '../_shared/ops.ts';
 const env = (name: string) => Deno.env.get(name);
-const guard = buildUpstashGuard(env);
 const options = { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
   global: { fetch: ((input, init) => fetch(input, { ...init, signal: AbortSignal.timeout(8000) })) as typeof fetch } };
 const verifier = () => createClient<Database>(env('DISCOVERY_SUPABASE_URL') ?? '', env('DISCOVERY_SUPABASE_PUBLISHABLE_KEY') ?? '', options);
 // The service client never inherits any caller headers or session.
 const server = () => createClient<Database>(env('DISCOVERY_SUPABASE_URL') ?? '', env('DISCOVERY_SUPABASE_SECRET_KEY') ?? '', options);
-Deno.serve(createRentalHandler({ ...createSupabaseRentalDeps(verifier, server), limit: (action, principal) => guard(action, principal) }));
+// T51a: 5xx answers and rate-limiter outages feed the ops monitor (docs/monitoring.md).
+const note = createSignalReporter('rental-bookings', supabaseSignalWriter(server));
+const guard = observeGuard(buildUpstashGuard(env), note);
+Deno.serve(observeHandler(createRentalHandler({ ...createSupabaseRentalDeps(verifier, server), limit: (action, principal) => guard(action, principal) }), note));

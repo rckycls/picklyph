@@ -58,7 +58,7 @@ Creation/cancellation guard calls reject guest/provider principals. Webhook bypa
 
 Namespaces include environment/action/principal kind. Identifiers are HMAC-SHA256 of principal kind and verified UUID or trusted source IP, using a private secret. Redis receives no raw IP/token/user UUID, and analytics is disabled. Guest IPv6 is canonicalized. No inventory, booking lock, event outbox or payment idempotency state goes to Redis. Cancellation and authenticated provider events remain processable during an outage.
 
-Missing/invalid Redis configuration also follows those outage policies. Degraded discovery emits one fixed sanitized warning per minute per warm isolate, without identifiers/query/secret values. No enforced-rate headers are invented on degraded responses. Alerting is T51.
+Missing/invalid Redis configuration also follows those outage policies. Degraded discovery emits one fixed sanitized warning per minute per warm isolate, without identifiers/query/secret values. No enforced-rate headers are invented on degraded responses. Since T51a every function also records these decisions as `limiter_degraded` signals, and the ops monitor alerts operators ([monitoring.md](monitoring.md)).
 
 ## H02 setup and live acceptance gate
 

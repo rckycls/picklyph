@@ -4,9 +4,9 @@ import { buildUpstashGuard } from '../_shared/upstash.ts';
 import { createSupabaseOwnerDeps } from './deps.ts';
 import { createGeocoder } from './geocode.ts';
 import { createOwnerHandler } from './handler.ts';
+import { createSignalReporter, observeGuard, observeHandler, supabaseSignalWriter } from '../_shared/ops.ts';
 
 const env = (name: string) => Deno.env.get(name);
-const guard = buildUpstashGuard(env);
 // Shares the T13 server credentials (same project; function secrets are project-wide).
 const supabaseUrl = env('DISCOVERY_SUPABASE_URL') ?? '';
 const publicKey = env('DISCOVERY_SUPABASE_PUBLISHABLE_KEY') ?? '';
@@ -18,9 +18,12 @@ const options = { auth: { persistSession: false, autoRefreshToken: false, detect
 // Lazy initialization lets a missing configuration return a sanitized 503.
 const verifier = () => createClient<Database>(supabaseUrl, publicKey, options);
 const server = () => createClient<Database>(supabaseUrl, secretKey, options);
+// T51a: 5xx answers and rate-limiter outages feed the ops monitor (docs/monitoring.md).
+const note = createSignalReporter('owner-submissions', supabaseSignalWriter(server));
+const guard = observeGuard(buildUpstashGuard(env), note);
 
 const lastWarning = new Map<string, number>();
-Deno.serve(createOwnerHandler({
+Deno.serve(observeHandler(createOwnerHandler({
   ...createSupabaseOwnerDeps(verifier, server),
   limit: (action, principal) => guard(action, principal),
   geocode: mapsKey ? createGeocoder(mapsKey) : null,
@@ -31,4 +34,4 @@ Deno.serve(createOwnerHandler({
       lastWarning.set(event, Date.now());
     }
   },
-}));
+}), note));

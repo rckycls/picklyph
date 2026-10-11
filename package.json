@@ -30,7 +30,7 @@
     "test:calendar:local": "node supabase/tests/calendar-local.cjs",
     "test:rentals": "node --test supabase/tests/rentals.test.cjs",
     "test:rentals:local": "node supabase/tests/rentals-local.cjs",
-    "functions:check": "npm exec --yes --package=deno@2.9.6 -- deno check --config supabase/functions/deno.json supabase/functions/venue-search/index.ts supabase/functions/owner-submissions/index.ts supabase/functions/owner-venues/index.ts supabase/functions/owner-schedules/index.ts supabase/functions/_shared/allocations.ts supabase/functions/rental-bookings/index.ts supabase/functions/owner-sessions/index.ts supabase/functions/session-bookings/index.ts supabase/functions/venue-reports/index.ts supabase/functions/account-deletion/index.ts supabase/functions/push-devices/index.ts supabase/functions/push-dispatch/index.ts",
+    "functions:check": "npm exec --yes --package=deno@2.9.6 -- deno check --config supabase/functions/deno.json supabase/functions/venue-search/index.ts supabase/functions/owner-submissions/index.ts supabase/functions/owner-venues/index.ts supabase/functions/owner-schedules/index.ts supabase/functions/_shared/allocations.ts supabase/functions/rental-bookings/index.ts supabase/functions/owner-sessions/index.ts supabase/functions/session-bookings/index.ts supabase/functions/venue-reports/index.ts supabase/functions/account-deletion/index.ts supabase/functions/push-devices/index.ts supabase/functions/push-dispatch/index.ts supabase/functions/ops-monitor/index.ts",
     "functions:lint": "npm exec --yes --package=deno@2.9.6 -- deno lint --config supabase/functions/deno.json supabase/functions",
     "test:functions": "npm exec --yes --package=deno@2.9.6 -- deno test --allow-env --config supabase/functions/deno.json supabase/functions/tests",
     "test:directory:local": "docker exec -i supabase_db_picklyph psql -U postgres -d postgres -v ON_ERROR_STOP=1 -X -q < supabase/tests/directory.sql",
@@ -74,6 +74,8 @@
     "test:cancellations": "node --test supabase/tests/venue-cancellations.test.cjs supabase/tests/venue-cancel-handler.test.cjs",
     "test:cancellations:local": "node supabase/tests/venue-cancellations-local.cjs",
     "test:acceptance:local": "node supabase/tests/acceptance-local.cjs",
+    "test:ops": "node --test supabase/tests/ops-monitoring.test.cjs supabase/tests/ops-monitor-handler.test.cjs",
+    "test:ops:local": "node supabase/tests/ops-monitoring-local.cjs",
     "release:check": "node scripts/release-check.cjs",
     "test:release": "node --test scripts/__tests__/*.test.cjs"
   },

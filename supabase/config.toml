@@ -94,3 +94,8 @@ import_map = "./functions/deno.json"
 # The notification worker, called by pg_cron through pg_net; it requires the PUSH_WORKER_SECRET bearer, never a user token.
 verify_jwt = false
 import_map = "./functions/deno.json"
+
+[functions.ops-monitor]
+# T51a health checks and Discord alerts, called by pg_cron through pg_net; it requires the OPS_MONITOR_SECRET bearer, never a user token.
+verify_jwt = false
+import_map = "./functions/deno.json"
