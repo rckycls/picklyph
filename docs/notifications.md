@@ -189,7 +189,7 @@ from Vault (`not_configured` if either is missing). Latency is therefore up to a
 
 ## Rollout and operator steps
 
-**Staging (2026-10-11):** steps 1–2 done (all three migrations applied; both functions ACTIVE). Steps 3–5 are pending, so `push-dispatch` answers 503 `not_configured` and no push is sent yet.
+**Staging (2026-10-11):** steps 1–4 done. All three migrations are applied and both functions are ACTIVE. `PUSH_WORKER_SECRET` is a generated 43-character value; it was never shown and isn't recorded anywhere but the function secrets and Vault, so rotate it by setting a new value in both. pg_net 0.20.4 is enabled. Vault holds `push_dispatch_url` and `push_worker_secret`, and their digests match the function secret. Cron job 3, `push-dispatch`, runs every minute as postgres. Verified: the worker returns 200 with the secret and 401 with a wrong bearer; a pg_net call using the Vault values returned 200; cron runs succeeded. Step 5 (a push-capable EAS build with an APNs key, then H10) is pending, so no phone is registered and nothing is sent yet.
 
 1. `supabase db push` for `20261010090000_push_notifications.sql`, `20261010120000_booking_reminders.sql`
    and `20261010150000_notification_preferences.sql` (T44 and T45 need no other operator step: the
