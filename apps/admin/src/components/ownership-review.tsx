@@ -1,12 +1,8 @@
 'use client';
 import { useState } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { REVIEW_REASON_LABELS, REVIEW_REJECTION_REASONS, ReviewInputError, readOwnershipDecision, type OwnershipDecision, type ReviewRejectionReason } from '@picklyph/domain';
-
-export function ReviewUnavailable() {
-  return <section className="workspace-panel"><h1>Review queue unavailable.</h1><p>We couldn’t load ownership requests. Try again shortly or contact the operator.</p><Link className="button secondary" href="/console/ownership">Try again</Link></section>;
-}
+import { Panel } from './panel';
 
 type Candidate = { id: string; name: string; city: string; distance_m: number };
 export function OwnershipDecisionForm({ subjectId, kind, isAdmin, candidates }: { subjectId: string; kind: 'claim' | 'venue'; isAdmin: boolean; candidates: Candidate[] }) {
@@ -34,8 +30,7 @@ export function OwnershipDecisionForm({ subjectId, kind, isAdmin, candidates }: 
   }
   const mergeTarget = target === 'other' ? otherTarget.trim() : target;
 
-  return <section className="workspace-panel decision-panel" aria-labelledby="decision-heading">
-    <h2 id="decision-heading">Decision</h2>
+  return <Panel title="Decision" className="decision-panel">
     <fieldset disabled={busy}>
       <label className="check-row"><input type="checkbox" checked={checked} onChange={event => setChecked(event.target.checked)} />I checked the proof photo, the details and any nearby listings.</label>
       {kind === 'claim' ? <div className="directory-actions"><button className="button primary" type="button" disabled={!checked} onClick={() => void send({ decision: 'approve', target_venue_id: null, rejection_reason: null })}>Approve ownership</button></div> : <>
@@ -48,8 +43,8 @@ export function OwnershipDecisionForm({ subjectId, kind, isAdmin, candidates }: 
           <div className="directory-actions"><button className="button secondary" type="button" disabled={!checked || !mergeTarget} onClick={() => void send({ decision: 'merge', target_venue_id: mergeTarget, rejection_reason: null })}>Merge and approve</button></div></div>
       </>}
       <div className="decision-option"><h3>Reject</h3>{kind === 'venue' && <p className="muted small-note">The owner’s draft is retired and never published.</p>}<div className="field-grid"><label className="wide-field">Reason<select value={reason} onChange={event => setReason(REVIEW_REJECTION_REASONS.find(value => value === event.target.value) ?? 'other')}>{REVIEW_REJECTION_REASONS.map(value => <option key={value} value={value}>{REVIEW_REASON_LABELS[value]}</option>)}</select></label></div>
-        <div className="directory-actions"><button className="button secondary" type="button" onClick={() => void send({ decision: 'reject', target_venue_id: null, rejection_reason: reason })}>Reject request</button></div></div>
+        <div className="directory-actions"><button className="button danger-outline" type="button" onClick={() => void send({ decision: 'reject', target_venue_id: null, rejection_reason: reason })}>Reject request</button></div></div>
     </fieldset>
     <div className="directory-feedback" role="status" aria-live="polite"><p>{message}</p>{conflict && <button className="button secondary" type="button" onClick={() => window.location.reload()}>Reload request</button>}</div>
-  </section>;
+  </Panel>;
 }

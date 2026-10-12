@@ -10,7 +10,7 @@ const WORKING: Record<DirectoryBulkAction, string> = { publish: 'Publishing…',
 const plural = (n: number) => `${n} ${n === 1 ? 'listing' : 'listings'}`;
 
 /** One page of the directory with selection and bulk actions (2026-10-13). Each change still runs per listing on the server. */
-export function DirectoryList({ items }: { items: DirectoryListing[] }) {
+export function DirectoryList({ items, updated }: { items: DirectoryListing[]; updated: Record<string, string> }) {
   const router = useRouter();
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const [busy, setBusy] = useState<DirectoryBulkAction | null>(null);
@@ -63,9 +63,8 @@ export function DirectoryList({ items }: { items: DirectoryListing[] }) {
 
   const none = chosen.length === 0 || busy !== null;
   return <>
-    <div className="bulk-bar" role="toolbar" aria-label="Bulk actions">
-      <label className="bulk-all"><input ref={all} type="checkbox" checked={everything} disabled={busy !== null} onChange={toggleAll} />
-        {chosen.length ? `${chosen.length} selected` : 'Select all on this page'}</label>
+    <div className="table-toolbar" role="toolbar" aria-label="Bulk actions">
+      <span className="selection-count">{chosen.length ? `${chosen.length} selected` : `${plural(items.length)} on this page`}</span>
       <div className="bulk-buttons">
         <button className="button secondary compact" disabled={none} onClick={() => void run('publish')}>{busy === 'publish' ? WORKING.publish : 'Publish'}</button>
         <button className="button secondary compact" disabled={none} onClick={() => void run('draft')}>{busy === 'draft' ? WORKING.draft : 'Move to draft'}</button>
@@ -81,10 +80,22 @@ export function DirectoryList({ items }: { items: DirectoryListing[] }) {
     </div>}
     <div className="directory-feedback" role="status" aria-live="polite"><p>{message}</p>
       {skipped.length > 0 && <ul className="bulk-skipped">{skipped.map((item) => <li key={item.id}><strong>{item.name}</strong>: {item.message}</li>)}</ul>}</div>
-    <ul className="venue-pick-list">{items.map((venue) => <li key={venue.id} className={selected.has(venue.id) ? 'venue-pick selected' : 'venue-pick'}>
-      <input type="checkbox" checked={selected.has(venue.id)} disabled={busy !== null} onChange={() => toggle(venue.id)} aria-label={`Select ${venue.name}`} />
-      <Link className="venue-pick-link" href={`/console/directory/${venue.id}`}><div><h2>{venue.name}</h2><p>{venue.city}, {venue.province} · {venue.courts.length} courts</p></div>
-        <span className={`badge publication-${venue.publication_status}`}>{STATUS_LABEL[venue.publication_status]}</span></Link>
-    </li>)}</ul>
+    <div className="table-wrap"><table className="data-table">
+      <thead><tr>
+        <th scope="col" className="col-check"><input ref={all} type="checkbox" checked={everything} disabled={busy !== null} onChange={toggleAll} aria-label="Select all on this page" /></th>
+        <th scope="col">Venue</th><th scope="col">Location</th><th scope="col" className="num">Courts</th><th scope="col">Status</th><th scope="col">Updated</th>
+      </tr></thead>
+      <tbody>{items.map((venue) => {
+        const inactive = venue.courts.filter((court) => court.status !== 'active').length;
+        return <tr key={venue.id} className={selected.has(venue.id) ? 'selected' : undefined}>
+          <td className="col-check"><input type="checkbox" checked={selected.has(venue.id)} disabled={busy !== null} onChange={() => toggle(venue.id)} aria-label={`Select ${venue.name}`} /></td>
+          <td><Link className="cell-link" href={`/console/directory/${venue.id}`}>{venue.name}</Link><span className="cell-sub">{venue.address_line}</span></td>
+          <td>{venue.city}, {venue.province}</td>
+          <td className="num">{venue.courts.length}{inactive > 0 && <span className="cell-sub">{inactive} inactive</span>}</td>
+          <td><span className={`badge publication-${venue.publication_status}`}>{STATUS_LABEL[venue.publication_status]}</span></td>
+          <td className="nowrap muted">{updated[venue.id]}</td>
+        </tr>;
+      })}</tbody>
+    </table></div>
   </>;
 }

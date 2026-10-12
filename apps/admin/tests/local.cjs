@@ -159,7 +159,7 @@ async function main() {
         assert.equal((await service.rpc('directory_admin_audit_read', { actor_user_id: id })).error?.code, '42501', 'Player/moderator denied audit reads by current DB role.');
         for (const action of ['save', 'publish', 'import', 'bulk']) assert.equal((await request(`/api/console/directory/${action}`, jar, { actor_user_id: fixtures[0] })).status, 403, 'Player/moderator cannot use curation commands.');
         const directoryHtml = await (await request('/console/directory', jar)).text();
-        assert.ok(!directoryHtml.includes('Better places to play.') && !directoryHtml.includes('Synthetic HTTP venue'), 'Directory data is administrator-only.');
+        assert.ok(directoryHtml.includes('Administrator access required.') && !directoryHtml.includes('Import listings') && !directoryHtml.includes('Synthetic HTTP venue'), 'Directory data is administrator-only.');
       } else {
         const venue = { name: 'Synthetic HTTP venue', address_line: 'Local fixture only', city: 'Manila', province: 'Metro Manila', latitude: 14.6, longitude: 121 };
         const court = { id: null, name: 'Court 1', surface: 'hard', is_indoor: false, is_covered: true, status: 'active' };
@@ -223,10 +223,13 @@ async function main() {
 
         stage = 'bulk directory actions';
         // Three imported drafts: two with an active court, one without.
-        const bulkImport = await request('/api/console/directory/import', jar, { listings: ['A', 'B', 'C'].map((letter) => ({
-          reference: `local-bulk:${randomUUID()}`, venue: { ...venue, name: `Bulk HTTP ${letter}` }, courts: letter === 'C' ? [] : [court] })) });
+        const bulkReferences = ['A', 'B', 'C'].map(() => `local-bulk:${randomUUID()}`);
+        const bulkImport = await request('/api/console/directory/import', jar, { listings: ['A', 'B', 'C'].map((letter, index) => ({
+          reference: bulkReferences[index], venue: { ...venue, name: `Bulk HTTP ${letter}` }, courts: letter === 'C' ? [] : [court] })) });
         assert.equal(bulkImport.status, 200, 'Bulk fixtures imported.');
-        const bulkIds = (await bulkImport.json()).data.map((result) => result.id); bulkIds.forEach((venueId) => venueFixtures.add(venueId));
+        // The import answers in reference order, so map results back to A, B, C.
+        const bulkResults = (await bulkImport.json()).data;
+        const bulkIds = bulkReferences.map((reference) => bulkResults.find((result) => result.reference === reference).id); bulkIds.forEach((venueId) => venueFixtures.add(venueId));
         const versions = async (ids) => Promise.all(ids.map(async (venueId) => {
           const read = await service.rpc('directory_admin_read', { actor_user_id: id, target_venue_id: venueId });
           return { id: venueId, expected_updated_at: read.data.items[0].updated_at };
@@ -265,10 +268,10 @@ async function main() {
         console.log('PASS: production bulk actions: CSRF/actor/input rejection, publish skips a courtless draft, status tabs filter the page, a stale version is skipped, move to draft, delete removes only unused drafts (audited) and repeats safely.');
       }
       if (role === 'player') {
-        assert.ok(html.includes('Access required.') && !html.includes('Your workspace is ready.'), 'Player cannot render protected workspace.');
+        assert.ok(html.includes('Access required.') && !html.includes('Access verified') && !html.includes('aria-label="Console"'), 'Player cannot render protected workspace or its navigation.');
         assert.equal(operation.status, 403, 'Metadata and forged body cannot elevate a player.');
       } else {
-        assert.ok(html.includes('Your workspace is ready.'), 'Assigned role can render console.');
+        assert.ok(html.includes('Access verified') && html.includes('aria-label="Console"'), 'Assigned role can render console.');
         assert.equal(operation.status, 200, 'Assigned role can call guarded operation.');
         const payload = await operation.json();
         assert.ok(payload.actorId === id && payload.roles.includes(role), 'Actor/roles derive from verified user and DB, ignoring request body.');
