@@ -79,3 +79,42 @@ export function readDirectoryImport(input: unknown): DirectoryImportEntry[] {
     return { reference, venue: readVenueInput(v.venue), courts };
   });
 }
+
+/** Console bulk actions (2026-10-13): one page of the directory at most. Delete only removes unused listings. */
+export const DIRECTORY_BULK_ACTIONS = ['publish', 'draft', 'suspend', 'delete'] as const;
+export type DirectoryBulkAction = (typeof DIRECTORY_BULK_ACTIONS)[number];
+export const MAX_DIRECTORY_BULK = 100;
+export const BULK_PUBLICATION_STATUS: Record<Exclude<DirectoryBulkAction, 'delete'>, VenuePublicationStatus> = { publish: 'approved', draft: 'draft', suspend: 'suspended' };
+export type DirectoryBulkItem = { id: string; expected_updated_at: string };
+export type DirectoryBulkRequest = { action: DirectoryBulkAction; items: DirectoryBulkItem[] };
+/** One outcome per requested listing, in request order; `message` explains a skipped one. */
+export type DirectoryBulkOutcome = { id: string; done: boolean; message: string | null };
+export type DirectoryBulkResult = { action: DirectoryBulkAction; outcomes: DirectoryBulkOutcome[] };
+
+export function readDirectoryBulk(input: unknown): DirectoryBulkRequest {
+  const v = record(input, ['action', 'items']);
+  if (typeof v.action !== 'string' || !(DIRECTORY_BULK_ACTIONS as readonly string[]).includes(v.action)) invalid('Choose a valid bulk action.');
+  if (!Array.isArray(v.items) || v.items.length < 1 || v.items.length > MAX_DIRECTORY_BULK) invalid(`Select 1–${MAX_DIRECTORY_BULK} listings.`);
+  const ids = new Set<string>();
+  const items = v.items.map((item) => {
+    const entry = record(item, ['id', 'expected_updated_at']);
+    const id = directoryUuid(entry.id);
+    if (ids.has(id)) invalid('A listing can only appear once.'); ids.add(id);
+    return { id, expected_updated_at: version(entry.expected_updated_at) };
+  });
+  return { action: v.action as DirectoryBulkAction, items };
+}
+
+/**
+ * Selected listings in the import format, e.g. to copy them from staging to production. References are stable
+ * per source listing, so importing the same file twice keeps the first drafts. Court IDs are left out (new rows).
+ */
+export function directoryExport(listings: DirectoryListing[]): { listings: DirectoryImportEntry[] } {
+  if (listings.length < 1 || listings.length > MAX_DIRECTORY_IMPORT) invalid(`Export 1–${MAX_DIRECTORY_IMPORT} listings at a time (the import limit).`);
+  return { listings: listings.map((venue) => ({
+    reference: `pickly-export:${venue.id}`,
+    venue: { name: venue.name, address_line: venue.address_line, city: venue.city, province: venue.province, latitude: venue.latitude, longitude: venue.longitude },
+    courts: venue.courts.map((court) => ({ id: null, name: court.name, surface: court.surface,
+      is_indoor: court.is_indoor, is_covered: court.is_covered, status: court.status })),
+  })) };
+}

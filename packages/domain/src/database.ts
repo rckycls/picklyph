@@ -94,7 +94,9 @@ export interface Database {
       venues_in_bounds: { Args: MapBounds; Returns: VenueMapPin[] };
       directory_search: { Args: { search: VenueSearch }; Returns: VenueSearchPage };
       my_account_access: { Args: Record<PropertyKey, never>; Returns: AccountAccess[] };
-      directory_admin_read: { Args: { actor_user_id: string; target_venue_id?: string | null; after_id?: string | null }; Returns: DirectoryPage };
+      directory_admin_read: { Args: { actor_user_id: string; target_venue_id?: string | null; after_id?: string | null; publication_filter?: VenuePublicationStatus }; Returns: DirectoryPage };
+      // Console bulk delete (2026-10-13): unused draft or suspended listings only.
+      directory_admin_delete: { Args: { actor_user_id: string; target_venue_id: string; expected_updated_at: string }; Returns: { id: string; outcome: 'deleted' } };
       directory_admin_save: { Args: { actor_user_id: string; target_venue_id: string | null; expected_updated_at: string | null; venue_input: VenueInput; court_inputs: CourtInput[] }; Returns: DirectoryListing };
       directory_admin_publish: { Args: { actor_user_id: string; target_venue_id: string; expected_updated_at: string; new_status: VenuePublicationStatus }; Returns: DirectoryListing };
       directory_admin_import: { Args: { actor_user_id: string; listings: DirectoryImportEntry[] }; Returns: DirectoryImportResult[] };

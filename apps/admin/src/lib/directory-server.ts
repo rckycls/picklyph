@@ -1,6 +1,6 @@
 import 'server-only';
 import { createClient } from '@supabase/supabase-js';
-import type { Database } from '@picklyph/domain';
+import type { Database, VenuePublicationStatus } from '@picklyph/domain';
 import { readDirectoryConfig } from './config';
 import { createAdminClient } from './supabase';
 import { readConsoleAccess, type ConsoleAccess } from './access';
@@ -19,9 +19,10 @@ export function createDirectoryServiceClient() {
   });
 }
 
-export async function readDirectoryPage(actorId: string, target: string | null = null, after: string | null = null) {
+/** `status` filters the list; without it the call also works on a database that predates the filter. */
+export async function readDirectoryPage(actorId: string, target: string | null = null, after: string | null = null, status: VenuePublicationStatus | null = null) {
   const { data, error } = await createDirectoryServiceClient().rpc('directory_admin_read', {
-    actor_user_id: actorId, target_venue_id: target, after_id: after,
+    actor_user_id: actorId, target_venue_id: target, after_id: after, ...(status ? { publication_filter: status } : {}),
   });
   if (error || !data) throw new Error('Directory is unavailable.');
   return data;

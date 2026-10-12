@@ -101,7 +101,7 @@ async function main() {
     const guestPage = await request('/console');
     assert.ok([307, 303].includes(guestPage.status) && guestPage.headers.get('location') === '/login', 'Guest console redirects to sign-in.');
     assert.equal((await request('/api/console/check-access', new Map(), {})).status, 401, 'Guest operation denied.');
-    for (const action of ['save', 'publish', 'import']) assert.equal((await request(`/api/console/directory/${action}`, new Map(), {})).status, 401, 'Guest directory command denied.');
+    for (const action of ['save', 'publish', 'import', 'bulk']) assert.equal((await request(`/api/console/directory/${action}`, new Map(), {})).status, 401, 'Guest directory command denied.');
     assert.equal((await request('/api/auth/request', new Map(), { email: 'bad' })).status, 400, 'Invalid email denied.');
     assert.equal((await request('/api/auth/request', new Map(), { email: 'nobody@example.invalid' }, { Origin: 'https://attacker.invalid' })).status, 403, 'Cross-site request denied.');
 
@@ -157,7 +157,7 @@ async function main() {
       stage = `${role} directory curation`;
       if (role !== 'admin') {
         assert.equal((await service.rpc('directory_admin_audit_read', { actor_user_id: id })).error?.code, '42501', 'Player/moderator denied audit reads by current DB role.');
-        for (const action of ['save', 'publish', 'import']) assert.equal((await request(`/api/console/directory/${action}`, jar, { actor_user_id: fixtures[0] })).status, 403, 'Player/moderator cannot use curation commands.');
+        for (const action of ['save', 'publish', 'import', 'bulk']) assert.equal((await request(`/api/console/directory/${action}`, jar, { actor_user_id: fixtures[0] })).status, 403, 'Player/moderator cannot use curation commands.');
         const directoryHtml = await (await request('/console/directory', jar)).text();
         assert.ok(!directoryHtml.includes('Better places to play.') && !directoryHtml.includes('Synthetic HTTP venue'), 'Directory data is administrator-only.');
       } else {
@@ -220,6 +220,49 @@ async function main() {
         await publicClient.auth.dispose();
         console.log('PASS: real HTTP verified actor attribution, minimal audit records, stale/invalid/CSRF denial without audit and one concurrent import event.');
         console.log('PASS: production admin directory draft/edit/conflict/publish/suspend, guest/role/CSRF denial and concurrent import retry.');
+
+        stage = 'bulk directory actions';
+        // Three imported drafts: two with an active court, one without.
+        const bulkImport = await request('/api/console/directory/import', jar, { listings: ['A', 'B', 'C'].map((letter) => ({
+          reference: `local-bulk:${randomUUID()}`, venue: { ...venue, name: `Bulk HTTP ${letter}` }, courts: letter === 'C' ? [] : [court] })) });
+        assert.equal(bulkImport.status, 200, 'Bulk fixtures imported.');
+        const bulkIds = (await bulkImport.json()).data.map((result) => result.id); bulkIds.forEach((venueId) => venueFixtures.add(venueId));
+        const versions = async (ids) => Promise.all(ids.map(async (venueId) => {
+          const read = await service.rpc('directory_admin_read', { actor_user_id: id, target_venue_id: venueId });
+          return { id: venueId, expected_updated_at: read.data.items[0].updated_at };
+        }));
+        const bulk = async (action, ids, extra = {}, headers = {}) => request('/api/console/directory/bulk', jar, { action, items: await versions(ids), ...extra }, headers);
+        const bulkOutcomes = async (response) => { assert.equal(response.status, 200, 'Bulk route answers 200 with per-listing outcomes.'); return (await response.json()).data.outcomes; };
+        assert.equal((await bulk('publish', bulkIds, {}, { Origin: 'https://attacker.invalid' })).status, 403, 'Bulk route rejects cross-site requests.');
+        assert.equal((await bulk('publish', bulkIds, { actor_user_id: fixtures[0] })).status, 400, 'Caller cannot supply an actor.');
+        assert.equal((await bulk('archive', bulkIds)).status, 400, 'Unknown bulk action rejected.');
+        const publishedOutcomes = await bulkOutcomes(await bulk('publish', bulkIds));
+        assert.deepEqual(publishedOutcomes.map((outcome) => outcome.done), [true, true, false], 'Publishes what it can; the courtless draft is skipped.');
+        assert.equal(publishedOutcomes[2].message, 'Add an active court before publishing.');
+        const publishedTab = await (await request('/console/directory?status=published', jar)).text();
+        const draftTab = await (await request('/console/directory?status=draft', jar)).text();
+        assert.ok(publishedTab.includes('Bulk HTTP A') && publishedTab.includes('Bulk HTTP B') && !publishedTab.includes('Bulk HTTP C'), 'Published tab lists only published listings.');
+        assert.ok(draftTab.includes('Bulk HTTP C') && !draftTab.includes('Bulk HTTP A'), 'Drafts tab lists only drafts.');
+        assert.ok(publishedTab.includes('Select all on this page') && publishedTab.includes('aria-label="Select Bulk HTTP A"'), 'The list renders selection controls.');
+        const staleItems = await versions(bulkIds.slice(0, 2)); staleItems[0].expected_updated_at = '2001-01-01T00:00:00Z';
+        const staleOutcomes = await bulkOutcomes(await request('/api/console/directory/bulk', jar, { action: 'suspend', items: staleItems }));
+        assert.deepEqual(staleOutcomes.map((outcome) => outcome.done), [false, true], 'A stale version is skipped; the other listing still changes.');
+        assert.match(staleOutcomes[0].message, /changed/);
+        assert.ok((await bulkOutcomes(await bulk('draft', bulkIds.slice(0, 2)))).every((outcome) => outcome.done), 'Move to draft.');
+        // History blocks deletion: a released court block on A.
+        sql(`insert into private.court_allocations(venue_id,court_id,kind,starts_at,ends_at,state,ended_at,requested_by,request_id)
+          select '${bulkIds[0]}', c.id, 'block', date_trunc('hour', now()) - interval '3 days', date_trunc('hour', now()) - interval '3 days' + interval '1 hour',
+            'released', now(), '${id}', gen_random_uuid() from public.courts c where c.venue_id = '${bulkIds[0]}';`);
+        const deletedOutcomes = await bulkOutcomes(await bulk('delete', bulkIds));
+        assert.deepEqual(deletedOutcomes.map((outcome) => outcome.done), [false, true, true], 'Unused drafts deleted; the one with history kept.');
+        assert.match(deletedOutcomes[0].message, /court bookings or blocks/);
+        assert.deepEqual((await service.from('venues').select('id').in('id', bulkIds)).data.map((row) => row.id), [bulkIds[0]], 'Only the listing with history remains.');
+        const deletedAudit = await service.rpc('directory_admin_audit_read', { actor_user_id: id, target_venue_id: bulkIds[1] });
+        assert.deepEqual(deletedAudit.data.items.map((event) => `${event.action}:${event.actor_user_id === id}`), ['directory.import:true', 'directory.publish:true', 'directory.suspend:true', 'directory.unpublish:true', 'directory.delete:true'],
+          'Every bulk change and the deletion audited with the verified actor, kept after the listing.');
+        const repeated = await bulkOutcomes(await request('/api/console/directory/bulk', jar, { action: 'delete', items: [{ id: bulkIds[1], expected_updated_at: '2026-10-13T00:00:00Z' }] }));
+        assert.deepEqual(repeated, [{ id: bulkIds[1], done: true, message: 'Already deleted.' }], 'Repeating a delete is safe.');
+        console.log('PASS: production bulk actions: CSRF/actor/input rejection, publish skips a courtless draft, status tabs filter the page, a stale version is skipped, move to draft, delete removes only unused drafts (audited) and repeats safely.');
       }
       if (role === 'player') {
         assert.ok(html.includes('Access required.') && !html.includes('Your workspace is ready.'), 'Player cannot render protected workspace.');
@@ -243,9 +286,10 @@ async function main() {
       console.log(`PASS: ${role} real email code, forged-cookie denial, refresh/restore, protected page/API, role/actor trust and sign-out.`);
     }
     console.log('PASS: production guest denial, CSRF/input checks, private responses and HttpOnly/Secure cookie headers.');
-  } catch {
-    // Only our fixed stage label; no assertion values, emails, OTPs, SDK/CLI errors or tokens.
-    throw new Error(`Local admin verification failed at: ${stage}.`);
+  } catch (error) {
+    // Our fixed stage label and our own assertion messages only; no assertion values, emails, OTPs, SDK/CLI errors or tokens.
+    const detail = error?.code === 'ERR_ASSERTION' && error.generatedMessage === false ? ` (${error.message})` : '';
+    throw new Error(`Local admin verification failed at: ${stage}${detail}.`);
   } finally {
     if (child && child.exitCode === null) {
       child.kill();

@@ -42,7 +42,8 @@ server secret; directory tools show an unavailable state until configured.
   requires at least one active court. Unpublish before deactivating the last one.
 - Saving edits preserves publication and claim status, court IDs, omitted courts,
   private evidence and ownership links. Existing courts are deactivated rather
-  than deleted; drafts and suspension replace hard venue deletion. A cross-venue
+  than deleted; drafts and suspension replace hard venue deletion (the only exception is
+  the bulk delete of never-used listings below). A cross-venue
   court ID is rejected. Existing court names cannot be swapped in one save due
   to their unique constraint; rename through a temporary unique name if needed.
 - Each edit/publication supplies the original `updated_at` without rounding its
@@ -134,6 +135,33 @@ cookie auth, editor HTML, route errors, public visibility, concurrent imports
 and revocation, then removes fixtures and stops its child server. It never
 reads hosted/mobile env. Browser layout, keyboard interaction and hosted
 console acceptance remain manual checks; no new iPhone binary is needed.
+
+## Bulk actions (2026-10-13)
+
+`/console/directory` has status tabs (All, Drafts, Published, Suspended), a checkbox per listing, **Select all
+on this page** (up to 100) and a bulk bar: **Publish**, **Move to draft**, **Suspend**, **Export JSON** and
+**Delete**. `POST /api/console/directory/bulk` takes `{action, items: [{id, expected_updated_at}]}` (1–100,
+same-origin, administrators only, actor from the verified session) and runs each listing through the same
+audited, version-checked command as a single change, one after another. The answer lists every outcome; a
+listing that can't change (no active court, a newer version, history) is skipped with a reason and stays
+selected, and the others still change.
+
+- **Delete** permanently removes only drafts and suspended listings that were never used: no court bookings or
+  blocks and no open-play sessions in any state, no venue cancellations, owners, claims, owner submissions
+  (also merged ones), photos, reports or moderation, or payment settings. Published listings must be moved to
+  draft or suspended first; anything with history is skipped ("suspend it instead"). Courts, hours, policy and
+  the private import reference go with it, so importing that reference again creates a new draft. Each
+  deletion writes a `directory.delete` audit row that outlives the listing. Deleting an already deleted
+  listing counts as done.
+- **Export JSON** downloads up to 25 selected listings in the import format (`pickly-export:<id>` references,
+  new court rows), for example to copy listings from staging to production. Importing it creates drafts;
+  importing it twice keeps the first ones.
+- SQL: migration `20261013090000_directory_bulk_actions.sql` (`directory_admin_read` gains an optional
+  `publication_filter`; service-only `directory_admin_delete`; private `directory_delete_blocker`). Called
+  without the filter, the read works on a database without this migration, so the All tab, publish, draft and
+  suspend work before it is applied; the other tabs and delete need it.
+- Tests: `supabase/tests/directory-bulk.sql` (PGlite and Docker), domain/admin unit tests, and a production
+  HTTP stage in `npm run test:admin:local`.
 
 ## Staging sample venues (2026-10-13)
 

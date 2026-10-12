@@ -1,5 +1,7 @@
 import 'server-only';
-import { DirectoryInputError, readDirectorySave, readDirectoryPublication, readDirectoryImport } from '@picklyph/domain';
+import { BULK_PUBLICATION_STATUS, DirectoryInputError, readDirectoryBulk, readDirectorySave, readDirectoryPublication, readDirectoryImport,
+  type DirectoryBulkOutcome } from '@picklyph/domain';
+import { bulkOutcome } from './directory-bulk';
 import { createAdminClient } from './supabase';
 import { createDirectoryServiceClient } from './directory-server';
 import { readConsoleAccess } from './access';
@@ -40,6 +42,34 @@ export async function handleDirectoryPost(request: Request, operation: 'save' | 
     }
     if (!result.data) throw new Error('Unavailable');
     return jsonResponse({ data: result.data });
+  } catch (error) {
+    if (error instanceof DirectoryInputError) return jsonResponse({ error: error.message }, 400);
+    if (error instanceof RequestError) return jsonResponse({ error: error.message }, error.status);
+    return jsonResponse({ error: 'Directory tools are unavailable. Retry or contact the operator.' }, 503);
+  }
+}
+
+/**
+ * Bulk publish, move to draft, suspend or delete (2026-10-13). Each listing runs through the same audited,
+ * version-checked command as a single change, one after another, so one listing that can't change (no active
+ * court, history, a newer version) never blocks the others. The answer lists every outcome in request order.
+ */
+export async function handleDirectoryBulk(request: Request) {
+  try {
+    requireSameOrigin(request, readAdminConfig(process.env).origin);
+    const access = await readConsoleAccess(await createAdminClient(true), 'admin');
+    if (access.status !== 'allowed') return jsonResponse({ error: 'Administrator access required.' }, access.status === 'guest' ? 401 : access.status === 'denied' ? 403 : 503);
+    const bulk = readDirectoryBulk(await readJsonBody(request, 32 * 1024));
+    const service = createDirectoryServiceClient();
+    const outcomes: DirectoryBulkOutcome[] = [];
+    for (const item of bulk.items) {
+      const { error } = bulk.action === 'delete'
+        ? await service.rpc('directory_admin_delete', { actor_user_id: access.actorId, target_venue_id: item.id, expected_updated_at: item.expected_updated_at })
+        : await service.rpc('directory_admin_publish', { actor_user_id: access.actorId, target_venue_id: item.id,
+          expected_updated_at: item.expected_updated_at, new_status: BULK_PUBLICATION_STATUS[bulk.action] });
+      outcomes.push(bulkOutcome(bulk.action, item.id, error));
+    }
+    return jsonResponse({ data: { action: bulk.action, outcomes } });
   } catch (error) {
     if (error instanceof DirectoryInputError) return jsonResponse({ error: error.message }, 400);
     if (error instanceof RequestError) return jsonResponse({ error: error.message }, error.status);
