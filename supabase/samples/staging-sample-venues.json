@@ -1,0 +1,195 @@
+{
+  "listings": [
+    {
+      "reference": "pickly-sample:manila-bayside",
+      "venue": {
+        "name": "Sample – Bayside Pickleball Courts",
+        "address_line": "Sample address near Rizal Park (not a real venue)",
+        "city": "Manila",
+        "province": "Metro Manila",
+        "latitude": 14.5831,
+        "longitude": 120.9794
+      },
+      "courts": [
+        { "id": null, "name": "Court 1", "surface": "hard", "is_indoor": false, "is_covered": false, "status": "active" },
+        { "id": null, "name": "Court 2", "surface": "hard", "is_indoor": false, "is_covered": false, "status": "active" },
+        { "id": null, "name": "Court 3", "surface": "hard", "is_indoor": false, "is_covered": true, "status": "active" },
+        { "id": null, "name": "Court 4", "surface": "hard", "is_indoor": false, "is_covered": true, "status": "active" }
+      ]
+    },
+    {
+      "reference": "pickly-sample:qc-diliman",
+      "venue": {
+        "name": "Sample – Diliman Dink Club",
+        "address_line": "Sample address near the Quezon Memorial Circle (not a real venue)",
+        "city": "Quezon City",
+        "province": "Metro Manila",
+        "latitude": 14.6514,
+        "longitude": 121.0498
+      },
+      "courts": [
+        { "id": null, "name": "Court A", "surface": "synthetic", "is_indoor": true, "is_covered": true, "status": "active" },
+        { "id": null, "name": "Court B", "surface": "synthetic", "is_indoor": true, "is_covered": true, "status": "active" },
+        { "id": null, "name": "Court C", "surface": "synthetic", "is_indoor": true, "is_covered": true, "status": "inactive" }
+      ]
+    },
+    {
+      "reference": "pickly-sample:makati-rooftop",
+      "venue": {
+        "name": "Sample – Makati Rooftop Courts",
+        "address_line": "Sample address near Ayala Triangle (not a real venue)",
+        "city": "Makati",
+        "province": "Metro Manila",
+        "latitude": 14.5571,
+        "longitude": 121.0232
+      },
+      "courts": [
+        { "id": null, "name": "Rooftop 1", "surface": "hard", "is_indoor": false, "is_covered": true, "status": "active" },
+        { "id": null, "name": "Rooftop 2", "surface": "hard", "is_indoor": false, "is_covered": true, "status": "active" }
+      ]
+    },
+    {
+      "reference": "pickly-sample:pasig-ortigas",
+      "venue": {
+        "name": "Sample – Ortigas Indoor Pickleball Hall",
+        "address_line": "Sample address near Ortigas Center (not a real venue)",
+        "city": "Pasig",
+        "province": "Metro Manila",
+        "latitude": 14.5865,
+        "longitude": 121.0609
+      },
+      "courts": [
+        { "id": null, "name": "Court 1", "surface": "synthetic", "is_indoor": true, "is_covered": true, "status": "active" },
+        { "id": null, "name": "Court 2", "surface": "synthetic", "is_indoor": true, "is_covered": true, "status": "active" },
+        { "id": null, "name": "Court 3", "surface": "synthetic", "is_indoor": true, "is_covered": true, "status": "active" },
+        { "id": null, "name": "Court 4", "surface": "synthetic", "is_indoor": true, "is_covered": true, "status": "active" },
+        { "id": null, "name": "Court 5", "surface": "synthetic", "is_indoor": true, "is_covered": true, "status": "active" },
+        { "id": null, "name": "Court 6", "surface": "synthetic", "is_indoor": true, "is_covered": true, "status": "active" }
+      ]
+    },
+    {
+      "reference": "pickly-sample:taguig-bgc",
+      "venue": {
+        "name": "Sample – BGC Kitchen Line Courts",
+        "address_line": "Sample address near Bonifacio High Street (not a real venue)",
+        "city": "Taguig",
+        "province": "Metro Manila",
+        "latitude": 14.5507,
+        "longitude": 121.0512
+      },
+      "courts": [
+        { "id": null, "name": "Court 1", "surface": "hard", "is_indoor": false, "is_covered": false, "status": "active" }
+      ]
+    },
+    {
+      "reference": "pickly-sample:angeles-clark",
+      "venue": {
+        "name": "Sample – Clark Field Pickleball Park",
+        "address_line": "Sample address near Clark Parade Grounds (not a real venue)",
+        "city": "Angeles City",
+        "province": "Pampanga",
+        "latitude": 15.1863,
+        "longitude": 120.5469
+      },
+      "courts": [
+        { "id": null, "name": "North 1", "surface": "hard", "is_indoor": false, "is_covered": false, "status": "active" },
+        { "id": null, "name": "North 2", "surface": "hard", "is_indoor": false, "is_covered": false, "status": "active" },
+        { "id": null, "name": "South 1", "surface": "other", "is_indoor": false, "is_covered": false, "status": "active" }
+      ]
+    },
+    {
+      "reference": "pickly-sample:baguio-pines",
+      "venue": {
+        "name": "Sample – Pines Covered Courts",
+        "address_line": "Sample address near Burnham Park (not a real venue)",
+        "city": "Baguio",
+        "province": "Benguet",
+        "latitude": 16.4114,
+        "longitude": 120.5936
+      },
+      "courts": [
+        { "id": null, "name": "Court 1", "surface": "hard", "is_indoor": false, "is_covered": true, "status": "active" },
+        { "id": null, "name": "Court 2", "surface": "hard", "is_indoor": false, "is_covered": true, "status": "active" }
+      ]
+    },
+    {
+      "reference": "pickly-sample:iloilo-esplanade",
+      "venue": {
+        "name": "Sample – Esplanade Pickleball Club",
+        "address_line": "Sample address near the Iloilo River Esplanade (not a real venue)",
+        "city": "Iloilo City",
+        "province": "Iloilo",
+        "latitude": 10.7015,
+        "longitude": 122.5486
+      },
+      "courts": [
+        { "id": null, "name": "Court 1", "surface": "hard", "is_indoor": false, "is_covered": false, "status": "active" },
+        { "id": null, "name": "Court 2", "surface": "hard", "is_indoor": false, "is_covered": false, "status": "active" },
+        { "id": null, "name": "Court 3", "surface": null, "is_indoor": false, "is_covered": false, "status": "active" }
+      ]
+    },
+    {
+      "reference": "pickly-sample:cebu-uptown",
+      "venue": {
+        "name": "Sample – Uptown Cebu Pickleball Center",
+        "address_line": "Sample address near Fuente Osmeña Circle (not a real venue)",
+        "city": "Cebu City",
+        "province": "Cebu",
+        "latitude": 10.3114,
+        "longitude": 123.8916
+      },
+      "courts": [
+        { "id": null, "name": "Court 1", "surface": "synthetic", "is_indoor": true, "is_covered": true, "status": "active" },
+        { "id": null, "name": "Court 2", "surface": "synthetic", "is_indoor": true, "is_covered": true, "status": "active" },
+        { "id": null, "name": "Court 3", "surface": "synthetic", "is_indoor": true, "is_covered": true, "status": "active" },
+        { "id": null, "name": "Court 4", "surface": "synthetic", "is_indoor": true, "is_covered": true, "status": "active" }
+      ]
+    },
+    {
+      "reference": "pickly-sample:lapulapu-mactan",
+      "venue": {
+        "name": "Sample – Mactan Seaside Courts",
+        "address_line": "Sample address near the Mactan Shrine (not a real venue)",
+        "city": "Lapu-Lapu City",
+        "province": "Cebu",
+        "latitude": 10.3093,
+        "longitude": 124.0151
+      },
+      "courts": [
+        { "id": null, "name": "Court 1", "surface": "hard", "is_indoor": false, "is_covered": true, "status": "active" },
+        { "id": null, "name": "Court 2", "surface": "hard", "is_indoor": false, "is_covered": false, "status": "active" }
+      ]
+    },
+    {
+      "reference": "pickly-sample:cdo-riverside",
+      "venue": {
+        "name": "Sample – Riverside Pickleball Courts",
+        "address_line": "Sample address near Gaston Park (not a real venue)",
+        "city": "Cagayan de Oro",
+        "province": "Misamis Oriental",
+        "latitude": 8.4772,
+        "longitude": 124.6459
+      },
+      "courts": [
+        { "id": null, "name": "Court 1", "surface": "hard", "is_indoor": false, "is_covered": false, "status": "active" },
+        { "id": null, "name": "Court 2", "surface": "hard", "is_indoor": false, "is_covered": false, "status": "active" }
+      ]
+    },
+    {
+      "reference": "pickly-sample:davao-people",
+      "venue": {
+        "name": "Sample – Davao Durian Dinkers",
+        "address_line": "Sample address near People's Park (not a real venue)",
+        "city": "Davao City",
+        "province": "Davao del Sur",
+        "latitude": 7.0716,
+        "longitude": 125.6110
+      },
+      "courts": [
+        { "id": null, "name": "Court 1", "surface": "synthetic", "is_indoor": false, "is_covered": true, "status": "active" },
+        { "id": null, "name": "Court 2", "surface": "synthetic", "is_indoor": false, "is_covered": true, "status": "active" },
+        { "id": null, "name": "Court 3", "surface": "synthetic", "is_indoor": false, "is_covered": true, "status": "active" }
+      ]
+    }
+  ]
+}

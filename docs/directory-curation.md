@@ -135,5 +135,19 @@ and revocation, then removes fixtures and stops its child server. It never
 reads hosted/mobile env. Browser layout, keyboard interaction and hosted
 console acceptance remain manual checks; no new iPhone binary is needed.
 
+## Staging sample venues (2026-10-13)
+
+`supabase/samples/staging-sample-venues.json` holds 12 **fictional** venues (35 courts, one inactive) across
+Metro Manila, Pampanga, Benguet, Iloilo, Cebu, Misamis Oriental and Davao del Sur, so staging's map, list
+and filters have something to show before the permissioned H04 data exists. Every name starts with
+`Sample – `, every address says "not a real venue", and every reference starts with `pickly-sample:`.
+They are for **staging and local only, never production**; T49 removes them before real listings go in.
+They are unclaimed, so they show directions only; to test bookings, claim one with a test owner account
+and approve it from a different reviewer account.
+
+To load them: run the console against staging (`npm run admin:dev`), sign in as the admin, open
+`/console/directory/import`, choose the file, check the preview (12 listings), import, then publish each
+draft from its directory page. A repeat import answers `existing` and creates nothing.
+
 Sources: [Supabase server API keys](https://supabase.com/docs/guides/getting-started/api-keys),
 [database function security](https://supabase.com/docs/guides/database/functions).
