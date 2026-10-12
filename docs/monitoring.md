@@ -2,7 +2,8 @@
 
 The backend checks itself every five minutes and posts to the operators' Discord channel when
 something breaks. It posts again every six hours while the problem lasts, and once when it clears.
-Mobile crash reporting, a console health page and paging are not part of this (T51).
+Mobile crash reporting, a console health page and paging are not part of this (T51). T51b added the
+storage sweep's job and backlog check.
 
 ```
 Edge functions ──5xx / 503 / limiter outage──▶ ops_signal_record ──▶ private.ops_signals
@@ -15,11 +16,12 @@ pg_cron "ops-monitor" (*/5) ─▶ private.ops_monitor_kick ─▶ pg_net POST (
 
 Every check has a fixed name and carries a **count only**: never IDs, names, emails or secret
 values, because alerts leave the system. Thresholds are in the migration
-(`20261011120000_ops_monitoring.sql`), so changing one is one migration.
+(`20261011120000_ops_monitoring.sql`; T51b's `20261012090000_storage_sweep.sql` holds the current
+`private.ops_health`), so changing one is one migration.
 
 | Check | Warn / fail | Means | First look |
 | --- | --- | --- | --- |
-| `cron.jobs` | fail at 1 | One of `booking-expiry-sweep`, `push-dispatch`, `privacy-retention-sweep`, `ops-monitor` is missing or inactive (all four when pg_cron is off) | `select jobname, active from cron.job` |
+| `cron.jobs` | fail at 1 | One of `booking-expiry-sweep`, `push-dispatch`, `privacy-retention-sweep`, `ops-monitor`, `storage-sweep` is missing or inactive (all five when pg_cron is off) | `select jobname, active from cron.job` |
 | `cron.failures` | 1 / 3 | Failed runs of those jobs in the last 15 minutes | `cron.job_run_details` `return_message` (e.g. push `not_configured` = Vault secrets missing) |
 | `cron.stalled` | fail at 1 | An every-minute job (`booking-expiry-sweep`, `push-dispatch`) has not succeeded in 10 minutes | the job's schedule; pg_cron worker running |
 | `holds.overdue` | fail at 1 | Rental or group holds elapsed over 10 minutes ago but still pending. Reads already treat them as expired, so this means the sweep is not running, not that inventory is wrong | `booking-expiry-sweep` |
@@ -33,6 +35,7 @@ values, because alerts leave the system. Thresholds are in the migration
 | `redis.reachable` | fail | The monitor could not ping Redis with this environment's settings (or they are missing/invalid) | `UPSTASH_REDIS_REST_*`, `RATE_LIMIT_KEY_SECRET`, `PICKLY_ENV` |
 | `redis.isolation` | fail at 1 | Another environment's marker is in this Redis database: two environments share it (H02 requires separate databases) | give each environment its own database |
 | `privacy.deletions` | fail at 1 | An account deletion started over an hour ago and its Auth user still exists (storage or Auth step failed) | `account-deletion` logs; the user retries, or an operator finishes it |
+| `storage.backlog` | 1 / 25 | Files the daily storage sweep should have removed over a day ago: proof photos 31+ days after their decision, unreferenced objects 48+ hours old (T51b) | the `storage-sweep` job, Vault `storage_sweep_*`, the function's 502 `storage_refused` replies in `net._http_response` ([privacy](privacy.md#storage-cleanup-t51b)) |
 | `rollout.arrival_only` | fail at 1 | An active merchant, a stored online/both policy, or a live booking snapshot offering online payment during the pay-on-arrival pilot | **replace this check when online payments resume** |
 
 The Redis checks run in the function: it pings with the same settings as the rate guard
@@ -43,7 +46,7 @@ state.
 ## Edge signals
 
 `_shared/ops.ts` wraps every function entrypoint except `ops-monitor`:
-`observeHandler` notes 503 as `unavailable` and other 5xx (or a throw) as `server_error`;
+`observeHandler` (`storage-sweep` included since T51b) notes 503 as `unavailable` and other 5xx (or a throw) as `server_error`;
 `observeGuard` notes each rate-guard decision made under the outage policy as `limiter_degraded`.
 The reporter writes at most once per kind per minute per isolate through `ops_signal_record`
 (service-only, fixed sources and kinds, 1–10000). The first signal after a quiet minute is written

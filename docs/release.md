@@ -126,6 +126,7 @@ npm run release:check -- --variant production --linked
 | `OPS_MONITOR_SECRET` | `ops-monitor` (T51a); the same value in Vault `ops_monitor_secret` | yes |
 | `OPS_ALERT_WEBHOOK_URL` | `ops-monitor`: the operators' Discord channel webhook | may be shared (messages name the environment) |
 | `OPS_HEARTBEAT_URL` (optional) | `ops-monitor`: outside dead-man's switch pinged after each run | must differ when set in both |
+| `STORAGE_SWEEP_SECRET` | `storage-sweep` (T51b); the same value in Vault `storage_sweep_secret` | yes |
 | `EXPO_ACCESS_TOKEN` (optional) | `push-dispatch`, only with Expo enhanced push security | may be shared |
 | `DISCOVERY_IP_SOURCE` (optional) | `venue-search`; `cloudflare` only after the H02 header checks | not checked |
 
@@ -141,10 +142,10 @@ npm run release:check -- --variant production --linked
    `supabase db push --dry-run` and `supabase db push`. No seeds.
 4. Production Upstash database (H02). Set the function secrets above, then run the secrets check
    against staging's list.
-5. Deploy the twelve functions in `supabase/config.toml` (`verify_jwt = false`, import map). Then set up
+5. Deploy the thirteen functions in `supabase/config.toml` (`verify_jwt = false`, import map). Then set up
    pg_net, Vault and the cron jobs (`booking-expiry-sweep`, `privacy-retention-sweep`, `push-dispatch`,
-   `ops-monitor`) as in [notifications.md](notifications.md#rollout-and-operator-steps),
-   [privacy.md](privacy.md#rollout-and-operator-notes) and
+   `ops-monitor`, `storage-sweep`) as in [notifications.md](notifications.md#rollout-and-operator-steps),
+   [privacy.md](privacy.md#rollout-and-operator-notes), [privacy.md](privacy.md#storage-cleanup-t51b) and
    [monitoring.md](monitoring.md#setup-per-environment-operator); check that the first monitor post
    arrives in the Discord channel.
 6. Assign the first administrator by trusted SQL ([authorization.md](authorization.md#first-administrator)).

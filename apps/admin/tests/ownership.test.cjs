@@ -17,6 +17,8 @@ test('database rejections map to reviewer messages; unexpected errors stay unava
   assert.equal(reviewRejection({ hint: 'listing_unavailable', code: 'P0002' }).status, 409);
   assert.match(reviewRejection({ hint: 'active_court_required', code: '22023' }).message, /active court/);
   assert.equal(reviewRejection({ hint: 'not_found', code: 'P0002' }).status, 404);
+  assert.equal(reviewRejection({ hint: 'evidence_removed', code: 'P0002' }).status, 410, 'purged evidence is gone, not missing (T51b)');
+  assert.match(reviewRejection({ hint: 'evidence_removed', code: 'P0002' }).message, /removed 30 days after the decision/);
   assert.equal(reviewRejection({ code: '42501' }).status, 403);
   assert.equal(reviewRejection({ code: '22023' }).status, 400);
   assert.equal(reviewRejection({ code: '57014' }), null);

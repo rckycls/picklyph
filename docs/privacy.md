@@ -67,7 +67,30 @@ Apple requires apps that offer Sign in with Apple to revoke the user's Apple tok
 | Venue photos the account uploaded | Venue content | With the listing |
 | Open reports | Anonymous after deletion, so reviewers can still act | Until decided |
 | Report free text | — | Cleared 180 days after the decision by `private.privacy_retention_sweep` (daily 03:17 Manila via pg_cron). Reason, status and dates stay. |
-| Owner evidence (active accounts) | Private bucket, reviewer-only through the console route | Deleted with the account. A purge some days after a decision needs a storage worker (T51); not built. Photos keep their metadata until then. |
+| Owner evidence (active accounts) | Private bucket, reviewer-only through the console route | Removed 30 days after the review decision by the storage sweep (below); a pending request keeps it. Deleted with the account. Photos keep their metadata until then. |
+| Files nothing references (uncertain uploads, failed cleanups, files of venues or Auth users deleted outside the app) | — | Removed by the storage sweep once they are 24 hours old |
+
+## Storage cleanup (T51b)
+
+A daily job removes private files that have outlived their purpose. It only ever touches the `owner-evidence`, `venue-photos` and `avatars` buckets.
+
+- **Removed:** a claim's or venue submission's proof photo 30 days after its review decision (`reviewed_at`), and any object in those buckets that is over 24 hours old and named by nothing: no claim or submission that still keeps its evidence, no `venue_photos` row and no profile `avatar_path`. Every upload commits within seconds under a fresh random name, so nothing in flight is that old. That covers uploads whose commit was uncertain, a removed listing photo or replaced avatar whose cleanup failed, and files left by a venue or Auth user deleted outside the app.
+- **Never removed:** evidence of a pending request or of a decision under 30 days old, photos on a listing (also suspended or retired ones: listing content), the current avatar, objects of unknown age, other buckets.
+- **How:** pg_cron `storage-sweep` (daily `47 19 * * *` UTC, 03:47 Manila) → `private.storage_sweep_kick` → pg_net with the Vault URL and secret → the `storage-sweep` function (only the `STORAGE_SWEEP_SECRET` bearer; user tokens 401, GET 405, 503 `not_configured` without the secret). Per batch: `storage_sweep_due` (200 items, evidence first) → one Storage API removal per bucket (Supabase refuses direct deletes from `storage.objects`) → `storage_sweep_confirm`, which records `evidence_purged_at` only for due evidence whose object is really gone. Up to 10 batches or 30 seconds per run. Anything Storage didn't remove stops the run and is retried the next day; overlapping runs are safe (a missing object is a no-op, and each purge is recorded once).
+- **Replies:** 200 with counts `{due, removed, purged, remaining, refused, rounds, more}`; 502 `storage_refused` when Storage refused a bucket (the monitor counts it under `edge.errors`); 503 `temporarily_unavailable` when the database is unreachable. `more: true` means the next run continues.
+- **Reviewers** see "Removed on <date>, 30 days after the decision" in place of the photo; the evidence route answers 410. The decision and its reason stay.
+- **Monitor:** `storage.backlog` warns at 1 and fails at 25 items over a day late, and `cron.jobs` expects the `storage-sweep` job ([monitoring](monitoring.md)).
+- **Changing the 30 days or the 24 hours** is one migration (the values appear in `private.storage_sweep_candidates` and `storage_sweep_confirm`) plus `packages/domain/src/storageSweep.ts`; a contract test ties them together.
+- **Tests:** `npm run test:storage-sweep` (the rollback-only PGlite suite `supabase/tests/storage-sweep.sql` and handler/deps tests); `npm run test:storage-sweep:local` (the same SQL on Docker, then real Storage uploads with backdated decisions and ages, the served function refusing other bearers, two overlapping runs, and pg_cron → pg_net → served sweep; it removes only its own fixtures and refuses to run when anything else is already due).
+
+**Setup per environment (operator):**
+
+1. Function secret `STORAGE_SWEEP_SECRET`: a new random value of at least 32 characters per environment. Never paste it into chat, commits or docs.
+2. `supabase db push` for `20261012090000_storage_sweep.sql`, then deploy `storage-sweep` (`verify_jwt = false` and the import map are in `config.toml`). The monitor's new check is SQL, so `ops-monitor` needs no redeploy.
+3. With pg_net enabled, store the function URL and the same secret in Vault by name only: `select vault.create_secret('<function URL>', 'storage_sweep_url');` and `select vault.create_secret('<STORAGE_SWEEP_SECRET>', 'storage_sweep_secret');`. Then `select private.storage_sweep_schedule();` (idempotent).
+4. A manual run with the secret (`curl -X POST -H "Authorization: Bearer <secret>" <url>`) is safe at any time. The first run removes any proof photos already 30 days past their decision.
+
+**Staging (2026-10-12):** not set up; T51b made no hosted changes.
 
 ## Rollout and operator notes
 
@@ -77,4 +100,4 @@ Apple requires apps that offer Sign in with Apple to revoke the user's Apple tok
 - Deleting an account on someone's behalf (support): follow the same order with trusted access. Run `select public.account_deletion_begin('<id>');`, empty both storage folders, then delete the Auth user.
 - **Apple revocation (T50a).** Staging has the four Apple secrets and the T50a `account-deletion` (2026-10-11). For another project, set them (docs/auth-setup.md#apple-token-revocation-key-t50a), then redeploy `account-deletion`; until then, Apple-linked accounts get `503 apple_unavailable`. No migration, and no native build (`expo-apple-authentication` is already in the app); reload Metro.
 - iPhone check (signed-in test account with a booking): Account → Delete account; read the list; the button stays disabled until `DELETE` is typed; delete; the done screen appears and Account shows the guest view; Bookings asks you to sign in; a console account sees the role message. Check VoiceOver and large text on the list. With an Apple-signed-in account, the extra line and **Continue with Apple and delete** appear. Closing Apple's sheet shows "Nothing was deleted…". Confirming deletes the account, and pickly is gone from Sign in with Apple in the iPhone's Apple ID settings.
-- Not covered: data export, an admin console deletion tool, an evidence purge job, an end date for booking records.
+- Not covered: data export, an admin console deletion tool, an end date for booking records.

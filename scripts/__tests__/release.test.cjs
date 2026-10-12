@@ -185,6 +185,12 @@ test('function secrets must be complete, point at their own project and differ f
     { ...staging, OPS_HEARTBEAT_URL: 'https://hc.example/x' }).join('\n');
   assert.match(sharedOps, /OPS_MONITOR_SECRET is the same in production and staging/);
   assert.match(sharedOps, /OPS_HEARTBEAT_URL is the same in production and staging/);
+  // T51b: the storage sweep's worker secret is required and per environment.
+  const unswept = { ...production };
+  delete unswept.STORAGE_SWEEP_SECRET;
+  assert.match(check('production', unswept).join('\n'), /STORAGE_SWEEP_SECRET is not set/);
+  assert.match(check('production', { ...production, STORAGE_SWEEP_SECRET: staging.STORAGE_SWEEP_SECRET }, staging).join('\n'),
+    /STORAGE_SWEEP_SECRET is the same in production and staging/);
   assert.match(check('production', production, production).join('\n'), /both secrets lists come from the same project/);
   assert.match(check('production', production, undefined, committed).join('\n'), /record the production project ref/);
   assert.match(release.checkFunctionSecrets({ backendName: 'staging', secrets: new Map(), environments: committed }).join('\n'), /empty or unreadable/);

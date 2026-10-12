@@ -57,6 +57,8 @@ type ReviewBase = {
   note: string | null;
   submitter: ReviewSubmitter;
   review: ReviewOutcome | null;
+  /** Reads only (T51b): when the storage sweep removed the proof photo, 30 days after the decision. */
+  evidence_removed_at?: string | null;
 };
 export type ClaimReview = ReviewBase & {
   kind: 'claim';

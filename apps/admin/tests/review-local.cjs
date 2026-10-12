@@ -271,6 +271,17 @@ async function main() {
       `report.submit,venue.suspend,report.resolve,${approved ? 'owner.revoke,' : ''}venue.reinstate`, 'One moderation audit row per change.');
     console.log('PASS: production moderation console: guest/player denial, reviewer queue/detail, CSRF/actor rejection, suspend (retry-safe) leaves Discover, owner removal, admin reinstatement, audited once each.');
 
+    stage = 'removed evidence';
+    // T51b: once the storage sweep removed the decided claim's proof (trusted SQL stands in for the sweep's record here),
+    // the detail page says when instead of showing the photo, and the evidence route answers 410 rather than streaming.
+    sql(`update private.venue_claims set evidence_purged_at = clock_timestamp() where id = '${claimId}'::uuid;`);
+    const removedHtml = await (await request(`/console/ownership/${claimId}`, jars.moderator)).text();
+    assert.ok(removedHtml.includes('30 days after the decision') && !removedHtml.includes(`/api/console/ownership/evidence/${claimId}`), 'The detail page shows the removal, not the photo.');
+    const removedPhoto = await request(`/api/console/ownership/evidence/${claimId}`, jars.moderator);
+    assert.equal(removedPhoto.status, 410, 'Removed evidence is gone, not missing.');
+    assert.match((await removedPhoto.json()).error, /removed 30 days after the decision/);
+    console.log('PASS: removed evidence: the detail page shows when the proof was removed (no photo link) and the evidence route answers 410.');
+
     stage = 'revocation';
     sql(`delete from private.account_roles where user_id = '${users.moderator.id}'::uuid;`);
     assert.equal((await moderate(jars.moderator, suspend)).status, 403, 'Revoked moderator cannot moderate.');

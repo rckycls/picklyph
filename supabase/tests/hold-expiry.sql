@@ -75,6 +75,8 @@ select public.owner_session_create(sweep_test.u('1'),jsonb_build_object('venue_i
 select sweep_test.assert_that(not exists(select 1 from pg_proc p join pg_namespace n on n.oid=p.pronamespace
   cross join (values ('anon'),('authenticated'),('service_role')) r(name)
   where n.nspname in ('public','private') and (p.proname like '%sweep%' or p.proname like 'booking_expiry%')
+    -- T51b's two service-only storage commands are the exception; storage-sweep.sql pins their grants.
+    and not (r.name='service_role' and p.proname in ('storage_sweep_due','storage_sweep_confirm'))
     and has_function_privilege(r.name,p.oid,'execute')),'no API role executes sweep functions');
 set local role service_role;
 select sweep_test.expect_error('select private.booking_expiry_sweep(10)','42501');

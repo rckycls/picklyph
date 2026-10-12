@@ -15,8 +15,8 @@ async function main(){
   const sql=query=>run(args,query).trim();
   const extension=name=>sql(`select exists(select 1 from pg_extension where extname='${name}')`)==='t';
   const cronAtStart=extension('pg_cron');const netAtStart=extension('pg_net');
-  const jobNames=['booking-expiry-sweep','push-dispatch','privacy-retention-sweep','ops-monitor'];
-  if(cronAtStart)assert.equal(sql(`select count(*) from cron.job where jobname in (${jobNames.map(n=>`'${n}'`).join(',')})`),'0','Run on a database without the four monitored jobs');
+  const jobNames=['booking-expiry-sweep','push-dispatch','privacy-retention-sweep','ops-monitor','storage-sweep'];
+  if(cronAtStart)assert.equal(sql(`select count(*) from cron.job where jobname in (${jobNames.map(n=>`'${n}'`).join(',')})`),'0','Run on a database without the five monitored jobs');
   assert.equal(sql(`select count(*) from vault.secrets where name in ('ops_monitor_url','ops_monitor_secret')`),'0','Run on a database without ops monitor Vault secrets');
   const inventory=()=>sql(`select jsonb_build_object('users',(select jsonb_agg(id order by id) from auth.users),'venues',(select jsonb_agg(id order by id) from public.venues),
     'allocations',(select jsonb_agg(id order by id) from private.court_allocations),'outbox',(select jsonb_agg(id order by id) from private.notification_outbox),
@@ -124,7 +124,7 @@ async function main(){
     const firstPost=delivered()[0].json;
     assert.deepEqual(Object.keys(firstPost).sort(),['allowed_mentions','content','username']);assert.deepEqual(firstPost.allowed_mentions,{parse:[]});
     assert.match(firstPost.content,/^\*\*PicklyPH local\*\* monitor: 3 problems\n/);
-    assert.match(firstPost.content,/Scheduled jobs: 4 expected pg_cron jobs are missing or inactive/);
+    assert.match(firstPost.content,/Scheduled jobs: 5 expected pg_cron jobs are missing or inactive/);
     assert.equal(pings.length,1,'heartbeat after the run');
     assert.equal(sql(`select string_agg(check_name||'='||notified_status,',' order by check_name) from private.ops_alert_state where status<>'ok'`),
       'cron.jobs=fail,edge.limiter=fail,redis.reachable=fail','posted states confirmed');
@@ -136,7 +136,7 @@ async function main(){
     if(!netAtStart){sql('create extension pg_net;');netCreated=true;}
     if(!cronAtStart){sql('create extension pg_cron;');cronCreated=true;}
     sql(`select vault.create_secret('http://kong:8000/functions/v1/ops-monitor','ops_monitor_url');select vault.create_secret('${secret}','ops_monitor_secret');`);vaultCreated=true;
-    sql('select private.booking_expiry_schedule();select private.privacy_retention_schedule();select private.push_dispatch_schedule();');
+    sql('select private.booking_expiry_schedule();select private.privacy_retention_schedule();select private.push_dispatch_schedule();select private.storage_sweep_schedule();');
     const lastSuccess=name=>sql(`select coalesce(max(d.start_time)::text,'') from cron.job_run_details d join cron.job j on j.jobid=d.jobid where j.jobname='${name}' and d.status='succeeded'`);
     await waitFor(()=>lastSuccess('booking-expiry-sweep')!==''&&lastSuccess('push-dispatch')!=='','every-minute jobs to succeed once',130000);
     const jobId=sql('select private.ops_monitor_schedule();');assert.equal(sql('select private.ops_monitor_schedule();'),jobId,'idempotent');

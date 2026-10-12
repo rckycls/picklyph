@@ -104,6 +104,7 @@ If PowerShell blocks the npm scripts, use `npm.cmd`/`npx.cmd` for these commands
 | `npm run release:check -- --variant <v> …` | Offline release check of pulled EAS values, an export or `.ipa`, function secret digests and the linked project; see [docs/release.md](docs/release.md). |
 | `npm run test:release` | Check the release environment rules, the release check and the real app config as an EAS worker evaluates it. |
 | `npm run test:ops` / `npm run test:ops:local` | Check the backend health checks and Discord operator alerts; the local run drives real pg_cron/pg_net and a fake Discord ([docs/monitoring.md](docs/monitoring.md)). |
+| `npm run test:storage-sweep` / `npm run test:storage-sweep:local` | Check the daily storage cleanup (proof photos 30 days after review, unreferenced files after 24 hours); the local run uses real Storage, the served worker and pg_cron/pg_net ([docs/privacy.md](docs/privacy.md#storage-cleanup-t51b)). |
 | `npx expo-doctor` | Check Expo project health; not a package script. |
 
 Use `npm ci` for a clean install and `npx expo install <package>` when adding

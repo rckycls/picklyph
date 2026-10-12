@@ -78,10 +78,13 @@ export default async function OwnershipItemPage({ params }: { params: Promise<{ 
         {item.note && <><h3>Note from submitter</h3><p className="submitter-note">{item.note}</p></>}</section>
     </div><div className="review-column">
       <section className="workspace-panel"><h2>Proof photo</h2>
-        {/* Private evidence must never enter the image optimizer cache; this route streams it with no-store. */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img className="evidence-photo" src={`/api/console/ownership/evidence/${item.id}`} alt={`Proof photo submitted for ${name}`} />
-        <p className="muted small-note">Private to reviewers. Don’t download or share it.</p></section>
+        {item.evidence_removed_at
+          ? <p className="muted">Removed on {when(item.evidence_removed_at)}, 30 days after the decision. The decision and its reason stay.</p>
+          : <>
+            {/* Private evidence must never enter the image optimizer cache; this route streams it with no-store. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img className="evidence-photo" src={`/api/console/ownership/evidence/${item.id}`} alt={`Proof photo submitted for ${name}`} />
+            <p className="muted small-note">Private to reviewers. Don’t download or share it. It is removed 30 days after the decision.</p></>}</section>
       {item.status !== 'pending' ? <Outcome item={item} admin={admin} />
         : own ? <section className="workspace-panel"><h2>Decision</h2><p>You submitted this request, so another reviewer must decide it.</p></section>
         : <OwnershipDecisionForm subjectId={item.id} kind={item.kind} isAdmin={admin} candidates={candidates} />}

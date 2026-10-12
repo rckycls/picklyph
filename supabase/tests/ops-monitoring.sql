@@ -118,10 +118,10 @@ insert into private.venue_owners(user_id, venue_id) values (ops_test.u('1'), 'cd
 select public.venue_schedule_save(ops_test.u('1'), 'cd200000-0000-4000-8000-000000000001', null,
   jsonb_build_object('weekly', (select jsonb_agg(jsonb_build_array(jsonb_build_object('start_minute', 0, 'end_minute', 1440, 'rates', jsonb_build_array(
     jsonb_build_object('start_minute', 0, 'end_minute', 1440, 'hourly_centavos', 40000))))) from generate_series(1, 7)), 'exceptions', '[]'::jsonb));
--- The four jobs, each with a recent successful run.
+-- The five jobs, each with a recent successful run.
 insert into cron.job(jobname, schedule, command) values ('booking-expiry-sweep', '* * * * *', 'select private.booking_expiry_sweep(100)'),
   ('push-dispatch', '* * * * *', 'select private.push_dispatch_kick()'), ('privacy-retention-sweep', '17 19 * * *', 'select private.privacy_retention_sweep(500)'),
-  ('ops-monitor', '*/5 * * * *', 'select private.ops_monitor_kick()');
+  ('ops-monitor', '*/5 * * * *', 'select private.ops_monitor_kick()'), ('storage-sweep', '47 19 * * *', 'select private.storage_sweep_kick()');
 insert into cron.job_run_details(jobid, status, start_time, end_time) select jobid, 'succeeded', clock_timestamp() - interval '1 minute', clock_timestamp() from cron.job;
 select ops_test.expect('{}', 'baseline: every check ok');
 
@@ -159,7 +159,7 @@ update cron.job set active = true where jobname = 'push-dispatch';
 insert into cron.job(jobname, schedule, command) values ('ops-monitor', '*/5 * * * *', 'select private.ops_monitor_kick()');
 insert into cron.job_run_details(jobid, status, start_time) select jobid, 'failed', clock_timestamp() - interval '2 minutes' from cron.job where jobname = 'push-dispatch';
 select ops_test.expect('{"cron.failures":"warn:1"}', 'one failed run');
-insert into cron.job_run_details(jobid, status, start_time) select jobid, 'failed', clock_timestamp() - interval '3 minutes' from cron.job where jobname in ('booking-expiry-sweep','ops-monitor');
+insert into cron.job_run_details(jobid, status, start_time) select jobid, 'failed', clock_timestamp() - interval '3 minutes' from cron.job where jobname in ('booking-expiry-sweep','storage-sweep');
 insert into cron.job_run_details(jobid, status, start_time) select jobid, 'failed', clock_timestamp() - interval '16 minutes' from cron.job where jobname = 'push-dispatch';
 -- A failed run of a job the monitor does not know about is not counted.
 insert into cron.job(jobname, schedule, command) values ('someone-else', '* * * * *', 'select 1');
@@ -172,7 +172,7 @@ select ops_test.expect('{"cron.stalled":"fail:1"}', 'an every-minute job without
 update cron.job_run_details set start_time = clock_timestamp() - interval '9 minutes' where jobid = (select jobid from cron.job where jobname = 'push-dispatch');
 select ops_test.expect('{}', 'a success 9 minutes ago is fine');
 alter schema cron rename to cron_hidden;
-select ops_test.expect('{"cron.jobs":"fail:4"}', 'no pg_cron: every job missing, run checks skipped');
+select ops_test.expect('{"cron.jobs":"fail:5"}', 'no pg_cron: every job missing, run checks skipped');
 alter schema cron_hidden rename to cron;
 
 -- Holds the sweep should have recorded.
@@ -302,7 +302,7 @@ select ops_test.expect_error($$select public.ops_alerts_confirm('[{"check":"hold
 
 -- Alert state: a quiet first run posts nothing; a problem posts until confirmed; then only changes, reminders and recovery.
 select ops_test.is(ops_test.run(), '', 'all ok: nothing to post');
-select ops_test.assert_that((select count(*) from private.ops_alert_state) = 15, 'all thirteen database checks and both Redis checks are tracked');
+select ops_test.assert_that((select count(*) from private.ops_alert_state) = 16, 'all fourteen database checks and both Redis checks are tracked');
 select ops_test.policy('approval');
 insert into ops_flow values ('late_hold', ops_test.rent('3', '1', '40', 660, 720));
 select ops_test.elapse_hold((select id from ops_flow where name = 'late_hold'), interval '11 minutes');

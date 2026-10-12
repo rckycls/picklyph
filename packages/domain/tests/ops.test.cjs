@@ -6,20 +6,28 @@ const { OPS_CHECKS, OPS_CHECK_NAMES, OPS_EXTERNAL_CHECKS, OPS_SIGNAL_SOURCES, OP
   isOpsWebhookUrl, isOpsHeartbeatUrl, isOpsCheckName } = require('../src/ops.ts');
 
 const root = path.resolve(path.dirname(require.resolve('../src/ops.ts')), '../../..');
-const migration = fs.readFileSync(path.join(root, 'supabase/migrations/20261011120000_ops_monitoring.sql'), 'utf8');
+const migrations = path.join(root, 'supabase/migrations');
+const read = (file) => fs.readFileSync(path.join(migrations, file), 'utf8');
+const migration = read('20261011120000_ops_monitoring.sql');
+// The newest migration that (re)defines something holds its current definition (T51b replaced ops_health and the source list).
+const latest = (pattern) => read(fs.readdirSync(migrations).filter((file) => file.endsWith('.sql')).sort().reverse().find((file) => pattern.test(read(file))));
 
-test('the contract matches the migration: every SQL check is named here, and the signal sources are the served functions', () => {
-  const sqlChecks = [...migration.matchAll(/private\.ops_check\('([a-z_.]+)'/g)].map((m) => m[1]);
+test('the contract matches the migrations: every SQL check is named here, and the signal sources are the served functions', () => {
+  const health = latest(/function private\.ops_health\(/);
+  const sqlChecks = [...health.matchAll(/private\.ops_check\('([a-z_.]+)'/g)].map((m) => m[1]);
   assert.deepEqual([...new Set(sqlChecks)].sort(), OPS_CHECK_NAMES.filter((name) => !OPS_EXTERNAL_CHECKS.includes(name)).sort());
   assert.deepEqual([...OPS_EXTERNAL_CHECKS].sort(), ['redis.isolation', 'redis.reachable']);
   assert.match(migration, /not in \('redis\.reachable','redis\.isolation'\)/);
-  const sources = [...migration.matchAll(/source (?:not )?in \(([^)]*)\)/g)].map((m) => [...m[1].matchAll(/'([a-z-]+)'/g)].map((s) => s[1]).sort());
+  const signals = latest(/function public\.ops_signal_record\(/);
+  assert.equal(signals, latest(/constraint ops_signals_source_check|source text not null check/), 'the table check and the command change together');
+  const sources = [...signals.matchAll(/source (?:not )?in \(([^)]*)\)/g)].map((m) => [...m[1].matchAll(/'([a-z-]+)'/g)].map((s) => s[1]).sort());
   assert.equal(sources.length, 2, 'table check and command validation');
   for (const list of sources) assert.deepEqual(list, [...OPS_SIGNAL_SOURCES].sort());
   const served = fs.readdirSync(path.join(root, 'supabase/functions'), { withFileTypes: true })
     .filter((entry) => entry.isDirectory() && !['_shared', 'tests', 'ops-monitor'].includes(entry.name)).map((entry) => entry.name).sort();
   assert.deepEqual(served, [...OPS_SIGNAL_SOURCES].sort(), 'every served function except the monitor reports signals');
   assert.deepEqual([...migration.matchAll(/kind (?:not )?in \(([^)]*)\)/g)].map((m) => m[1].replace(/\s/g, '')), Array(2).fill(OPS_SIGNAL_KINDS.map((k) => `'${k}'`).join(',')));
+  assert.deepEqual([...signals.matchAll(/kind (?:not )?in \(([^)]*)\)/g)].map((m) => m[1].replace(/\s/g, '')), [OPS_SIGNAL_KINDS.map((k) => `'${k}'`).join(',')]);
   for (const name of OPS_CHECK_NAMES) assert.ok(isOpsCheckName(name));
   assert.ok(!isOpsCheckName('toString') && !isOpsCheckName('constructor'), 'own names only');
 });

@@ -23,7 +23,7 @@ Approving a second claim on a listing that already has an owner adds a co-owner;
 - `/console/ownership`: pending queue, oldest first, 50 per page with a keyset cursor. Each row shows the type and a duplicate signal (claims: other pending claims or existing owners; submissions: listings or submissions found nearby when it was sent).
 - `/console/ownership/[id]`: listing or proposed venue, a Google Maps link to the pin, submitter (display name, account ID, history), their note, the proof photo, and for submissions every listing within 150 m (or a similar name within 2 km), **including drafts and suspended listings the submitter never saw**, plus other submissions nearby. Decision controls require ticking "I checked the proof photo…" before approving.
 - `POST /api/console/ownership/decide`: same-origin JSON `{subject_id, decision, target_venue_id, rejection_reason}` (2 KiB, unknown fields rejected). The actor is the verified user; the database re-checks the role inside the transaction.
-- `GET /api/console/ownership/evidence/[id]`: streams the private photo to a verified reviewer. The server fetches it with the service key, checks the leading bytes are JPEG/PNG, and returns it with `no-store`, `nosniff`, `Content-Security-Policy: default-src 'none'; sandbox` and `Cross-Origin-Resource-Policy: same-origin`. Cross-site fetches (`Sec-Fetch-Site`) are refused. **No signed URL ever reaches the browser**, and the page uses a plain `<img>` so the photo never enters the Next image-optimizer cache.
+- `GET /api/console/ownership/evidence/[id]`: streams the private photo to a verified reviewer. The server fetches it with the service key, checks the leading bytes are JPEG/PNG, and returns it with `no-store`, `nosniff`, `Content-Security-Policy: default-src 'none'; sandbox` and `Cross-Origin-Resource-Policy: same-origin`. Cross-site fetches (`Sec-Fetch-Site`) are refused. **No signed URL ever reaches the browser**, and the page uses a plain `<img>` so the photo never enters the Next image-optimizer cache. After the T51b storage sweep removed it (30 days after the decision) the route answers 410 and the page shows when it was removed (`evidence_removed_at` on `ownership_review_read`).
 
 Console times go through `toDisplayInstant`: Postgres returns microseconds, and the shared Manila formatter accepts at most milliseconds.
 
@@ -54,6 +54,6 @@ The migration was applied to hosted staging on 2026-10-07, together with T15's. 
 Not in T17:
 - Notifying submitters, or showing them the rejection reason (only the status).
 - Audited ownership revocation: done in T46, which dropped T08's unaudited `set_verified_venue_owner`; see [moderation](moderation.md).
-- Evidence purge after a decision and metadata stripping (evidence is deleted with the account; see [privacy](privacy.md)).
+- Evidence metadata stripping. (Evidence is deleted with the account and removed 30 days after the decision by the T51b storage sweep; the detail page then shows when, and this route answers 410. See [privacy](privacy.md#storage-cleanup-t51b).)
 
 H06 (a pilot owner trial of claim and review) can now run on staging.

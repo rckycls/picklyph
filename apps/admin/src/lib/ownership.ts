@@ -17,6 +17,7 @@ export function reviewRejection(error: { code?: string | null; hint?: string | n
     case 'already_decided': return { status: 409, message: 'Another reviewer already decided this request. Reload to see the decision.' };
     case 'listing_unavailable': return { status: 409, message: 'That listing or the owner’s draft is suspended or no longer exists. Reload the request.' };
     case 'not_found': return { status: 404, message: 'This request no longer exists.' };
+    case 'evidence_removed': return { status: 410, message: 'This proof photo was removed 30 days after the decision.' };
     case 'invalid_input': return { status: 400, message: 'Check the decision and try again.' };
   }
   if (error.code === '42501') return { status: 403, message: 'Ownership reviewer access required.' };
