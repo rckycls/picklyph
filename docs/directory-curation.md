@@ -163,6 +163,19 @@ selected, and the others still change.
 - Tests: `supabase/tests/directory-bulk.sql` (PGlite and Docker), domain/admin unit tests, and a production
   HTTP stage in `npm run test:admin:local`.
 
+## Collecting real venues (H04, 2026-10-13)
+
+`docs/templates/h04-venue-collection.xlsx` is the collection template for H04 (rebuild it with
+`node scripts/generate-venue-collection.cjs`). **Start here** explains it; **Venues** takes one row per venue,
+**Courts** one row per court and **Permissions** who agreed to the listing, how, when and where the proof is.
+Dropdowns and checks follow the import limits above (lengths, Philippine coordinates, unique court names, at
+most 40 courts), and each venue's Status says Ready once it has every field, permission, a pin confirmed by
+the owner or a site visit, and at least one active court. Hours, photos and session prices are not collected:
+owners add them in the app after claiming the listing. Venue codes become permanent import references.
+
+Permissions holds personal contact details. Keep filled copies in the ignored `venue-data/` folder (never in
+git), and hand over a copy without the Permissions sheet for conversion to the import format.
+
 ## Staging sample venues (2026-10-13)
 
 `supabase/samples/staging-sample-venues.json` holds 12 **fictional** venues (35 courts, one inactive) across
