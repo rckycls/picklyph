@@ -19,6 +19,7 @@ import type { RentalBooking, RentalBookingPage, RentalBookingResult, RentalQuote
 import type { CancellationReason } from './cancellation.ts';
 import type { OpsAlert, OpsCheck, OpsSignalKind, OpsSignalSource } from './ops.ts';
 import type { StorageSweepItem } from './storageSweep.ts';
+import type { PrelaunchRegisterResult, PrelaunchRegistration } from './prelaunch.ts';
 
 // Schema-maintained PostgREST contract for the directory, authorization, owner-submission, ownership-review and owner-venue migrations.
 // Only the exposed public schema belongs in mobile code. PostGIS geometry is
@@ -189,6 +190,12 @@ export interface Database {
       // T51b: the storage-sweep worker parses both replies strictly (storageSweep.ts).
       storage_sweep_due: { Args: { batch_limit?: number }; Returns: unknown };
       storage_sweep_confirm: { Args: { items: StorageSweepItem[] }; Returns: unknown };
+      // T53 registration server only (service_role).
+      prelaunch_register: {
+        Args: { request_key: string; registration: PrelaunchRegistration; code_hash: string; acknowledge_duplicates: boolean };
+        Returns: PrelaunchRegisterResult;
+      };
+      prelaunch_email_sent: { Args: { registration_id: string; sent_version: number }; Returns: boolean };
       authorize_venue_management: {
         Args: { actor_user_id: string; target_venue_id: string };
         Returns: undefined;

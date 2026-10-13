@@ -5,7 +5,7 @@ type RpcError = { code?: string | null; hint?: string | null; details?: string |
 /** What `directory_admin_delete` found (its error detail), in the reviewer's words. */
 const HISTORY: Record<string, string> = {
   court_history: 'court bookings or blocks', session_history: 'open-play sessions', cancellations: 'venue cancellations',
-  owner: 'an owner', claim: 'an ownership claim', submission: 'an owner submission', photos: 'photos',
+  owner: 'an owner', claim: 'an ownership claim', submission: 'an owner submission', registration: 'a pre-launch registration', photos: 'photos',
   reports: 'reports or moderation history', merchant: 'payment settings',
 };
 

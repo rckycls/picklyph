@@ -17,7 +17,7 @@ const mutations = [
   ['private.session_booking_guard()', 'and exists (select 1 from private.account_deletions d where d.user_id = old.requested_by) then', 'then'],
   ['private.session_booking_guard()', 'new.expires_at,new.updated_at)', 'new.expires_at,old.updated_at)'],
   ['private.refuse_deleting_account()', 'if exists (select 1 from private.account_deletions d where d.user_id = who) then', 'if false then'],
-  ['private.privacy_retention_sweep(integer)', "interval '180 days'", "interval '170 days'"],
+  ['private.privacy_retention_sweep(integer)', "x.reviewed_at < clock_timestamp() - interval '180 days'", "x.reviewed_at < clock_timestamp() - interval '170 days'"],
 ];
 const droppedTriggers = [['court_allocations_account_deleting', 'private.court_allocations'], ['session_bookings_account_deleting', 'private.session_bookings'],
   ['venue_owners_account_deleting', 'private.venue_owners'], ['account_roles_account_deleting', 'private.account_roles'],

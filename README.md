@@ -99,6 +99,9 @@ If PowerShell blocks the npm scripts, use `npm.cmd`/`npx.cmd` for these commands
 | `npm run admin:typecheck` / `npm run admin:lint` | Check admin source separately from the mobile app. |
 | `npm run test:admin` | Check server identity/current-role trust, revocation, CSRF/input and configuration boundaries. |
 | `npm run test:admin:local` | Test production console/email/session/page/API access against local Supabase/Mailpit; requires a built admin and removes its own fixtures. |
+| `npm run web:dev` / `npm run web:build` | Run or build the public pre-launch court registration page (`apps/web`, T53); configure `apps/web/.env.local` from its `.env.example`. See [pre-launch registration](docs/prelaunch-registration.md). |
+| `npm run web:typecheck` / `npm run web:lint` / `npm run test:web` | Check the registration page and its handlers. `npm run test:prelaunch` runs its SQL suite. |
+| `npm run test:web:local` | Production registration server against local Docker Supabase with loopback Upstash/email stand-ins and Cloudflare test keys; requires a built `apps/web`, removes its own rows. |
 | `npm run check:dependencies` | Check the installed versions against the Expo SDK. |
 | `npm run bundle:ios` | Export an iOS Hermes bundle to ignored `dist/ios`; does not create an installable `.ipa`. |
 | `npm run release:check -- --variant <v> …` | Offline release check of pulled EAS values, an export or `.ipa`, function secret digests and the linked project; see [docs/release.md](docs/release.md). |
@@ -307,6 +310,7 @@ access and verified target selection; a mobile publishable key cannot apply them
 | `src/theme/`, `assets/brand/`, `docs/` | Concept C colors, typography, paddle-pin assets and setup notes. |
 | `packages/domain/` | Shared TypeScript domain package. |
 | `apps/admin/` | Next.js admin/moderator console with its own server auth, env and checks. |
+| `apps/web/` | Public pre-launch court registration page (T53): no accounts, its own origin, env and checks. |
 | `supabase/` | Directory/authorization migrations, local configuration and SQL/API tests; Edge Functions later. |
 | `vibe-plus/` | Task plan and current handoff. |
 

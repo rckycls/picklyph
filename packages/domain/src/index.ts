@@ -49,3 +49,6 @@ export type { AllocationKind, AllocationState, CourtAllocation, AllocationOutcom
 export { MAX_CALENDAR_DAYS, MAX_COURT_WINDOWS, MAX_COURT_CLOSURES, CalendarInputError, readCourtHours, readCourtHoursSave, readCalendarQuery, readScheduleCommand, courtDayRanges, resolveCourtHours } from './calendar';
 export type { CourtWindow, CourtHours, CourtHoursView, CourtHoursSave, CalendarCourt, CalendarView, CalendarQuery, ScheduleCommand } from './calendar';
 export type { Court, CourtStatus, CourtSurface, MapBounds, Venue, VenueClaimStatus, VenueMapPin, VenuePublicationStatus } from './directory';
+export { CLAIM_CODE_ALPHABET, CLAIM_CODE_LENGTH, COURT_SURFACES, MAX_OPEN_REGISTRATIONS_PER_EMAIL, MAX_PRELAUNCH_BODY, MAX_TURNSTILE_TOKEN, PrelaunchInputError, REGISTRATION_RETENTION_DAYS, REGISTRATION_ROLES, REGISTRATION_ROLE_LABELS,
+  formatClaimCode, normalizeClaimCode, readAddressQuery, readContactEmail, readMobileNumber, readOwnerName, readPrelaunchRegistration, readPrelaunchRequest, readRegistrationCourts, readRegistrationRole } from './prelaunch';
+export type { PrelaunchDuplicate, PrelaunchErrorReply, PrelaunchRegisterResult, PrelaunchRegistration, PrelaunchReply, PrelaunchRequest, RegistrationCourts, RegistrationRole } from './prelaunch';

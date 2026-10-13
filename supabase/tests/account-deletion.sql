@@ -225,10 +225,10 @@ insert into private.venue_reports(venue_id,reporter_user_id,request_id,reason,de
   (del_test.v('2'),del_test.u('3'),del_test.k('42'),'closed','Open note','open',null,clock_timestamp()-interval '400 days'),
   (del_test.v('1'),del_test.u('3'),del_test.k('43'),'unsafe','Older note','resolved',clock_timestamp()-interval '300 days',clock_timestamp()-interval '310 days');
 select del_test.expect_error($q$select private.privacy_retention_sweep(0)$q$,'22023','invalid_input');
-select del_test.assert_that(private.privacy_retention_sweep(1)='{"report_details":1,"more":true}'::jsonb,'first bounded batch');
+select del_test.assert_that(private.privacy_retention_sweep(1)='{"report_details":1,"prelaunch_registrations":0,"more":true}'::jsonb,'first bounded batch');
 select del_test.assert_that(del_test.report_details('43')='<null>' and del_test.report_details('40')='Old note','oldest decision first');
-select del_test.assert_that(private.privacy_retention_sweep(500)='{"report_details":1,"more":false}'::jsonb,'second batch');
-select del_test.assert_that(private.privacy_retention_sweep(500)='{"report_details":0,"more":false}'::jsonb,'nothing left');
+select del_test.assert_that(private.privacy_retention_sweep(500)='{"report_details":1,"prelaunch_registrations":0,"more":false}'::jsonb,'second batch');
+select del_test.assert_that(private.privacy_retention_sweep(500)='{"report_details":0,"prelaunch_registrations":0,"more":false}'::jsonb,'nothing left');
 select del_test.assert_that(del_test.report_details('40')='<null>' and del_test.report_details('41')='Recent note'
   and del_test.report_details('42')='Open note' and del_test.report_details('19')='Gate closes early','only decisions older than 180 days lose text');
 
