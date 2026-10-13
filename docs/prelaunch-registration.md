@@ -95,7 +95,7 @@ For the iPhone (Safari), run it on the network with `PICKLY_ENV=local`, `PRELAUN
 
 - **Local Docker** and **hosted staging** (2026-10-13, at the user's request after a dry run listing only `20261013120000`; no seeds or roles) have the migration. On staging, anonymous calls to `prelaunch_register` and `prelaunch_email_sent` answer 401/42501 and `venue_registrations` is not exposed. Staging is for trials: point a local or preview run of the page at it, never live registrations.
 - **Production**: the migration goes with T50's production project. The page is not deployed anywhere yet (H13).
-- **T54 claims** (2026-10-13): migration `20261013150000` is applied to local Docker only. Staging needs it pushed, `owner-submissions` redeployed and `PRELAUNCH_CODE_SECRET` set as a function secret with the same value the page uses there; until then the app's **Claim with a code** answers "unavailable".
+- **T54 claims** (2026-10-13): migration `20261013150000` is on local Docker and **hosted staging** (pushed at the user's request after a dry run listing only it; no seeds or roles; a second dry run is up to date), and `owner-submissions` v6 with T54 is deployed there. Probes: no bearer 401 `sign_in_required`, forged 401 `invalid_auth`, PUT 405; anon `owner_registration_check`/`owner_redeem_registration` 401/42501; `claim_code_failures` not exposed (404 PGRST205); public venue reads 200. **Still to do on staging:** set `PRELAUNCH_CODE_SECRET` as a function secret with the same value the page uses there; until then signed-in code checks answer 503 `claim_codes_unavailable` ("unavailable" in the app).
 
 ## Going live (H13) and next steps
 
