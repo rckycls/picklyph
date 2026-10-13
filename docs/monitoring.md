@@ -2,8 +2,8 @@
 
 The backend checks itself every five minutes and posts to the operators' Discord channel when
 something breaks. It posts again every six hours while the problem lasts, and once when it clears.
-Mobile crash reporting, a console health page and paging are not part of this (T51). T51b added the
-storage sweep's job and backlog check.
+Mobile crash reporting and paging are not part of this (T51). T51b added the storage sweep's job and
+backlog check; T51c added the console's [System health](#console-system-health-t51c) page.
 
 ```
 Edge functions ──5xx / 503 / limiter outage──▶ ops_signal_record ──▶ private.ops_signals
@@ -88,6 +88,34 @@ healthchecks.io check expecting a ping every five minutes, with a grace period);
 it after every completed run (nothing due, or Discord accepted the post), so missing pings alert by
 the outside service's own channel.
 
+## Console System health (T51c)
+
+Administrators open **System health** in the console (`/console/health`; moderators and players are
+refused, and the database rechecks the role). One service-only read, `ops_admin_read(actor)`
+(migration `20261013210000_ops_console.sql`), writes nothing and returns:
+
+- **Checks now:** `private.ops_health` evaluated on page load, the same SQL the monitor runs, so the
+  page works where the monitor is not set up yet. The two Redis checks show the monitor's last result
+  only. Without pg_cron, `cron.failures` and `cron.stalled` are not checked and say so.
+- **What the monitor saw and posted:** each check's stored status, since when, when a run last
+  checked it (`ops_alert_state.checked_at`, stamped by `ops_monitor_run` since T51c; null for rows
+  from before) and what the channel was last told, or "Not posted yet".
+- **Monitor freshness:** the latest stamp. Over 15 minutes old (three missed runs) the page and the
+  Overview card say the monitor stopped; with no stamp at all they say it never ran.
+- **Scheduled jobs:** the five expected jobs (the active row of a name): present, active, schedule
+  (UTC), the last run and its status, the last success and failed runs in the last 24 hours, and the
+  latest failure's pg_cron message cut to 300 characters. Null ("pg_cron is off") without pg_cron.
+  It reads only the last day of `cron.job_run_details`, which pg_cron never trims by itself.
+- **Edge signals:** per function and kind, the counts for 15 minutes, an hour and 24 hours (capped at
+  1,000,000 like the checks) and the last minute seen.
+
+Counts, job names, schedules and pg_cron messages only. **Check again** reloads the page; there are no
+buttons that run the monitor, post or change anything. The Overview shows administrators a **Health
+problems** card (live problems plus the monitor's Redis results) with the monitor's freshness.
+
+**Staging:** the migration is not pushed yet (operator: the next `supabase db push`, after a dry run).
+Until then the page answers "System health unavailable".
+
 ## Setup per environment (operator)
 
 1. In Discord, create a channel webhook (channel settings → Integrations → Webhooks) and copy its
@@ -128,5 +156,13 @@ the outside service's own channel.
   until the next run delivers them. It installs and removes pg_cron/pg_net, Vault secrets and jobs,
   and restores alert state and signals exactly. Run it alone: it replaces any running
   `functions serve` container. It never calls the real Discord.
+- `npm run test:ops` also runs `supabase/tests/ops-console.sql` (T51c): grants, the admin recheck,
+  live checks equal to `ops_health`, `checked_at` per run, jobs with and without a stand-in cron
+  schema, 24-hour windows, signal grouping and caps, no writes; 18 mutations must each fail it.
+- `npm run test:health:local` (T51c, after `npm run admin:build`): the Docker console and T51a SQL,
+  then the production console with Mailpit sign-in: guests to sign-in, moderators and players refused,
+  a fresh page, a recorded Edge signal and an unfinished deletion shown live, a monitor run and its
+  posts, a 20-minute-silent monitor called stopped, a revoked admin refused. It restores alert state
+  and signals exactly and removes its accounts.
 - Other local harnesses' served functions leave a few signal rows behind (harmless; pruned after two
   days by monitor runs).

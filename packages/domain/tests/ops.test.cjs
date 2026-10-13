@@ -103,3 +103,52 @@ test('heartbeat URLs are https without credentials; loopback http only locally',
   assert.ok(isOpsHeartbeatUrl('http://127.0.0.1:4100/ping', 'local'));
   assert.equal(isOpsHeartbeatUrl('http://127.0.0.1:4100/ping', 'staging'), false);
 });
+
+const { OPS_JOBS, readOpsAdminView } = require('../src/ops.ts');
+const job = (name, patch = {}) => ({ job: name, present: true, active: true, schedule: '* * * * *', last_run_at: '2026-10-13T12:59:00.123456+00:00',
+  last_status: 'succeeded', last_success_at: '2026-10-13T12:59:00+00:00', failures: 0, last_failure_at: null, last_failure: null, ...patch });
+const view = (patch = {}) => ({
+  at: '2026-10-13T13:00:00.654321+00:00',
+  checks: [{ check: 'holds.overdue', status: 'fail', count: 2 }, { check: 'future.check', status: 'ok', count: 0 }],
+  state: [{ check: 'redis.reachable', status: 'fail', count: 1, since: '2026-10-13T12:00:00+00:00', checked_at: '2026-10-13T12:55:00+00:00',
+    notified_status: 'fail', notified_at: '2026-10-13T12:00:01+00:00' },
+  { check: 'holds.overdue', status: 'ok', count: 0, since: '2026-10-12T12:00:00+00:00', checked_at: null, notified_status: null, notified_at: null }],
+  monitor_ran_at: '2026-10-13T12:55:00+00:00',
+  jobs: OPS_JOBS.map((name) => job(name)),
+  signals: [{ source: 'venue-search', kind: 'server_error', last_15m: 1, last_hour: 2, last_day: 3, last_at: '2026-10-13T12:58:00+00:00' }],
+  ...patch,
+});
+
+test('the console job list is the one cron.jobs expects, in the read\'s order', () => {
+  const health = latest(/function private\.ops_health\(/);
+  const read = latest(/function public\.ops_admin_read\(/);
+  const list = (sql) => [...sql.match(/array\[('[a-z-]+'(?:,\s*'[a-z-]+')*)\]/)[1].matchAll(/'([a-z-]+)'/g)].map((m) => m[1]);
+  assert.deepEqual(list(health.slice(health.indexOf('expected text[]'))), [...OPS_JOBS]);
+  assert.deepEqual(list(read.slice(read.indexOf('function public.ops_admin_read('))), [...OPS_JOBS]);
+});
+
+test('health views parse strictly, keep names a newer database adds, and trim microseconds', () => {
+  const parsed = readOpsAdminView(view());
+  assert.equal(parsed.at, '2026-10-13T13:00:00.654Z');
+  assert.equal(parsed.jobs[0].last_run_at, '2026-10-13T12:59:00.123Z');
+  assert.deepEqual(parsed.checks.map((c) => c.check), ['holds.overdue', 'future.check'], 'unknown but well-formed names are kept');
+  assert.equal(parsed.state[1].checked_at, null);
+  assert.equal(readOpsAdminView(view({ jobs: null, monitor_ran_at: null })).jobs, null, 'pg_cron off');
+  assert.equal(readOpsAdminView(view({ signals: [{ source: 'new-function', kind: 'unavailable', last_15m: 0, last_hour: 0, last_day: 1, last_at: '2026-10-13T01:00:00Z' }] })).signals[0].source, 'new-function');
+  const long = 'é'.repeat(300);
+  assert.equal(readOpsAdminView(view({ jobs: OPS_JOBS.map((name) => job(name, { last_status: 'failed', failures: 3, last_failure_at: '2026-10-13T12:59:00Z', last_failure: long })) })).jobs[0].last_failure, long);
+  for (const bad of [null, [], view({ at: 'now' }), view({ checks: {} }), view({ checks: [{ check: 'Holds Overdue', status: 'ok', count: 0 }] }),
+    view({ checks: [{ check: 'holds.overdue', status: 'bad', count: 0 }] }), view({ checks: [{ check: 'holds.overdue', status: 'ok', count: -1 }] }),
+    view({ checks: [{ check: 'holds.overdue', status: 'ok', count: 1000001 }] }), view({ checks: Array(51).fill({ check: 'holds.overdue', status: 'ok', count: 0 }) }),
+    view({ state: [{ check: 'holds.overdue', status: 'ok', count: 0, since: null, checked_at: null, notified_status: null, notified_at: null }] }),
+    view({ state: [{ check: 'holds.overdue', status: 'ok', count: 0, since: '2026-10-13T12:00:00Z', checked_at: null, notified_status: 'maybe', notified_at: null }] }),
+    view({ monitor_ran_at: 'yesterday' }), view({ jobs: OPS_JOBS.slice(1).map((name) => job(name)) }), view({ jobs: [...OPS_JOBS].reverse().map((name) => job(name)) }),
+    view({ jobs: OPS_JOBS.map((name) => job(name, { last_status: 'exploded' })) }), view({ jobs: OPS_JOBS.map((name) => job(name, { failures: 1.5 })) }),
+    view({ jobs: OPS_JOBS.map((name) => job(name, { present: 'yes' })) }), view({ jobs: OPS_JOBS.map((name) => job(name, { last_failure: 'x'.repeat(301) })) }),
+    view({ jobs: OPS_JOBS.map((name) => job(name, { schedule: 5 })) }), view({ jobs: {} }),
+    view({ signals: [{ source: 'Venue Search', kind: 'server_error', last_15m: 0, last_hour: 0, last_day: 1, last_at: '2026-10-13T01:00:00Z' }] }),
+    view({ signals: [{ source: 'venue-search', kind: 'teapot', last_15m: 0, last_hour: 0, last_day: 1, last_at: '2026-10-13T01:00:00Z' }] }),
+    view({ signals: [{ source: 'venue-search', kind: 'server_error', last_15m: 0, last_hour: 0, last_day: 1, last_at: null }] })]) {
+    assert.throws(() => readOpsAdminView(bad), /Unexpected health view/, JSON.stringify(bad)?.slice(0, 200));
+  }
+});

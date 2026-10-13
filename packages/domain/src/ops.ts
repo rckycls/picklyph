@@ -82,6 +82,84 @@ export function readOpsRun(raw: unknown): OpsRun {
   };
 }
 
+/** The scheduled jobs `cron.jobs` expects and the console lists, in order (T51c `ops_admin_read`). */
+export const OPS_JOBS = ['booking-expiry-sweep', 'push-dispatch', 'privacy-retention-sweep', 'ops-monitor', 'storage-sweep'] as const;
+export type OpsJobName = typeof OPS_JOBS[number];
+/** pg_cron's `job_run_details.status` values. */
+export const OPS_JOB_RUN_STATUSES = ['starting', 'running', 'sending', 'connecting', 'succeeded', 'failed'] as const;
+export type OpsJobRunStatus = typeof OPS_JOB_RUN_STATUSES[number];
+
+/**
+ * The console's System health view (T51c). Check names and signal sources are kept as strings, because the database
+ * can gain a check or a function before the console is redeployed; known names get their wording from OPS_CHECKS.
+ */
+export type OpsViewCheck = { check: string; status: OpsStatus; count: number };
+export type OpsCheckState = OpsViewCheck & { since: string; checked_at: string | null; notified_status: OpsStatus | null; notified_at: string | null };
+export type OpsJobState = {
+  job: OpsJobName; present: boolean; active: boolean; schedule: string | null;
+  last_run_at: string | null; last_status: OpsJobRunStatus | null; last_success_at: string | null;
+  failures: number; last_failure_at: string | null; last_failure: string | null;
+};
+export type OpsSignalSummary = { source: string; kind: OpsSignalKind; last_15m: number; last_hour: number; last_day: number; last_at: string };
+/** `jobs` is null when pg_cron is off. `monitor_ran_at` is null until a monitor run stamps its checks. */
+export type OpsAdminView = { at: string; checks: OpsViewCheck[]; state: OpsCheckState[]; monitor_ran_at: string | null; jobs: OpsJobState[] | null; signals: OpsSignalSummary[] };
+
+const CHECK_NAME = /^[a-z]+\.[a-z_]+$/;
+const SOURCE_NAME = /^[a-z][a-z-]{0,39}$/;
+const viewError = () => new Error('Unexpected health view.');
+function viewInstant(value: unknown): string {
+  try { return readInstant(value); } catch { throw viewError(); }
+}
+const viewNullableInstant = (value: unknown) => value === null ? null : viewInstant(value);
+const viewObject = (raw: unknown) => { try { return object(raw); } catch { throw viewError(); } };
+const viewCount = (value: unknown) => { if (!isCount(value)) throw viewError(); return value; };
+const viewStatus = (value: unknown) => { if (!isStatus(value)) throw viewError(); return value; };
+const viewText = (value: unknown, max: number) => {
+  if (value === null) return null;
+  if (typeof value !== 'string' || [...value].length > max) throw viewError();
+  return value;
+};
+const viewList = (value: unknown, max: number) => { if (!Array.isArray(value) || value.length > max) throw viewError(); return value; };
+const viewCheck = (value: unknown): OpsViewCheck => {
+  const item = viewObject(value);
+  if (typeof item.check !== 'string' || !CHECK_NAME.test(item.check)) throw viewError();
+  return { check: item.check, status: viewStatus(item.status), count: viewCount(item.count) };
+};
+
+/** Strict `ops_admin_read` reply. Timestamps come back as ISO strings in milliseconds. */
+export function readOpsAdminView(raw: unknown): OpsAdminView {
+  const view = viewObject(raw);
+  const jobs = view.jobs === null ? null : viewList(view.jobs, OPS_JOBS.length).map((value, index): OpsJobState => {
+    const item = viewObject(value);
+    if (item.job !== OPS_JOBS[index] || typeof item.present !== 'boolean' || typeof item.active !== 'boolean'
+      || !Number.isSafeInteger(item.failures) || (item.failures as number) < 0) throw viewError();
+    if (item.last_status !== null && !(OPS_JOB_RUN_STATUSES as readonly unknown[]).includes(item.last_status)) throw viewError();
+    return { job: item.job as OpsJobName, present: item.present, active: item.active, schedule: viewText(item.schedule, 100),
+      last_run_at: viewNullableInstant(item.last_run_at), last_status: item.last_status as OpsJobRunStatus | null,
+      last_success_at: viewNullableInstant(item.last_success_at), failures: item.failures as number,
+      last_failure_at: viewNullableInstant(item.last_failure_at), last_failure: viewText(item.last_failure, 300) };
+  });
+  if (jobs && jobs.length !== OPS_JOBS.length) throw viewError();
+  return {
+    at: viewInstant(view.at),
+    checks: viewList(view.checks, 50).map(viewCheck),
+    state: viewList(view.state, 50).map((value) => {
+      const item = viewObject(value);
+      return { ...viewCheck({ check: item.check, status: item.status, count: item.count }), since: viewInstant(item.since),
+        checked_at: viewNullableInstant(item.checked_at), notified_status: item.notified_status === null ? null : viewStatus(item.notified_status),
+        notified_at: viewNullableInstant(item.notified_at) };
+    }),
+    monitor_ran_at: viewNullableInstant(view.monitor_ran_at),
+    jobs,
+    signals: viewList(view.signals, 200).map((value) => {
+      const item = viewObject(value);
+      if (typeof item.source !== 'string' || !SOURCE_NAME.test(item.source) || !(OPS_SIGNAL_KINDS as readonly unknown[]).includes(item.kind)) throw viewError();
+      return { source: item.source, kind: item.kind as OpsSignalKind, last_15m: viewCount(item.last_15m), last_hour: viewCount(item.last_hour),
+        last_day: viewCount(item.last_day), last_at: viewInstant(item.last_at) };
+    }),
+  };
+}
+
 const manila = new Intl.DateTimeFormat('en-PH', { timeZone: 'Asia/Manila', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 const MARK: Record<OpsStatus, string> = { fail: '🔴 FAIL', warn: '🟡 WARN', ok: '✅ RESOLVED' };
 const STILL: Record<OpsStatus, string> = { fail: '🔴 STILL FAILING', warn: '🟡 STILL WARNING', ok: '' };

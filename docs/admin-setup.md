@@ -104,6 +104,7 @@ npm run admin:lint
 npm run admin:build
 npm run test:admin:local
 npm run test:registrations:local
+npm run test:health:local
 npm run typecheck
 npm run lint
 npm run check:dependencies
@@ -126,6 +127,8 @@ HTTPS in production.
 `npm run test:registrations:local` (T54b) uses the same production server pattern
 with a loopback stand-in for the email provider; see
 [pre-launch registration](prelaunch-registration.md#console-registrations-and-launch-codes-t54b).
+`npm run test:health:local` (T51c) does the same for **System health**; see
+[monitoring](monitoring.md#console-system-health-t51c).
 
 These checks prove server behavior, not a browser screenshot or physical-device
 layout review. Use dev mode for local browser layout, keyboard focus, narrow

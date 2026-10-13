@@ -7,6 +7,8 @@ const AREAS = {
     unavailable: ['Directory unavailable.', 'We couldn’t load the directory. Try again shortly or contact the operator.'] },
   registrations: { href: '/console/registrations', denied: ['Administrator access required.', 'Pre-launch registrations are available to administrators.'],
     unavailable: ['Registrations unavailable.', 'We couldn’t load pre-launch registrations. Try again shortly or contact the operator.'] },
+  health: { href: '/console/health', denied: ['Administrator access required.', 'System health is available to administrators.'],
+    unavailable: ['System health unavailable.', 'We couldn’t load system health. The database may be unreachable or missing the latest update; try again shortly or contact the operator.'] },
   ownership: { href: '/console/ownership', denied: ['Reviewer access required.', 'Ownership review is available to administrators and moderators.'],
     unavailable: ['Review queue unavailable.', 'We couldn’t load ownership requests. Try again shortly or contact the operator.'] },
   reports: { href: '/console/reports', denied: ['Moderator access required.', 'Listing reports are available to administrators and moderators.'],

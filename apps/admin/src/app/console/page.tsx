@@ -9,6 +9,8 @@ import { createAdminClient } from '@/lib/supabase';
 import { readConsoleAccess, type ConsoleAccess } from '@/lib/access';
 import { readOwnershipQueue } from '@/lib/ownership-server';
 import { readModerationQueue } from '@/lib/moderation-server';
+import { readHealthView } from '@/lib/health-server';
+import { agoText, monitorFreshness, problemCounts } from '@/lib/health';
 import { toDisplayInstant } from '@/lib/ownership';
 
 const PREVIEW = 5;
@@ -30,14 +32,19 @@ export default async function OverviewPage() {
     <div className="state-actions"><form action="/console" method="get"><button className="button primary" type="submit">Check again</button></form><SignoutButton /></div></ConsoleState>;
 
   const admin = access.roles.includes('admin');
-  // Both queues are open to administrators and moderators; a failed read only blanks its own card.
-  const [ownership, reports] = await Promise.all([settle(readOwnershipQueue(access.actorId, null)), settle(readModerationQueue(access.actorId, null))]);
+  // Both queues are open to administrators and moderators; a failed read only blanks its own card. Health is admin-only.
+  const [ownership, reports, health] = await Promise.all([settle(readOwnershipQueue(access.actorId, null)), settle(readModerationQueue(access.actorId, null)),
+    admin ? settle(readHealthView(access.actorId)) : null]);
+  const problems = health ? problemCounts(health) : null;
+  const freshness = health ? monitorFreshness(health) : null;
   return <>
     <PageHeader title="Overview" meta="Requests and reports waiting for a decision, oldest first."
       actions={admin && <><Link className="button secondary" href="/console/directory/import"><Icon name="upload" />Import listings</Link><Link className="button primary" href="/console/directory/new"><Icon name="plus" />Add a venue</Link></>} />
-    <div className="stat-grid">
+    <div className={admin ? 'stat-grid four' : 'stat-grid'}>
       <Stat href="/console/ownership" label="Ownership requests" value={ownership?.pending_total} hint="Pending review" />
       <Stat href="/console/reports" label="Reported listings" value={reports?.open_total} hint="With open reports" />
+      {admin && <Stat href="/console/health" label="Health problems" value={problems ? problems.fail + problems.warn : undefined}
+        hint={!freshness ? '' : freshness.state === 'never' ? 'Monitor never ran' : `Monitor ${freshness.state === 'stale' ? 'stopped; last ran' : 'ran'} ${agoText(freshness.minutes)}`} />}
       <div className="stat-card"><span className="stat-label">Your access</span><strong className="stat-value stat-text">{admin ? 'Administrator' : 'Moderator'}</strong><span className="stat-hint status-dot">Access verified</span></div>
     </div>
     <div className="overview-grid">

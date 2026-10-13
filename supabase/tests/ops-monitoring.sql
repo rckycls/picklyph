@@ -88,7 +88,7 @@ select ops_test.assert_that(not exists(select 1 from pg_proc p join pg_namespace
   where n.nspname in ('public','private') and p.proname like 'ops\_%' and has_function_privilege(r.name, p.oid, 'execute')), 'no client role executes ops functions');
 select ops_test.assert_that((select array_agg(p.proname::text order by p.proname) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
   where n.nspname in ('public','private') and p.proname like 'ops\_%' and has_function_privilege('service_role', p.oid, 'execute'))
-  = array['ops_alerts_confirm','ops_monitor_run','ops_signal_record'], 'service role executes exactly the three commands');
+  = array['ops_admin_read','ops_alerts_confirm','ops_monitor_run','ops_signal_record'], 'service role executes exactly the three commands and the console read (T51c)');
 select ops_test.assert_that(not exists(select 1 from information_schema.role_table_grants g
   where g.table_schema = 'private' and g.table_name in ('ops_signals','ops_alert_state') and g.grantee in ('anon','authenticated','service_role')),
   'ops tables have no API grants');

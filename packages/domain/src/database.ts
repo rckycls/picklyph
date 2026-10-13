@@ -193,6 +193,8 @@ export interface Database {
       // The monitor parses the run strictly (readOpsRun), so it is typed as unknown here.
       ops_monitor_run: { Args: { external_checks?: OpsCheck[] }; Returns: unknown };
       ops_alerts_confirm: { Args: { alerts: Pick<OpsAlert, 'check' | 'status'>[] }; Returns: { confirmed: number } };
+      // T51c console System health page (admin only); parsed strictly by readOpsAdminView.
+      ops_admin_read: { Args: { actor_user_id: string }; Returns: unknown };
       // T51b: the storage-sweep worker parses both replies strictly (storageSweep.ts).
       storage_sweep_due: { Args: { batch_limit?: number }; Returns: unknown };
       storage_sweep_confirm: { Args: { items: StorageSweepItem[] }; Returns: unknown };

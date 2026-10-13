@@ -13,6 +13,7 @@ const NAV: { href: string; label: string; icon: IconName; adminOnly?: boolean }[
   { href: '/console/registrations', label: 'Pre-launch', icon: 'registrations', adminOnly: true },
   { href: '/console/ownership', label: 'Ownership review', icon: 'ownership' },
   { href: '/console/reports', label: 'Listing reports', icon: 'reports' },
+  { href: '/console/health', label: 'System health', icon: 'health', adminOnly: true },
 ];
 const ROLE_LABEL: Record<PrivilegedRole, string> = { admin: 'Administrator', moderator: 'Moderator' };
 
