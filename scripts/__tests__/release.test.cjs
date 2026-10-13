@@ -191,6 +191,12 @@ test('function secrets must be complete, point at their own project and differ f
   assert.match(check('production', unswept).join('\n'), /STORAGE_SWEEP_SECRET is not set/);
   assert.match(check('production', { ...production, STORAGE_SWEEP_SECRET: staging.STORAGE_SWEEP_SECRET }, staging).join('\n'),
     /STORAGE_SWEEP_SECRET is the same in production and staging/);
+  // T54: owner-submissions needs the claim-code secret of that environment's registration server.
+  const codeless = { ...production };
+  delete codeless.PRELAUNCH_CODE_SECRET;
+  assert.match(check('production', codeless).join('\n'), /PRELAUNCH_CODE_SECRET is not set/);
+  assert.match(check('production', { ...production, PRELAUNCH_CODE_SECRET: staging.PRELAUNCH_CODE_SECRET }, staging).join('\n'),
+    /PRELAUNCH_CODE_SECRET is the same in production and staging/);
   assert.match(check('production', production, production).join('\n'), /both secrets lists come from the same project/);
   assert.match(check('production', production, undefined, committed).join('\n'), /record the production project ref/);
   assert.match(release.checkFunctionSecrets({ backendName: 'staging', secrets: new Map(), environments: committed }).join('\n'), /empty or unreadable/);

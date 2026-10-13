@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { REVIEW_REASON_LABELS, formatManilaDateTime, isUuid, type OwnershipReview } from '@picklyph/domain';
+import { REGISTRATION_ROLE_LABELS, REVIEW_REASON_LABELS, formatManilaDateTime, isUuid, type OwnershipReview, type RegistrationReview } from '@picklyph/domain';
 import { readOwnershipReview, readReviewAccess } from '@/lib/ownership-server';
 import { OwnershipDecisionForm } from '@/components/ownership-review';
 import { AccessProblem, Unavailable } from '@/components/console-state';
@@ -30,6 +30,23 @@ function Outcome({ item, admin }: { item: OwnershipReview; admin: boolean }) {
     {item.kind === 'venue' && item.draft && review.resolution !== 'new' && <p className="field-hint">The owner’s draft was retired and is not published.</p>}</Panel>;
 }
 
+/** T54: the pre-launch registration this request redeemed with its emailed code. Contacts reach admins only. */
+function Registration({ registration, admin }: { registration: RegistrationReview; admin: boolean }) {
+  const { contact } = registration;
+  return <Panel title="Pre-launch registration"><dl className="fact-list">
+    <dt>Registered</dt><dd>{when(registration.registered_at)} on the pre-launch page</dd>
+    <dt>Code claimed</dt><dd>{when(registration.claimed_at)}</dd>
+    <dt>Role at venue</dt><dd>{REGISTRATION_ROLE_LABELS[registration.role]}</dd>
+    <dt>Account email</dt><dd>{registration.email_matched ? 'Matches the registration email' : 'Differs from the registration email'}</dd>
+    {contact && <><dt>Registered by</dt><dd>{contact.owner_name}</dd>
+      <dt>Email</dt><dd>{contact.email}</dd>
+      <dt>Mobile</dt><dd>{contact.phone ?? 'Not given'}</dd></>}</dl>
+    {contact?.note && <><h3>Note on the registration</h3><p className="submitter-note">{contact.note}</p></>}
+    <p className="field-hint">{registration.erased ? 'The registration’s contact details were erased 30 days after the decision.'
+      : admin ? 'Private to administrators. The contact details are erased 30 days after the decision.'
+      : 'The registrant’s contact details are visible to administrators only.'}</p></Panel>;
+}
+
 export default async function OwnershipItemPage({ params }: { params: Promise<{ id: string }> }) {
   const access = await readReviewAccess();
   if (access.status !== 'allowed') return <AccessProblem area="ownership" status={access.status} />;
@@ -45,7 +62,7 @@ export default async function OwnershipItemPage({ params }: { params: Promise<{ 
 
   return <>
     <PageHeader crumbs={[{ href: '/console/ownership', label: 'Ownership review' }]} title={name}
-      meta={<><span className={`badge kind-${item.kind}`}>{item.kind === 'claim' ? 'Ownership claim' : 'New venue'}</span> <span className={`badge review-${item.status}`}>{statusLabel[item.status]}</span> Submitted {when(item.created_at)}</>} />
+      meta={<><span className={`badge kind-${item.kind}`}>{item.kind === 'claim' ? 'Ownership claim' : 'New venue'}</span> {item.kind === 'venue' && item.registration && <><span className="badge">Pre-launch</span> </>}<span className={`badge review-${item.status}`}>{statusLabel[item.status]}</span> Submitted {when(item.created_at)}</>} />
     <div className="review-layout"><div className="review-column">
       {item.kind === 'claim' ? <Panel title="Listing being claimed"><dl className="fact-list">
         <dt>Listing</dt><dd><Listing id={item.venue.id} name={item.venue.name} admin={admin} /></dd>
@@ -74,7 +91,8 @@ export default async function OwnershipItemPage({ params }: { params: Promise<{ 
         <Panel title="Possible duplicates"><p className="field-hint">Listings within 150 m, or with a similar name within 2 km, including drafts and suspended listings the submitter never saw.</p>
           {item.nearby_venues.length ? <ul className="nearby-list">{item.nearby_venues.map(venue => <li key={venue.id}><div><strong><Listing id={venue.id} name={venue.name} admin={admin} /></strong><span className="muted"> · {venue.distance_m} m · {venue.city}</span></div><span className="muted small-note">{listingLabel(venue.publication_status, venue.claim_status)}{venue.in_snapshot ? '' : ' · found after submission'}</span></li>)}</ul> : <p className="muted">No listings nearby.</p>}
           <h3>Other submissions here</h3>
-          {item.nearby_submissions.length ? <ul className="nearby-list">{item.nearby_submissions.map(other => <li key={other.id}><div><strong><Link href={`/console/ownership/${other.id}`}>{other.name}</Link></strong><span className="muted"> · {other.distance_m} m · {statusLabel[other.status]}</span></div>{other.same_submitter && <span className="muted small-note">Same submitter</span>}</li>)}</ul> : <p className="muted">No other submissions within 150 m.</p>}</Panel></>}
+          {item.nearby_submissions.length ? <ul className="nearby-list">{item.nearby_submissions.map(other => <li key={other.id}><div><strong><Link href={`/console/ownership/${other.id}`}>{other.name}</Link></strong><span className="muted"> · {other.distance_m} m · {statusLabel[other.status]}</span></div>{other.same_submitter && <span className="muted small-note">Same submitter</span>}</li>)}</ul> : <p className="muted">No other submissions within 150 m.</p>}</Panel>
+        {item.registration && <Registration registration={item.registration} admin={admin} />}</>}
       <Panel title="Submitter"><dl className="fact-list">
         <dt>Name</dt><dd>{item.submitter.display_name ?? 'No display name'}</dd>
         <dt>Account</dt><dd><code>{item.submitter.id}</code></dd>

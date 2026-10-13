@@ -44,10 +44,11 @@ Logs are fixed event names (`prelaunch.created`, `prelaunch.email_failed`, …):
 - `public.prelaunch_email_sent(registration_id, sent_version)` (service-only): records delivery only for the code version that was sent.
 - `private.privacy_retention_sweep` now also erases registrations still open **180 days after their last code email** (or after creation if none was delivered): contact details, note and code hash become null, and a still-draft listing is suspended with a `prelaunch.retire` audit row. A listing an admin already published stays. It locks the listing before the registration, like other venue commands. Its result gained `prelaunch_registrations`.
 - `private.directory_delete_blocker` names `registration`, so the console's bulk Delete skips these listings ("suspend it instead").
+- **T54 (`20261013150000_prelaunch_claims.sql`):** a third status, `claimed`, with `claimed_by` (a bare account UUID), `claimed_at`, `submission_id` and `claim_email_matched`; a claimed row keeps its contacts but never a code hash. The sweep also erases a claimed registration's contacts 30 days after its claim's review decision, or as soon as its submission is gone (the claiming account was deleted); the review decides the draft. Its result's `prelaunch_registrations` counts both kinds. Redemption itself is in [owner submissions](owner-submissions.md#pre-launch-claim-codes-t54).
 
 ## Claim codes
 
-10 characters from `ABCDEFGHJKMNPQRSTVWXYZ23456789` (no 0/O, 1/I/L, U), uniformly drawn from the server's CSPRNG, printed as `ABCDE-FGHJK`. Only `HMAC-SHA256(PRELAUNCH_CODE_SECRET, "pickly-claim-code:v1:" + code)` (hex) is stored. `normalizeClaimCode` (domain) accepts any case, spaces and dashes for T54. Codes are emailed once per version and never logged; the provider's `Idempotency-Key` is `prelaunch-<registration id>-v<version>`.
+10 characters from `ABCDEFGHJKMNPQRSTVWXYZ23456789` (no 0/O, 1/I/L, U), uniformly drawn from the server's CSPRNG, printed as `ABCDE-FGHJK`. Only `HMAC-SHA256(PRELAUNCH_CODE_SECRET, "pickly-claim-code:v1:" + code)` (hex) is stored. The alphabet, `normalizeClaimCode` (any case, spaces and dashes) and `hashClaimCode` live in `packages/domain/src/claimCode.ts`, shared by this page and the app's redemption (T54, `owner-submissions`), so **both must have the same `PRELAUNCH_CODE_SECRET`**. Codes are emailed once per version and never logged; the provider's `Idempotency-Key` is `prelaunch-<registration id>-v<version>`. A code works once: redemption clears the hash, and wrong, used and erased codes look the same to the app.
 
 ## Limits, Turnstile and email
 
@@ -64,7 +65,7 @@ All settings are server-side and read per request; a missing one answers 503 ins
 | `PICKLY_ENV` | `local`, `staging` or `production`. Hosted environments need https; only `local` accepts http (loopback or a LAN address) and loopback stand-ins for Upstash, Supabase and email. |
 | `PRELAUNCH_ORIGIN`, `PRELAUNCH_CONTACT_EMAIL` | The page origin and the privacy/removal address (also the email's reply-to). |
 | `PRELAUNCH_SUPABASE_URL`, `PRELAUNCH_SUPABASE_SECRET_KEY` | **Production project** for live registrations. Server-only secret key. |
-| `PRELAUNCH_CODE_SECRET` | 32+ characters. T54 needs the same value; rotating it voids outstanding codes. |
+| `PRELAUNCH_CODE_SECRET` | 32+ characters. The same value must be a function secret of that environment's Supabase project (T54 `owner-submissions`; `release:check --secrets` requires it); rotating it voids outstanding codes. |
 | `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`, `RATE_LIMIT_KEY_SECRET` | That environment's Upstash database. |
 | `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` | For the domain (H13). |
 | `GOOGLE_MAPS_BROWSER_API_KEY` | Maps JavaScript API only, restricted to the domain's referrers; separate from the iOS and server keys. |
@@ -84,7 +85,8 @@ For the iPhone (Safari), run it on the network with `PICKLY_ENV=local`, `PRELAUN
 
 ## Verification
 
-- `npm run test:prelaunch`: PGlite SQL suite (`supabase/tests/prelaunch.sql`) plus 17 mutations of the new functions, all caught.
+- `npm run test:prelaunch`: PGlite SQL suite (`supabase/tests/prelaunch.sql`) plus 17 mutations of the new functions, all caught; and the T54 claim suite (`prelaunch-claims.sql`) with 24 mutations, all caught.
+- `npm run test:claims:local` (T54): the claim suite on Docker and a real redemption through the app client; see [owner submissions](owner-submissions.md#verification).
 - `npm run test:web`: handler and service tests (Origin, body bounds, Turnstile fail/outage, limits and outage, retries, enumeration-free replies, send failure and rotation, code collisions, configuration, CSP, client IP, email content, code sampling and hashing).
 - `npm run test:domain`: contract readers and claim-code normalization.
 - `npm run test:web:local` (after `npm run web:build`, local Docker Supabase running with the migration applied): Docker SQL suite, bundle scan, then the real production server with loopback Upstash and email stand-ins and Cloudflare's test keys: pages and CSP, cross-site/oversized refusal, registration → private draft (anon read, bounds read and search see nothing; anon can't call the commands) → one email whose code matches the stored hash → retry returns the original → failed send then rotation → duplicate acknowledgement → 429 and Redis outage 503 with no write → no code in logs → always-fail Turnstile 403. It removes its own rows.
@@ -93,6 +95,7 @@ For the iPhone (Safari), run it on the network with `PICKLY_ENV=local`, `PRELAUN
 
 - **Local Docker** and **hosted staging** (2026-10-13, at the user's request after a dry run listing only `20261013120000`; no seeds or roles) have the migration. On staging, anonymous calls to `prelaunch_register` and `prelaunch_email_sent` answer 401/42501 and `venue_registrations` is not exposed. Staging is for trials: point a local or preview run of the page at it, never live registrations.
 - **Production**: the migration goes with T50's production project. The page is not deployed anywhere yet (H13).
+- **T54 claims** (2026-10-13): migration `20261013150000` is applied to local Docker only. Staging needs it pushed, `owner-submissions` redeployed and `PRELAUNCH_CODE_SECRET` set as a function secret with the same value the page uses there; until then the app's **Claim with a code** answers "unavailable".
 
 ## Going live (H13) and next steps
 
@@ -100,4 +103,4 @@ For the iPhone (Safari), run it on the network with `PICKLY_ENV=local`, `PRELAUN
 2. T50's production Supabase project with this migration, and production Upstash. Set every setting above in Vercel (production), with `PICKLY_ENV=production`.
 3. Check once on the deployment: a registration lands as a production draft, the email arrives, and Upstash shows `pickly:production:prelaunch-*` keys (proves the REST transaction format against the real service); a request from another origin is refused.
 4. The user reviews the privacy notice wording (joins H11).
-5. **T54** redeems codes in the app (single-use, rate-limited, lockout), lists registrations in the console (contacts admins only), resends or rotates codes at launch (the sweep counts from `email_sent_at`) and retires spam. A claim should lock the listing before the registration, like the sweep.
+5. **T54** (done locally 2026-10-13) redeems codes in the app: single-use, `owner-code` limited, a per-account lockout, reviewed like app-created venues ([owner submissions](owner-submissions.md#pre-launch-claim-codes-t54)). **T54b** lists registrations in the console (contacts admins only), sends fresh codes at launch (rotation; the sweep counts from `email_sent_at`) and retires spam.

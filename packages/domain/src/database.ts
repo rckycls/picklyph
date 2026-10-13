@@ -3,7 +3,7 @@ import type { AccountAccess, PrivilegedRole, Profile } from './authorization.ts'
 import type { VenueInput, CourtInput, DirectoryPage, DirectoryListing, DirectoryImportEntry, DirectoryImportResult } from './curation.ts';
 import type { DirectoryAuditPage } from './audit.ts';
 import type { VenueSearch, VenueSearchPage } from './search.ts';
-import type { OwnerDuplicate, OwnerSubmission, OwnerSubmitResult, OwnerVenueInput } from './owner.ts';
+import type { OwnerDuplicate, OwnerSubmission, OwnerSubmitResult, OwnerVenueInput, RegistrationCheckResult } from './owner.ts';
 import type { OwnershipDecisionResult, OwnershipQueuePage, OwnershipReview, ReviewRejectionReason } from './review.ts';
 import type { ModerationQueuePage, ModerationResult, ModerationVenue, ReportReason, RevocationReason, VenueReportRequest, VenueReportResult } from './moderation.ts';
 import type { AccountDeletionBegin, AccountDeletionStatus } from './privacy.ts';
@@ -110,6 +110,11 @@ export interface Database {
       };
       owner_submit_claim: {
         Args: { actor_user_id: string; submission_request_id: string; target_venue_id: string; evidence_ref: string; claim_note: string | null };
+        Returns: OwnerSubmitResult;
+      };
+      owner_registration_check: { Args: { actor_user_id: string; code_hash: string }; Returns: RegistrationCheckResult };
+      owner_redeem_registration: {
+        Args: { actor_user_id: string; submission_request_id: string; code_hash: string; evidence_ref: string; submission_note: string | null };
         Returns: OwnerSubmitResult;
       };
       owner_submit_venue: {

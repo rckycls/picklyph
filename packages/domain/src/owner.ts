@@ -1,3 +1,4 @@
+import { normalizeClaimCode } from './claimCode.ts';
 import type { VenueClaimStatus } from './directory.ts';
 
 // Owner submissions (T15). The database re-validates every rule independently;
@@ -29,7 +30,9 @@ export type OwnerVenueRequest = {
   note: string | null;
   acknowledge_duplicates: boolean;
 };
-export type OwnerSubmissionRequest = OwnerClaimRequest | OwnerVenueRequest;
+/** T54: redeem a pre-launch claim code; the registration's draft becomes this owner's submission. `code` is canonical. */
+export type OwnerRegistrationRequest = { kind: 'registration'; request_id: string; code: string; note: string | null };
+export type OwnerSubmissionRequest = OwnerClaimRequest | OwnerVenueRequest | OwnerRegistrationRequest;
 
 export type OwnerSubmissionStatus = 'pending' | 'approved' | 'rejected';
 /** Everything a submitter sees about their own record: no evidence, notes or reviewer data. */
@@ -54,9 +57,26 @@ export type OwnerDuplicate = {
   distance_m: number;
 };
 export type OwnerSubmitResult = {
-  outcome: 'created' | 'existing' | 'duplicates';
+  /** `invalid` and `locked` come only from code redemption: they are answers, not errors, so a wrong try still counts. */
+  outcome: 'created' | 'existing' | 'duplicates' | 'invalid' | 'locked';
   submission: OwnerSubmission | null;
   duplicates: OwnerDuplicate[];
+  /** `locked` only: seconds until the account may try codes again. */
+  retry_after_seconds?: number | null;
+};
+/** The venue an open registration's code names, shown so the owner can confirm it before adding proof. */
+export type RegistrationPreview = {
+  name: string;
+  address_line: string;
+  city: string;
+  province: string;
+  court_count: number;
+};
+/** `owner_registration_check`: wrong, used and erased codes are all `invalid`. */
+export type RegistrationCheckResult = {
+  outcome: 'valid' | 'invalid' | 'locked';
+  registration: RegistrationPreview | null;
+  retry_after_seconds: number | null;
 };
 /** Address search suggestion; the owner confirms the pin and text before submitting. */
 export type AddressCandidate = {
@@ -146,7 +166,34 @@ export function readOwnerSubmission(json: string): OwnerSubmissionRequest {
     return { kind: 'venue', request_id, venue: readOwnerVenueInput(body.venue), note: readOwnerNote(body.note),
       acknowledge_duplicates: body.acknowledge_duplicates };
   }
+  if (body.kind === 'registration') {
+    if (Object.keys(body).sort().join(',') !== 'code,kind,note,request_id') throw new OwnerInputError();
+    return { kind: 'registration', request_id, code: readClaimCode(body.code), note: readOwnerNote(body.note) };
+  }
   throw new OwnerInputError();
+}
+
+export const MAX_CODE_CHECK_BYTES = 256;
+
+/** The code itself can't be a claim code (as opposed to the rest of the request). */
+export class ClaimCodeInputError extends OwnerInputError {
+  constructor() { super('Enter the 10-character code from your email, like ABCDE-FGHJK.'); this.name = 'ClaimCodeInputError'; }
+}
+
+/** A claim code as typed (any case, spaces or dashes) → canonical. */
+export function readClaimCode(value: unknown): string {
+  const code = normalizeClaimCode(value);
+  if (!code) throw new ClaimCodeInputError();
+  return code;
+}
+
+/** The JSON body of a code check: `{code}` only. Codes travel in bodies, never URLs. */
+export function readRegistrationCheck(json: string): string {
+  if (json.length > MAX_CODE_CHECK_BYTES) throw new OwnerInputError();
+  let raw: unknown;
+  try { raw = JSON.parse(json); } catch { throw new OwnerInputError(); }
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw) || Object.keys(raw).join(',') !== 'code') throw new OwnerInputError();
+  return readClaimCode((raw as Record<string, unknown>).code);
 }
 
 /** Identifies evidence by its leading bytes, never by a client-supplied name or type. */

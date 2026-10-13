@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '../../../packages/domain/src/database.ts';
-import type { OwnerDuplicate, OwnerSubmissionRequest, OwnerSubmitResult, EvidenceType } from '../../../packages/domain/src/owner.ts';
+import type { OwnerDuplicate, OwnerSubmissionRequest, OwnerSubmitResult, EvidenceType, RegistrationCheckResult } from '../../../packages/domain/src/owner.ts';
 import { CommandRejected, REJECTIONS } from './handler.ts';
 
 function rejected(error: { hint?: string | null } | null): never {
@@ -38,13 +38,22 @@ export function createSupabaseOwnerDeps(verifier: () => SupabaseClient<Database>
       const { error } = await evidence().remove([path]);
       if (error) throw new Error('Evidence cleanup failed');
     },
-    submit: async (actor: string, request: OwnerSubmissionRequest, path: string): Promise<OwnerSubmitResult> => {
+    submit: async (actor: string, request: OwnerSubmissionRequest, path: string, codeHash: string | null): Promise<OwnerSubmitResult> => {
       const { data, error } = request.kind === 'claim'
         ? await server().rpc('owner_submit_claim', { actor_user_id: actor, submission_request_id: request.request_id,
           target_venue_id: request.venue_id, evidence_ref: path, claim_note: request.note })
-        : await server().rpc('owner_submit_venue', { actor_user_id: actor, submission_request_id: request.request_id,
-          venue_input: request.venue, evidence_ref: path, submission_note: request.note,
-          acknowledge_duplicates: request.acknowledge_duplicates });
+        : request.kind === 'venue'
+          ? await server().rpc('owner_submit_venue', { actor_user_id: actor, submission_request_id: request.request_id,
+            venue_input: request.venue, evidence_ref: path, submission_note: request.note,
+            acknowledge_duplicates: request.acknowledge_duplicates })
+          : codeHash === null ? rejected(null)
+            : await server().rpc('owner_redeem_registration', { actor_user_id: actor, submission_request_id: request.request_id,
+              code_hash: codeHash, evidence_ref: path, submission_note: request.note });
+      if (error || !data) return rejected(error);
+      return data;
+    },
+    checkCode: async (actor: string, codeHash: string): Promise<RegistrationCheckResult> => {
+      const { data, error } = await server().rpc('owner_registration_check', { actor_user_id: actor, code_hash: codeHash });
       if (error || !data) return rejected(error);
       return data;
     },

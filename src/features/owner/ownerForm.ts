@@ -1,6 +1,6 @@
 import {
-  MAX_EVIDENCE_BYTES, OwnerInputError, inSubmissionBounds, readOwnerNote, readOwnerVenueInput,
-  type AddressCandidate, type EvidenceType, type OwnerClaimRequest, type OwnerSubmission, type OwnerVenueRequest,
+  MAX_EVIDENCE_BYTES, OwnerInputError, inSubmissionBounds, readClaimCode, readOwnerNote, readOwnerVenueInput,
+  type AddressCandidate, type EvidenceType, type OwnerClaimRequest, type OwnerRegistrationRequest, type OwnerSubmission, type OwnerVenueRequest,
 } from '@picklyph/domain';
 
 export type Pin = { latitude: number; longitude: number };
@@ -43,6 +43,18 @@ export function venueRequest(draft: VenueDraft, pin: Pin | null, requestId: stri
 
 export function claimRequest(venueId: string, note: string, requestId: string): Built<OwnerClaimRequest> {
   try { return { ok: true, request: { kind: 'claim', request_id: requestId, venue_id: venueId, note: readOwnerNote(note) } }; }
+  catch (error) { return { ok: false, message: message(error) }; }
+}
+
+/** T54: the code as typed (any case, spaces or dashes) → canonical, or the message for the code field. */
+export function claimCodeInput(code: string): { ok: true; code: string } | { ok: false; message: string } {
+  try { return { ok: true, code: readClaimCode(code) }; }
+  catch (error) { return { ok: false, message: message(error) }; }
+}
+
+/** T54: redeem a pre-launch registration's code; the request ID stays the same for retries of this code. */
+export function registrationRequest(code: string, note: string, requestId: string): Built<OwnerRegistrationRequest> {
+  try { return { ok: true, request: { kind: 'registration', request_id: requestId, code: readClaimCode(code), note: readOwnerNote(note) } }; }
   catch (error) { return { ok: false, message: message(error) }; }
 }
 

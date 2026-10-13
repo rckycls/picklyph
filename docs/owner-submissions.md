@@ -58,6 +58,22 @@ Migration `20261008150000_owner_created_venues.sql` replaces "a reviewer creates
 
 Drafts stay out of every public read (venue/court RLS, `venue_photos` rows, search). Owner photo uploads still go to the public bucket under unguessable names, as in T18.
 
+## Pre-launch claim codes (T54)
+
+Owners who registered on the pre-launch page ([pre-launch registration](prelaunch-registration.md)) got an emailed code. In the app, **Account (Owner mode) → Claim with a code** (`/owner/code`) asks for the code, shows the venue it names (name, address, active courts), then takes the T15 proof photo and an optional note. Claiming turns the registration's private draft into this account's own pending new-venue submission: no second draft, the same review as an app-created venue (approve publishes it and links them; merge or reject retires it), and the owner can set the draft up meanwhile (**Set up your venue**).
+
+The code alone is enough (Apple's hidden relay addresses can't match a registration email); reviewers see whether the account email matched.
+
+| Request | Limit (verified user/min) | Result |
+| --- | --- | --- |
+| `POST` JSON `{code}` (256 bytes; any case, spaces or dashes) | `owner-code` 10 | 200 `{registration:{name,address_line,city,province,court_count}}`; 404 `code_not_valid`; 429 `code_locked` + `Retry-After` |
+| `POST` multipart `submission` `{kind:"registration", request_id, code, note}` + `evidence` | `owner-submit` 10 | 201 created, 200 existing (retry), 404 `code_not_valid`, 429 `code_locked`, plus the T15 errors |
+
+- Codes travel only in POST bodies, never URLs or logs. The function hashes the canonical code with `PRELAUNCH_CODE_SECRET` (the same secret and HMAC as the registration server, `packages/domain/src/claimCode.ts`) and the database only ever compares hashes. Without the secret both requests answer 503 `claim_codes_unavailable` before any upload or write. A code that can't be one answers 400 `invalid_code` and never reaches the database.
+- **Wrong, already used and erased codes all answer the same** `code_not_valid`. Each one, from a check or a redemption, counts in `private.claim_code_failures`: **5 wrong within an hour lock the account out of codes for an hour** (`code_locked`, even for a right code). The commands return these answers instead of raising, so the count commits. A redemption clears the count. Both limits fail closed in a Redis outage.
+- `owner_registration_check(actor, code_hash)` and `owner_redeem_registration(actor, request_id, code_hash, evidence_ref, note)` are service-only. Redemption serializes per account, returns the original for a retried request ID (even though the code is spent), locks the listing then the registration, refuses a suspended listing (`listing_unavailable`) or one with a verified owner (`already_verified`), applies the T15 caps (`already_pending` within 150 m, `too_many_pending`), the evidence rules and the deletion-in-progress guard, then in one transaction creates the submission (the draft's current details; reviewer snapshot = the registration's plus a fresh nearby check, never the draft itself), sets the draft's claim status to `pending`, marks the registration `claimed` with its code hash cleared and the email match recorded, and writes a `registration.claim` ownership audit row.
+- Contracts: `readRegistrationCheck`, `readClaimCode`, `OwnerRegistrationRequest`, `RegistrationPreview` (domain `owner.ts`); mobile `checkClaimCode`, `registrationRequest`, `claimCodeInput`.
+
 ## Configuration
 
 Server secrets are project-wide. `owner-submissions` reuses the T13 `DISCOVERY_SUPABASE_URL`, `DISCOVERY_SUPABASE_PUBLISHABLE_KEY`, `DISCOVERY_SUPABASE_SECRET_KEY`, `PICKLY_ENV` and Upstash secrets (see [discovery API](discovery-api.md#h02-setup-and-live-acceptance-gate)). Its one addition:
@@ -76,5 +92,7 @@ Staging status (2026-10-07): migration applied, `GOOGLE_MAPS_SERVER_API_KEY` set
 - `npm run test:directory` (includes `owner.test.cjs` and `owner-handler.test.cjs`): embedded PostgreSQL/PostGIS suite plus handler/geocoder unit tests (auth first, limiter before side effects, body/type caps, cleanup, sanitized errors, key out of URLs, no server names in mobile/admin source).
 - `npm run test:domain`: shared readers.
 - `npm run test:owner:local`, with the local Docker stack running and migrations applied, runs three stages. First, `owner.sql` on real Postgres/Storage. Second, the **actual served function** without Redis: 401/forged-JWT 401, then lookups and submissions 503 with no storage or database change. Third, the real handler with local Auth/Storage/RPC, driven through the mobile client: evidence privacy (download, list, sign and upload all denied), direct RPC denial (42501), retries, duplicate warning/ack, competing claim, 415, self-only list, unchanged public listing, one audit row per created command. It removes only its own users, venue, evidence, audit rows and temp env file. It doesn't run against hosted data and covers no live Redis or Google calls.
+
+- `npm run test:claims:local` (T54; local Docker stack with migrations applied): the Docker claim suite; the actual served function without Redis (forged JWT 401; code check and redemption 503 with nothing written, counted or stored; no code in its log); then the real handler with local Auth/Storage/RPC through the shipped mobile client: no secret → 503; five wrong codes lock the account (the right code refused); the check shows the venue; redemption with proof turns the draft into a pending submission; a lost-reply retry returns the original; another account gets `code_not_valid`; direct RPCs 42501; an admin sees the contacts and approval publishes and links. It removes its own accounts, registration, draft, evidence and audit rows.
 
 H06 (pilot owners trialling evidence and review) can now run on staging; see [ownership review](ownership-review.md).

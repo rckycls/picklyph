@@ -141,3 +141,39 @@ test('new venues name the owner’s draft while pending and the listing once app
   assert.throws(() => parseSubmission({ ...submission, status: 'rejected', venue_id: VENUE }));
   assert.throws(() => parseSubmission({ ...submission, kind: 'claim', venue_id: null }));
 });
+
+test('claim codes (T54): the shipped client checks and redeems through the real handler; wrong, used and locked codes read clearly', async () => {
+  const { checkClaimCode } = require('../ownerClient.ts');
+  const preview = { name: 'Claimable Courts', address_line: '12 Mabini St', city: 'Manila', province: 'Metro Manila', court_count: 4 };
+  const checks = [];
+  const { transport, seen } = server({
+    hashCode: async (code) => `hash:${code}`,
+    checkCode: async (actor, hash) => { checks.push([actor, hash]); return hash === 'hash:ABCDEFGHJK' ? { outcome: 'valid', registration: preview, retry_after_seconds: null } : { outcome: 'invalid', registration: null, retry_after_seconds: null }; },
+  });
+  const typed = form.claimCodeInput(' abcde-fghjk ');
+  assert.deepEqual(plain(typed), { ok: true, code: 'ABCDEFGHJK' });
+  const found = await checkClaimCode(transport, typed.code);
+  assert.ok(found.ok); assert.deepEqual(plain(found.value), preview);
+  assert.deepEqual(checks[0], [ACTOR, 'hash:ABCDEFGHJK']);
+  const wrong = await checkClaimCode(transport, 'ABCDEFGHJM');
+  assert.deepEqual(wrong, { ok: false, failure: { kind: 'rejected', reason: 'code_not_valid', retryAfterSeconds: null } });
+  assert.match(ownerFailureMessage(wrong.failure), /each code works once/);
+  assert.equal(form.claimCodeInput('ABCDE-FGHJ0').ok, false, 'impossible codes stop on the device');
+  const built = form.registrationRequest('abcde fghjk', ' From the front desk ', REQUEST);
+  assert.ok(built.ok); assert.deepEqual(plain(built.request), { kind: 'registration', request_id: REQUEST, code: 'ABCDEFGHJK', note: 'From the front desk' });
+  const sent = await submitOwner(transport, plain(built.request), evidence);
+  assert.ok(sent.ok); assert.equal(sent.value.status, 'created');
+  assert.deepEqual(plain(seen.submit[0]), [ACTOR, plain(built.request)]);
+  assert.deepEqual(seen.limit, ['owner-code', 'owner-code', 'owner-submit']);
+
+  const locked = server({ hashCode: async () => 'h', checkCode: async () => ({ outcome: 'locked', registration: null, retry_after_seconds: 3540 }) });
+  const refused = await checkClaimCode(locked.transport, 'ABCDEFGHJK');
+  assert.deepEqual(refused, { ok: false, failure: { kind: 'code_locked', retryAfterSeconds: 3540 } });
+  assert.equal(ownerFailureMessage(refused.failure), 'Too many codes that didn’t work. For your security, try again in 59 minutes.');
+  const spent = await submitOwner(server({ hashCode: async () => 'h', submit: async () => ({ outcome: 'invalid', submission: null, duplicates: [], retry_after_seconds: null }) }).transport, plain(built.request), evidence);
+  assert.deepEqual(spent, { ok: false, failure: { kind: 'rejected', reason: 'code_not_valid', retryAfterSeconds: null } });
+  const limited = await checkClaimCode(server({ limit: async () => ({ allowed: false, status: 429, state: 'enforced', headers: { 'Retry-After': '12' } }) }).transport, 'ABCDEFGHJK');
+  assert.deepEqual(limited, { ok: false, failure: { kind: 'rate_limited', retryAfterSeconds: 12 } }, 'the per-minute limit is not the lockout');
+  const unconfigured = await checkClaimCode(server({ hashCode: null }).transport, 'ABCDEFGHJK');
+  assert.equal(unconfigured.ok, false); assert.equal(unconfigured.failure.kind, 'unavailable');
+});

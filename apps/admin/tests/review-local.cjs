@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const net = require('node:net');
 const path = require('node:path');
 const { execFileSync, spawn } = require('node:child_process');
-const { randomUUID } = require('node:crypto');
+const { randomBytes, randomUUID } = require('node:crypto');
 const { setTimeout: delay } = require('node:timers/promises');
 const { createClient } = require('@supabase/supabase-js');
 
@@ -35,6 +35,8 @@ async function main() {
   const users = {};
   const venues = new Set();
   const evidence = [];
+  // T54: pre-launch registrations this run made (their drafts can only go once these rows are gone).
+  const registrationKeys = [];
   const messageIds = new Set();
   const clients = [];
   let child;
@@ -88,7 +90,7 @@ async function main() {
     console.log('PASS: Docker PostgreSQL ownership review suite (reviewer-only reads, decisions, duplicates, retries, self-review, revocation, audit); rolled back.');
 
     stage = 'fixtures';
-    for (const role of ['admin', 'moderator', 'claimant', 'submitter']) {
+    for (const role of ['admin', 'moderator', 'claimant', 'submitter', 'registrant']) {
       const email = `review-${role}-${randomUUID()}@example.invalid`;
       const password = `Local-${randomUUID()}!`;
       const created = await service.auth.admin.createUser({ email, password, email_confirm: true });
@@ -282,6 +284,38 @@ async function main() {
     assert.match((await removedPhoto.json()).error, /removed 30 days after the decision/);
     console.log('PASS: removed evidence: the detail page shows when the proof was removed (no photo link) and the evidence route answers 410.');
 
+    stage = 'pre-launch registration';
+    // T54: a registration (T53 command) redeemed with its code becomes a pending new venue. Reviewers see the
+    // pre-launch marker, role and email match; only admins see the registrant's contact details.
+    const registrationKey = randomUUID();
+    registrationKeys.push(registrationKey);
+    const codeHash = randomBytes(32).toString('hex');
+    const registrantName = `Registrant ${registrationKey.slice(0, 8)}`;
+    const registeredName = `Review Pre-launch ${registrationKey.slice(0, 8)}`;
+    const registered = check(await service.rpc('prelaunch_register', { request_key: registrationKey, code_hash: codeHash, acknowledge_duplicates: true,
+      registration: { owner_name: registrantName, email: users.registrant.email.toLowerCase(), phone: '+639171234567', role: 'manager',
+        venue: { name: registeredName, address_line: 'Fixture lane', city: 'Fixture City', province: 'Fixture',
+          latitude: Number((latitude + 0.02).toFixed(5)), longitude, court_count: 2 },
+        courts: { indoor: false, covered: false, surface: null }, note: 'Registered before launch', consent: true } }), 'Fixture registration.');
+    assert.equal(registered.outcome, 'created');
+    venues.add(value(`select venue_id from private.venue_registrations where request_key = '${registrationKey}'::uuid;`));
+    const redeemed = check(await service.rpc('owner_redeem_registration', { actor_user_id: users.registrant.id, submission_request_id: randomUUID(),
+      code_hash: codeHash, evidence_ref: await upload(users.registrant.id), submission_note: null }), 'Fixture redemption.');
+    assert.equal(redeemed.outcome, 'created');
+    const prelaunchId = redeemed.submission.id;
+    const markedQueue = await (await request('/console/ownership', jars.moderator)).text();
+    assert.ok(markedQueue.includes(registeredName) && markedQueue.includes('Pre-launch'), 'The queue marks pre-launch requests.');
+    const moderatorView = await (await request(`/console/ownership/${prelaunchId}`, jars.moderator)).text();
+    assert.ok(moderatorView.includes('Pre-launch registration') && moderatorView.includes('Matches the registration email')
+      && moderatorView.includes('visible to administrators only'), 'Moderators see the registration panel.');
+    for (const contact of [registrantName, '+639171234567', 'Registered before launch', users.registrant.email]) {
+      assert.ok(!moderatorView.includes(contact), 'Moderators never see the registrant\'s contact details.');
+    }
+    const adminView = await (await request(`/console/ownership/${prelaunchId}`, jars.admin)).text();
+    assert.ok(adminView.includes(registrantName) && adminView.includes('+639171234567') && adminView.includes('Registered before launch')
+      && adminView.includes('Private to administrators'), 'Admins see the registrant\'s contact details.');
+    console.log('PASS: pre-launch requests: queue badge; registration panel with role and email match for reviewers; registrant contacts for admins only.');
+
     stage = 'revocation';
     sql(`delete from private.account_roles where user_id = '${users.moderator.id}'::uuid;`);
     assert.equal((await moderate(jars.moderator, suspend)).status, 403, 'Revoked moderator cannot moderate.');
@@ -307,6 +341,13 @@ async function main() {
     const ids = Object.values(users).map((user) => user.id);
     for (const id of ids) {
       try { if ((await service.auth.admin.deleteUser(id)).error) cleanupFailed = true; } catch { cleanupFailed = true; }
+    }
+    // A registration holds its draft; its audit row names the registration, not an account.
+    if (registrationKeys.length) {
+      const keys = registrationKeys.map((key) => `'${key}'::uuid`).join(',');
+      try { sql(`delete from private.directory_audit_events where target_venue_id in (select venue_id from private.venue_registrations where request_key in (${keys}));
+        delete from private.venue_registrations where request_key in (${keys});`); }
+      catch { cleanupFailed = true; }
     }
     for (const id of venues) {
       try { if ((await service.from('venues').delete().eq('id', id)).error) cleanupFailed = true; } catch { cleanupFailed = true; }

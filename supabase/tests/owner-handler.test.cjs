@@ -48,7 +48,7 @@ function post(submission = claim, evidence = JPEG, extra = {}, headers = { autho
 test('mobile/admin source never references the server Maps key, evidence bucket or owner command RPCs (except the console evidence route)', () => {
   // T17: the console's server-only evidence route is the one reader outside the function, and only of the bucket.
   const evidenceReader = path.join(root, 'apps/admin/src/lib/ownership-handler.ts');
-  const forbidden = /GOOGLE_MAPS_SERVER_API_KEY|owner-evidence|owner_submit_(claim|venue)|owner_duplicate_candidates/;
+  const forbidden = /GOOGLE_MAPS_SERVER_API_KEY|owner-evidence|owner_submit_(claim|venue)|owner_duplicate_candidates|owner_registration_check|owner_redeem_registration|PRELAUNCH_CODE_SECRET/;
   function scan(directory) {
     for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
       if (['node_modules', '.next', '.expo', 'dist', '__tests__'].includes(entry.name)) continue;
@@ -117,7 +117,7 @@ test('submissions: limiter and outage run before upload/database; body, type and
   assert.equal((await outage.handler(post())).status, 503); assert.equal((await outage.handler(get('address=Manila'))).status, 503);
   assert.equal(outage.calls.upload.length + outage.calls.geocode.length, 0);
   const { handler, calls } = harness();
-  assert.equal((await handler(new Request(url, { method: 'POST', body: '{}', headers: { authorization: 'Bearer valid-user', 'content-type': 'application/json' } }))).status, 415);
+  assert.equal((await handler(new Request(url, { method: 'POST', body: '{}', headers: { authorization: 'Bearer valid-user', 'content-type': 'text/plain' } }))).status, 415);
   assert.equal((await handler(new Request(url, { method: 'POST', body: 'x', headers: { authorization: 'Bearer valid-user', 'content-type': 'multipart/form-data; boundary=x', 'content-length': '99999999' } }))).status, 413);
   assert.equal((await handler(post(claim, new Uint8Array(5 * 1024 * 1024 + 1).fill(0xff)))).status, 413);
   assert.equal((await handler(post('not json'))).status, 400);
@@ -160,6 +160,92 @@ test('accepted evidence is stored privately under a server path; only created re
   assert.deepEqual(broken.calls.warn, ['submission_failed', 'evidence_cleanup_failed']);
   const noStorage = harness({ upload: async () => { throw new Error('bucket'); } });
   assert.equal((await noStorage.handler(post())).status, 503); assert.equal(noStorage.calls.submit.length, 0);
+});
+
+// T54 pre-launch claim codes.
+const CODE = 'ABCDEFGHJK';
+const hashCode = async (code) => `hash:${code}`;
+const preview = { name: 'Claimable Courts', address_line: '12 Mabini St', city: 'Manila', province: 'Metro Manila', court_count: 4 };
+const check = (body, headers = { authorization: 'Bearer valid-user' }) => new Request(url, {
+  method: 'POST', body: typeof body === 'string' ? body : JSON.stringify(body), headers: { ...headers, 'content-type': 'application/json' } });
+const redemption = { kind: 'registration', request_id: REQUEST, code: 'abcde fghjk', note: null };
+const leaks = async (response) => { const text = await response.text(); return text.includes(CODE) || text.includes('ABCDE-FGHJK') || text.includes('secret'); };
+
+test('claim-code checks: JSON bodies only, the owner-code limit first, the venue for a right code and one answer for wrong or used codes', async () => {
+  const checks = [];
+  const answers = { [`hash:${CODE}`]: { outcome: 'valid', registration: preview, retry_after_seconds: null } };
+  const { handler, calls } = harness({ hashCode, checkCode: async (...args) => { checks.push(args); return answers[args[1]] ?? { outcome: 'invalid', registration: null, retry_after_seconds: null }; } });
+  const found = await handler(check({ code: 'abcde-fghjk' }));
+  assert.equal(found.status, 200); assert.equal(found.headers.get('cache-control'), 'private, no-store');
+  assert.deepEqual(plain(await found.json()), { registration: preview });
+  assert.deepEqual(plain(calls.limit[0]), ['owner-code', { kind: 'user', id: ACTOR }]);
+  assert.deepEqual(checks[0], [ACTOR, `hash:${CODE}`], 'the database sees the verified actor and only the hash');
+  const wrong = await handler(check({ code: 'ABCDE-FGHJM' }));
+  assert.equal(wrong.status, 404); assert.deepEqual(plain(await wrong.json()), { error: 'code_not_valid' });
+  assert.equal((await handler(check({ code: 'ABCDE-FGHJ0' }))).status, 400, 'impossible codes never reach the database');
+  for (const body of [{ code: CODE, extra: 1 }, { request_id: REQUEST }, 'not json', [CODE]]) {
+    const reply = await handler(check(body)); assert.equal(reply.status, 400); assert.equal((await reply.json()).error, 'invalid_request');
+  }
+  assert.equal((await handler(check({ code: 'A'.repeat(300) }))).status, 413);
+  assert.equal(checks.length, 2);
+  assert.equal((await handler(check({ code: CODE }, {}))).status, 401);
+
+  const locked = harness({ hashCode, checkCode: async () => ({ outcome: 'locked', registration: null, retry_after_seconds: 3540 }) });
+  const refused = await locked.handler(check({ code: CODE }));
+  assert.equal(refused.status, 429); assert.equal(refused.headers.get('retry-after'), '3540'); assert.equal((await refused.json()).error, 'code_locked');
+  for (const [reason, status, error] of [['listing_unavailable', 404, 'listing_unavailable'], ['actor_required', 403, 'account_required']]) {
+    const run = harness({ hashCode, checkCode: async () => { throw new CommandRejected(reason); } });
+    const reply = await run.handler(check({ code: CODE }));
+    assert.equal(reply.status, status); assert.equal((await reply.json()).error, error);
+  }
+  const broken = harness({ hashCode, checkCode: async () => { throw new Error(`connection secret ${CODE}`); } });
+  const failed = await broken.handler(check({ code: CODE }));
+  assert.equal(failed.status, 503); assert.equal(failed.headers.get('retry-after'), '5'); assert.ok(!(await leaks(failed)));
+  assert.deepEqual(broken.calls.warn, ['code_check_failed']);
+  // No secret configured, a refusing limiter or a Redis outage: nothing is hashed or checked.
+  const unconfigured = harness({ hashCode: null, checkCode: async () => assert.fail('checked without a secret') });
+  const missing = await unconfigured.handler(check({ code: CODE }));
+  assert.equal(missing.status, 503); assert.equal((await missing.json()).error, 'claim_codes_unavailable');
+  for (const decision of [{ allowed: false, status: 429, state: 'enforced', headers: { 'Retry-After': '30' } }, { allowed: false, status: 503, state: 'degraded', headers: { 'Retry-After': '5' } }]) {
+    const run = harness({ limit: async () => decision, hashCode: async () => assert.fail('hashed past the limiter'), checkCode: async () => assert.fail('checked past the limiter') });
+    assert.equal((await run.handler(check({ code: CODE }))).status, decision.status);
+  }
+  const realGuard = createRateGuard({ backend: async () => { throw new Error('redis'); }, identifier: async () => 'hash', timeoutMs: 10 });
+  const outage = harness({ limit: (action, principal) => realGuard(action, principal), hashCode, checkCode: async () => assert.fail('checked in an outage') });
+  assert.equal((await outage.handler(check({ code: CODE }))).status, 503, 'owner-code fails closed');
+});
+
+test('code redemptions: hashed before any upload, the T15 evidence rules, and wrong, used or locked codes remove the upload', async () => {
+  const { handler, calls } = harness({ hashCode });
+  const reply = await handler(post(redemption));
+  assert.equal(reply.status, 201);
+  assert.deepEqual(plain(calls.limit[0]), ['owner-submit', { kind: 'user', id: ACTOR }]);
+  assert.deepEqual(plain(calls.submit[0]), [ACTOR, { kind: 'registration', request_id: REQUEST, code: CODE, note: null },
+    `${ACTOR}/e1000000-0000-4000-8000-000000000001.jpg`, `hash:${CODE}`]);
+  assert.deepEqual(calls.remove, []);
+  assert.equal((await handler(post({ ...claim }))).status, 201); assert.equal(calls.submit[1][3], null, 'claims carry no code hash');
+  for (const [result, status, error, retry] of [
+    [{ outcome: 'invalid', submission: null, duplicates: [], retry_after_seconds: null }, 404, 'code_not_valid', null],
+    [{ outcome: 'locked', submission: null, duplicates: [], retry_after_seconds: 120 }, 429, 'code_locked', '120'],
+    [{ ...created, outcome: 'existing' }, 200, null, null],
+  ]) {
+    const run = harness({ hashCode, submit: async () => result });
+    const answer = await run.handler(post(redemption));
+    assert.equal(answer.status, status); assert.equal(answer.headers.get('retry-after'), retry);
+    if (error) assert.equal((await answer.json()).error, error);
+    assert.deepEqual(run.calls.remove, [run.calls.upload[0][0]], 'the upload goes when no record was created');
+  }
+  const bad = harness({ hashCode });
+  const malformed = await bad.handler(post({ ...redemption, code: 'ABCDE-FGHJ0' }));
+  assert.equal(malformed.status, 400); assert.equal((await malformed.json()).error, 'invalid_code');
+  assert.equal((await bad.handler(post({ ...redemption, venue_id: VENUE }))).status, 400, 'unknown fields');
+  assert.equal(bad.calls.upload.length + bad.calls.submit.length, 0);
+  const unconfigured = harness({ hashCode: null });
+  const missing = await unconfigured.handler(post(redemption));
+  assert.equal(missing.status, 503); assert.equal((await missing.json()).error, 'claim_codes_unavailable');
+  assert.equal(unconfigured.calls.upload.length + unconfigured.calls.submit.length, 0, 'no upload without the secret');
+  const run = harness({ hashCode, submit: async () => { throw new CommandRejected('already_verified'); } });
+  assert.equal((await run.handler(post(redemption))).status, 409); assert.equal(run.calls.remove.length, 1);
 });
 
 test('geocoding keeps Philippine results with bounded fields and keeps the key out of URLs', async () => {

@@ -1,16 +1,17 @@
 import type { CourtSurface } from './directory.ts';
 import { readOwnerNote, readOwnerVenueInput, isUuid, type OwnerDuplicate, type OwnerVenueInput } from './owner.ts';
 
+export { CLAIM_CODE_ALPHABET, CLAIM_CODE_LENGTH, formatClaimCode, normalizeClaimCode } from './claimCode.ts';
+
 // Pre-launch court registration (T53). The public page and its server read the same contract; the
 // database (`prelaunch_register`) re-validates every field. Claim codes are redeemed in the app (T54).
 export const MAX_PRELAUNCH_BODY = 8 * 1024;
 export const MAX_OPEN_REGISTRATIONS_PER_EMAIL = 10;
 /** Contact details and the code hash of unclaimed registrations are erased this long after the last code email. */
 export const REGISTRATION_RETENTION_DAYS = 180;
+/** A claimed registration's contact details are erased this long after the claim's review decision (T54). */
+export const CLAIMED_REGISTRATION_RETENTION_DAYS = 30;
 export const MAX_TURNSTILE_TOKEN = 2048;
-/** No 0/O, 1/I/L or U: easy to read aloud and type. 30 symbols, 10 characters ≈ 49 bits. */
-export const CLAIM_CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTVWXYZ23456789';
-export const CLAIM_CODE_LENGTH = 10;
 export const REGISTRATION_ROLES = ['owner', 'manager', 'staff'] as const;
 export const REGISTRATION_ROLE_LABELS: Record<RegistrationRole, string> = { owner: 'Owner', manager: 'Manager', staff: 'Staff' };
 export const COURT_SURFACES: readonly CourtSurface[] = ['hard', 'synthetic', 'other'];
@@ -157,17 +158,4 @@ export function readAddressQuery(raw: unknown): string {
     throw new PrelaunchInputError('Enter 3 to 200 characters to search.');
   }
   return query;
-}
-
-/** ABCDEFGHJK → ABCDE-FGHJK, as printed in the email. */
-export function formatClaimCode(code: string): string {
-  return `${code.slice(0, 5)}-${code.slice(5)}`;
-}
-
-/** What someone typed (any case, spaces or dashes) → the canonical code, or null if it can't be one. */
-export function normalizeClaimCode(input: unknown): string | null {
-  if (typeof input !== 'string' || input.length > 40) return null;
-  const code = input.replace(/[\s-]/g, '').toUpperCase();
-  if (code.length !== CLAIM_CODE_LENGTH || [...code].some((symbol) => !CLAIM_CODE_ALPHABET.includes(symbol))) return null;
-  return code;
 }

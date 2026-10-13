@@ -1,4 +1,7 @@
-import { CLAIM_CODE_ALPHABET, CLAIM_CODE_LENGTH } from '@picklyph/domain/src/prelaunch.ts';
+import { CLAIM_CODE_ALPHABET, CLAIM_CODE_LENGTH } from '@picklyph/domain/src/claimCode.ts';
+
+// One HMAC for the registration server and the app's redemption (owner-submissions, T54).
+export { hashClaimCode } from '@picklyph/domain/src/claimCode.ts';
 
 /** A uniformly random claim code from the server's CSPRNG (rejection sampling keeps every symbol equally likely). */
 export function generateClaimCode(random: (size: number) => Uint8Array = (size) => crypto.getRandomValues(new Uint8Array(size))): string {
@@ -10,11 +13,4 @@ export function generateClaimCode(random: (size: number) => Uint8Array = (size) 
     }
   }
   return code;
-}
-
-/** HMAC-SHA256 (hex) of the canonical code under PRELAUNCH_CODE_SECRET. Only this hash is stored. */
-export async function hashClaimCode(secret: string, code: string): Promise<string> {
-  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
-  const signature = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(`pickly-claim-code:v1:${code}`));
-  return Array.from(new Uint8Array(signature), (byte) => byte.toString(16).padStart(2, '0')).join('');
 }

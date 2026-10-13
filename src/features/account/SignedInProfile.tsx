@@ -111,6 +111,8 @@ export function SignedInProfile({ session, startInOwnerMode = false }: { session
             onPress={() => router.push('/owner/submit')} />
           <MenuRow icon="flag" tone="lime" title="Claim your listing" subtitle="Open your venue on Discover, then tap Claim"
             onPress={() => router.navigate('/(tabs)')} />
+          <MenuRow icon="mail" title="Claim with a code" subtitle="Registered before launch? Enter the code from your email"
+            onPress={() => router.push('/owner/code')} />
         </MenuGroup>
       )}
 

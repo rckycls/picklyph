@@ -32,6 +32,8 @@ export type OwnershipQueueItem = {
   venue_id: string | null;
   /** Claims: other pending claims + current owners. Venues: nearby listings/submissions at submission time. */
   duplicate_signals: number;
+  /** T54: a new venue redeemed from a pre-launch registration. */
+  prelaunch: boolean;
 };
 export type OwnershipQueuePage = { items: OwnershipQueueItem[]; next_cursor: ReviewCursor | null; pending_total: number };
 
@@ -84,6 +86,20 @@ export type VenueSubmissionReview = ReviewBase & {
     publication_status: VenuePublicationStatus; claim_status: VenueClaimStatus; distance_m: number; in_snapshot: boolean;
   }[];
   nearby_submissions: { id: string; name: string; status: OwnerSubmissionStatus; distance_m: number; same_submitter: boolean; in_snapshot: boolean }[];
+  /** T54: the pre-launch registration this submission redeemed, or null for one made in the app. */
+  registration: RegistrationReview | null;
+};
+/** A pre-launch registration redeemed with its claim code (T53/T54). */
+export type RegistrationReview = {
+  registered_at: string;
+  claimed_at: string;
+  role: 'owner' | 'manager' | 'staff';
+  /** The claiming account's email equalled the registration email when the code was redeemed. */
+  email_matched: boolean;
+  /** True once the privacy sweep erased the contact details (30 days after the decision). */
+  erased: boolean;
+  /** Reads by admins only, until erased; always null for moderators. */
+  contact: { owner_name: string; email: string; phone: string | null; note: string | null } | null;
 };
 export type OwnershipReview = ClaimReview | VenueSubmissionReview;
 export type OwnershipDecisionResult = { outcome: 'decided' | 'existing'; item: OwnershipReview };

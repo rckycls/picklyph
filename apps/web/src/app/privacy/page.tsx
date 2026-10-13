@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { MAX_OPEN_REGISTRATIONS_PER_EMAIL, REGISTRATION_RETENTION_DAYS } from '@picklyph/domain';
+import { CLAIMED_REGISTRATION_RETENTION_DAYS, MAX_OPEN_REGISTRATIONS_PER_EMAIL, REGISTRATION_RETENTION_DAYS } from '@picklyph/domain';
 import { readContactAddress } from '@/lib/config';
 import { Footer, Hero } from '@/components/site';
 
@@ -36,10 +36,14 @@ export default function PrivacyPage() {
           <p>Your registration is not public. Players see nothing about it, and the venue appears in the app only after you claim it, show that
             you run it, and we review it. pickly administrators can see your details. Service providers process them for us under their own
             security terms: our database host (Supabase), this page’s host (Vercel), our email provider, Cloudflare (Turnstile), Google (the map
-            and address search) and Upstash (request counts). We don’t sell your information.</p>
+            and address search) and Upstash (request counts). We don’t sell your information. When someone claims the venue in the app with
+            your code, the pickly reviewers who check the claim see your role at the venue and whether the claiming account uses the same email
+            address; only administrators see your name, email, mobile number and note.</p>
 
           <h2>How long we keep it</h2>
-          <p>Until you claim your venue in the app. If it is still unclaimed {REGISTRATION_RETENTION_DAYS} days after we email your claim code, we
+          <p>Until you claim your venue in the app and we review the claim. The claim code stops working once it is used. We erase your name,
+            email, mobile number and note {CLAIMED_REGISTRATION_RETENTION_DAYS} days after we decide the claim, or straight away if the account
+            that claimed it is deleted before then. If it is still unclaimed {REGISTRATION_RETENTION_DAYS} days after we email your claim code, we
             erase your name, email, mobile number, note and the claim code, and retire the draft listing. The venue details may remain in a
             retired listing without anything about you. One email address can hold up to {MAX_OPEN_REGISTRATIONS_PER_EMAIL} unclaimed registrations.</p>
 

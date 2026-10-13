@@ -8,7 +8,7 @@ import { getSupabase } from '@/lib/supabase';
 
 import { blockCourt, loadCalendar, loadVenueSchedule, releaseBlock, saveCourtHours, saveVenueSchedule } from './calendarClient';
 import {
-  findNearbyListings, parseMySubmissions, searchAddress, submitOwner,
+  checkClaimCode, findNearbyListings, parseMySubmissions, searchAddress, submitOwner,
   type EvidenceFile, type OwnerOutcome, type OwnerTransport,
 } from './ownerClient';
 import type { Pin } from './ownerForm';
@@ -90,6 +90,11 @@ export function liveAddressSearch(address: string, signal?: AbortSignal) {
 export function liveNearbyListings(pin: Pin, name: string | null, signal?: AbortSignal) {
   const live = liveTransport();
   return live ? findNearbyListings(live, pin, name, signal) : Promise.resolve(notConfigured);
+}
+
+export function liveCheckClaimCode(code: string, signal?: AbortSignal): ReturnType<typeof checkClaimCode> {
+  const live = liveTransport();
+  return live ? checkClaimCode(live, code, signal) : Promise.resolve(notConfigured);
 }
 
 export function liveSubmit(request: OwnerSubmissionRequest, evidence: EvidenceFile): ReturnType<typeof submitOwner> {

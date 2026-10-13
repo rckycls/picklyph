@@ -9,7 +9,7 @@ module.exports = function load(file, imports = {}, globals = {}) {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
   }).outputText;
   vm.runInNewContext(compiled, { module, exports: module.exports, URL, URLSearchParams, Request, Response, Headers,
-    setTimeout, clearTimeout, TextEncoder, Uint8Array, crypto: globalThis.crypto, ...globals,
+    setTimeout, clearTimeout, TextEncoder, TextDecoder, Uint8Array, crypto: globalThis.crypto, ...globals,
     require: (name) => imports[name] ?? (name.startsWith('.') ? load(path.resolve(path.dirname(file), name), imports, globals) : require(name)),
   }, { filename: file });
   return module.exports;

@@ -19,6 +19,8 @@ const REQUIRED_SECRETS = [
   'PUSH_WORKER_SECRET', 'GOOGLE_MAPS_SERVER_API_KEY',
   'APPLE_TEAM_ID', 'APPLE_KEY_ID', 'APPLE_CLIENT_ID', 'APPLE_PRIVATE_KEY',
   'OPS_MONITOR_SECRET', 'OPS_ALERT_WEBHOOK_URL', 'STORAGE_SWEEP_SECRET',
+  // T54: owner-submissions hashes pre-launch claim codes with the registration server's secret.
+  'PRELAUNCH_CODE_SECRET',
 ];
 // Settings that must never be shared between staging and production. The Apple key, the
 // Maps server key, the Expo access token and the alert webhook (messages name the environment)
@@ -26,7 +28,7 @@ const REQUIRED_SECRETS = [
 const ENVIRONMENT_SECRETS = [
   'DISCOVERY_SUPABASE_URL', 'DISCOVERY_SUPABASE_PUBLISHABLE_KEY', 'DISCOVERY_SUPABASE_SECRET_KEY',
   'UPSTASH_REDIS_REST_URL', 'UPSTASH_REDIS_REST_TOKEN', 'RATE_LIMIT_KEY_SECRET', 'PICKLY_ENV',
-  'PUSH_WORKER_SECRET', 'OPS_MONITOR_SECRET', 'OPS_HEARTBEAT_URL', 'STORAGE_SWEEP_SECRET',
+  'PUSH_WORKER_SECRET', 'OPS_MONITOR_SECRET', 'OPS_HEARTBEAT_URL', 'STORAGE_SWEEP_SECRET', 'PRELAUNCH_CODE_SECRET',
 ];
 // Server setting names that have no reason to appear in a shipped app bundle.
 const SERVER_SETTING_NAMES = [

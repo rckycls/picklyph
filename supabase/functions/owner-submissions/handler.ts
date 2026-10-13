@@ -1,6 +1,7 @@
 import {
-  MAX_EVIDENCE_BYTES, OwnerInputError, readOwnerLookup, readOwnerSubmission, sniffEvidence,
+  ClaimCodeInputError, MAX_CODE_CHECK_BYTES, MAX_EVIDENCE_BYTES, OwnerInputError, readOwnerLookup, readOwnerSubmission, readRegistrationCheck, sniffEvidence,
   type AddressCandidate, type EvidenceType, type OwnerDuplicate, type OwnerSubmissionRequest, type OwnerSubmitResult,
+  type RegistrationCheckResult,
 } from '../../../packages/domain/src/owner.ts';
 import type { RateAction, RateDecision, RatePrincipal } from '../_shared/rate-limit.ts';
 
@@ -21,24 +22,28 @@ export const REJECTIONS: Record<string, { status: number; error: string }> = {
 
 type Dependencies = {
   verifyUser: (token: string) => Promise<string | null>;
-  limit: (action: Extract<RateAction, 'owner-submit' | 'owner-lookup'>, principal: RatePrincipal) => Promise<RateDecision>;
+  limit: (action: Extract<RateAction, 'owner-submit' | 'owner-lookup' | 'owner-code'>, principal: RatePrincipal) => Promise<RateDecision>;
   /** Null when address search is not configured; throws when the provider fails. */
   geocode: ((address: string) => Promise<AddressCandidate[]>) | null;
   nearby: (actor: string, latitude: number, longitude: number, name: string | null) => Promise<OwnerDuplicate[]>;
   upload: (path: string, bytes: Uint8Array, type: EvidenceType) => Promise<void>;
   remove: (path: string) => Promise<void>;
-  submit: (actor: string, request: OwnerSubmissionRequest, evidencePath: string) => Promise<OwnerSubmitResult>;
+  /** `codeHash` is the T53 HMAC of a registration's claim code; null for claims and new venues. */
+  submit: (actor: string, request: OwnerSubmissionRequest, evidencePath: string, codeHash: string | null) => Promise<OwnerSubmitResult>;
+  /** T54: the PRELAUNCH_CODE_SECRET HMAC of a canonical claim code; null when the secret is not configured. */
+  hashCode: ((code: string) => Promise<string>) | null;
+  checkCode: (actor: string, codeHash: string) => Promise<RegistrationCheckResult>;
   newId: () => string;
-  /** Fixed event names only: never identifiers, input or infrastructure errors. */
-  warn?: (event: 'address_search_failed' | 'submission_failed' | 'evidence_cleanup_failed') => void;
+  /** Fixed event names only: never identifiers, codes, input or infrastructure errors. */
+  warn?: (event: 'address_search_failed' | 'submission_failed' | 'evidence_cleanup_failed' | 'code_check_failed') => void;
 };
 
 // Multipart overhead around one evidence file and a small JSON part.
 const MAX_BODY = MAX_EVIDENCE_BYTES + 64 * 1024;
 
-async function readBounded(request: Request): Promise<Uint8Array<ArrayBuffer> | null> {
+async function readBounded(request: Request, max = MAX_BODY): Promise<Uint8Array<ArrayBuffer> | null> {
   const declared = request.headers.get('content-length');
-  if (declared !== null && (!/^\d{1,9}$/.test(declared) || Number(declared) > MAX_BODY)) return null;
+  if (declared !== null && (!/^\d{1,9}$/.test(declared) || Number(declared) > max)) return null;
   if (!request.body) return new Uint8Array();
   const reader = request.body.getReader();
   const chunks: Uint8Array[] = [];
@@ -47,7 +52,7 @@ async function readBounded(request: Request): Promise<Uint8Array<ArrayBuffer> | 
     const { done, value } = await reader.read();
     if (done) break;
     size += value.byteLength;
-    if (size > MAX_BODY) { await reader.cancel().catch(() => {}); return null; }
+    if (size > max) { await reader.cancel().catch(() => {}); return null; }
     chunks.push(value);
   }
   const body = new Uint8Array(size);
@@ -60,7 +65,8 @@ async function readBounded(request: Request): Promise<Uint8Array<ArrayBuffer> | 
  * Authenticated owner commands. Native-only: no browser CORS.
  * GET ?address=…                       address suggestions (owner-lookup limit)
  * GET ?latitude=…&longitude=…[&name=…] approved listings nearby (owner-lookup limit)
- * POST multipart {submission, evidence} claim, or new venue (the owner's draft) for review (owner-submit limit)
+ * POST multipart {submission, evidence} claim, new venue (the owner's draft) or pre-launch registration code for review (owner-submit limit)
+ * POST JSON {code}                     the venue a pre-launch claim code names (owner-code limit). Codes travel only in bodies.
  */
 export function createOwnerHandler(deps: Dependencies) {
   return async (request: Request): Promise<Response> => {
@@ -102,9 +108,37 @@ export function createOwnerHandler(deps: Dependencies) {
     }
 
     // POST: the limiter runs before reading the body or any storage/database side effect.
-    const decision = await deps.limit('owner-submit', principal);
-    if (!decision.allowed) return respond(decision.status, { error: decision.status === 429 ? 'rate_limited' : 'temporarily_unavailable' }, decision.headers);
     const contentType = request.headers.get('content-type') ?? '';
+    const codeCheck = /^application\/json(?:;|$)/i.test(contentType);
+    const decision = await deps.limit(codeCheck ? 'owner-code' : 'owner-submit', principal);
+    if (!decision.allowed) return respond(decision.status, { error: decision.status === 429 ? 'rate_limited' : 'temporarily_unavailable' }, decision.headers);
+    // A wrong or used code answers 404 and a locked account 429 (the database lockout), alike for checks and redemptions.
+    const refuseCode = (outcome: 'invalid' | 'locked', seconds: number | null | undefined) => outcome === 'locked'
+      ? respond(429, { error: 'code_locked' }, { ...decision.headers, 'Retry-After': String(Math.max(1, seconds ?? 60)) })
+      : respond(404, { error: 'code_not_valid' }, decision.headers);
+    if (codeCheck) {
+      if (!deps.hashCode) return respond(503, { error: 'claim_codes_unavailable' }, decision.headers);
+      let code: string;
+      try {
+        const body = await readBounded(request, MAX_CODE_CHECK_BYTES);
+        if (!body) return respond(413, { error: 'invalid_request' }, decision.headers);
+        code = readRegistrationCheck(new TextDecoder('utf-8', { fatal: true }).decode(body));
+      } catch (error) { return respond(400, { error: error instanceof ClaimCodeInputError ? 'invalid_code' : 'invalid_request' }, decision.headers); }
+      let result: RegistrationCheckResult;
+      try { result = await deps.checkCode(actor, await deps.hashCode(code)); }
+      catch (error) {
+        if (error instanceof CommandRejected && REJECTIONS[error.reason]) {
+          const rejection = REJECTIONS[error.reason]!;
+          return respond(rejection.status, { error: rejection.error }, decision.headers);
+        }
+        deps.warn?.('code_check_failed');
+        return respond(503, { error: 'lookup_unavailable' }, { ...decision.headers, 'Retry-After': '5' });
+      }
+      if (result.outcome === 'valid' && result.registration) return respond(200, { registration: result.registration }, decision.headers);
+      if (result.outcome === 'invalid' || result.outcome === 'locked') return refuseCode(result.outcome, result.retry_after_seconds);
+      deps.warn?.('code_check_failed');
+      return respond(503, { error: 'lookup_unavailable' }, { ...decision.headers, 'Retry-After': '5' });
+    }
     if (!/^multipart\/form-data;\s*boundary=/i.test(contentType)) return respond(415, { error: 'multipart_required' }, decision.headers);
     let bytes: Uint8Array;
     let submission: OwnerSubmissionRequest;
@@ -125,7 +159,17 @@ export function createOwnerHandler(deps: Dependencies) {
       const sniffed = sniffEvidence(bytes);
       if (!sniffed) return respond(415, { error: 'unsupported_evidence' }, decision.headers);
       evidenceType = sniffed;
-    } catch { return respond(400, { error: 'invalid_submission' }, decision.headers); }
+    } catch (error) {
+      // A code that can't be one is named, so the app can point at the code field; it never reaches the database.
+      if (error instanceof ClaimCodeInputError) return respond(400, { error: 'invalid_code' }, decision.headers);
+      return respond(400, { error: 'invalid_submission' }, decision.headers);
+    }
+    let codeHash: string | null = null;
+    if (submission.kind === 'registration') {
+      if (!deps.hashCode) return respond(503, { error: 'claim_codes_unavailable' }, decision.headers);
+      try { codeHash = await deps.hashCode(submission.code); }
+      catch { return respond(503, { error: 'claim_codes_unavailable' }, { ...decision.headers, 'Retry-After': '5' }); }
+    }
 
     // Server-chosen object name under the verified user's folder; never client input.
     const path = `${actor}/${deps.newId()}.${evidenceType === 'image/png' ? 'png' : 'jpg'}`;
@@ -137,7 +181,7 @@ export function createOwnerHandler(deps: Dependencies) {
     let result: OwnerSubmitResult | null = null;
     let rejected: { status: number; error: string } | null = null;
     try {
-      result = await deps.submit(actor, submission, path);
+      result = await deps.submit(actor, submission, path, codeHash);
     } catch (error) {
       if (error instanceof CommandRejected && REJECTIONS[error.reason]) rejected = REJECTIONS[error.reason]!;
       else deps.warn?.('submission_failed');
@@ -147,6 +191,7 @@ export function createOwnerHandler(deps: Dependencies) {
     if (result?.outcome === 'created') return respond(201, { submission: result.submission, duplicates: result.duplicates }, decision.headers);
     if (result?.outcome === 'existing') return respond(200, { submission: result.submission, duplicates: [] }, decision.headers);
     if (result?.outcome === 'duplicates') return respond(409, { error: 'possible_duplicates', duplicates: result.duplicates }, decision.headers);
+    if (result?.outcome === 'invalid' || result?.outcome === 'locked') return refuseCode(result.outcome, result.retry_after_seconds);
     if (rejected) return respond(rejected.status, { error: rejected.error }, decision.headers);
     return respond(503, { error: 'submission_unavailable' }, { ...decision.headers, 'Retry-After': '5' });
   };

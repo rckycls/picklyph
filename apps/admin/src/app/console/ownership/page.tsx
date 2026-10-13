@@ -21,7 +21,7 @@ export default async function OwnershipQueuePage({ searchParams }: { searchParam
         <thead><tr><th scope="col">Request</th><th scope="col">Type</th><th scope="col">Location</th><th scope="col">Submitted</th><th scope="col">Signals</th></tr></thead>
         <tbody>{page.items.map(item => <tr key={item.id}>
           <td><Link className="cell-link" href={`/console/ownership/${item.id}`}>{item.name}</Link></td>
-          <td><span className={`badge kind-${item.kind}`}>{item.kind === 'claim' ? 'Ownership claim' : 'New venue'}</span></td>
+          <td><span className={`badge kind-${item.kind}`}>{item.kind === 'claim' ? 'Ownership claim' : 'New venue'}</span>{item.prelaunch && <> <span className="badge">Pre-launch</span></>}</td>
           <td>{item.city}, {item.province}</td>
           <td className="nowrap">{formatManilaDateTime(toDisplayInstant(item.created_at))}</td>
           <td>{item.duplicate_signals > 0 ? <span className="badge signal">{signal(item)}</span> : <span className="muted">None</span>}</td>

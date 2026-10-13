@@ -127,6 +127,7 @@ npm run release:check -- --variant production --linked
 | `OPS_ALERT_WEBHOOK_URL` | `ops-monitor`: the operators' Discord channel webhook | may be shared (messages name the environment) |
 | `OPS_HEARTBEAT_URL` (optional) | `ops-monitor`: outside dead-man's switch pinged after each run | must differ when set in both |
 | `STORAGE_SWEEP_SECRET` | `storage-sweep` (T51b); the same value in Vault `storage_sweep_secret` | yes |
+| `PRELAUNCH_CODE_SECRET` | `owner-submissions` claim codes (T54); **the same value** as that environment's pre-launch page (`apps/web`, T53). Changing it voids every outstanding code | yes |
 | `EXPO_ACCESS_TOKEN` (optional) | `push-dispatch`, only with Expo enhanced push security | may be shared |
 | `DISCOVERY_IP_SOURCE` (optional) | `venue-search`; `cloudflare` only after the H02 header checks | not checked |
 

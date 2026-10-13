@@ -1,5 +1,5 @@
 import type {
-  AddressCandidate, EvidenceType, OwnerDuplicate, OwnerSubmission, OwnerSubmissionRequest, VenueClaimStatus,
+  AddressCandidate, EvidenceType, OwnerDuplicate, OwnerSubmission, OwnerSubmissionRequest, RegistrationPreview, VenueClaimStatus,
 } from '@picklyph/domain';
 
 // Pure client for the owner-submissions Edge function: type-only domain imports,
@@ -21,10 +21,14 @@ export type OwnerTransport = {
 
 export type OwnerRejection =
   | 'invalid_submission' | 'invalid_evidence' | 'evidence_too_large' | 'unsupported_evidence' | 'account_required'
-  | 'listing_unavailable' | 'already_verified' | 'already_pending' | 'request_reused' | 'too_many_pending';
+  | 'listing_unavailable' | 'already_verified' | 'already_pending' | 'request_reused' | 'too_many_pending'
+  // T54 claim codes: a code that can't be one, and one the server doesn't accept (wrong, used or erased alike).
+  | 'invalid_code' | 'code_not_valid';
 export type OwnerFailure =
   | { kind: 'sign_in' | 'network' | 'unavailable' | 'not_configured' | 'address_search_unavailable'; retryAfterSeconds: number | null }
   | { kind: 'rate_limited'; retryAfterSeconds: number }
+  /** Too many wrong claim codes: the account may try again after this wait. */
+  | { kind: 'code_locked'; retryAfterSeconds: number }
   | { kind: 'rejected'; reason: OwnerRejection; retryAfterSeconds: null };
 export type OwnerOutcome<T> = { ok: true; value: T } | { ok: false; failure: OwnerFailure };
 export type SubmitValue =
@@ -32,7 +36,8 @@ export type SubmitValue =
   | { status: 'duplicates'; duplicates: OwnerDuplicate[] };
 
 const REJECTIONS: readonly OwnerRejection[] = ['invalid_submission', 'invalid_evidence', 'evidence_too_large', 'unsupported_evidence',
-  'account_required', 'listing_unavailable', 'already_verified', 'already_pending', 'request_reused', 'too_many_pending'];
+  'account_required', 'listing_unavailable', 'already_verified', 'already_pending', 'request_reused', 'too_many_pending',
+  'invalid_code', 'code_not_valid'];
 const unexpected = (): never => { throw new Error('Unexpected owner response.'); };
 const text = (value: unknown, max: number, allowEmpty = false): value is string =>
   typeof value === 'string' && (allowEmpty || value.length > 0) && value.length <= max;
@@ -85,11 +90,24 @@ function retryAfter(response: Response, fallback: number | null): number | null 
   return Math.min(Math.max(Number(raw), 1), 3600);
 }
 
+/** The venue an open registration's code names. */
+export function parseRegistrationPreview(raw: unknown): RegistrationPreview {
+  const item = record(raw);
+  if (!text(item.name, 120) || !text(item.address_line, 240) || !text(item.city, 80) || !text(item.province, 80)
+    || !Number.isSafeInteger(item.court_count) || (item.court_count as number) < 0 || (item.court_count as number) > 200) return unexpected();
+  return { name: item.name as string, address_line: item.address_line as string, city: item.city as string,
+    province: item.province as string, court_count: item.court_count as number };
+}
+
 async function failure(response: Response): Promise<OwnerFailure> {
   if (response.status === 401) return { kind: 'sign_in', retryAfterSeconds: null };
-  if (response.status === 429) return { kind: 'rate_limited', retryAfterSeconds: retryAfter(response, 1) ?? 1 };
   let error: unknown;
   try { error = record(await response.json()).error; } catch { error = null; }
+  if (response.status === 429) {
+    return error === 'code_locked'
+      ? { kind: 'code_locked', retryAfterSeconds: retryAfter(response, 60) ?? 60 }
+      : { kind: 'rate_limited', retryAfterSeconds: retryAfter(response, 1) ?? 1 };
+  }
   if (error === 'address_search_unavailable') return { kind: 'address_search_unavailable', retryAfterSeconds: retryAfter(response, null) };
   if (response.status < 500 && REJECTIONS.includes(error as OwnerRejection)) {
     return { kind: 'rejected', reason: error as OwnerRejection, retryAfterSeconds: null };
@@ -137,6 +155,19 @@ export function findNearbyListings(transport: OwnerTransport, pin: { latitude: n
   return lookup(transport, params, 'duplicates', parseDuplicates, signal);
 }
 
+/** T54: the venue a pre-launch claim code names. The code travels only in the POST body, never the URL. */
+export async function checkClaimCode(transport: OwnerTransport, code: string, signal?: AbortSignal): Promise<OwnerOutcome<RegistrationPreview>> {
+  const sent = await send(transport, transport.endpoint, { method: 'POST', body: JSON.stringify({ code }), headers: { 'Content-Type': 'application/json' }, signal });
+  if ('failure' in sent) return { ok: false, failure: sent.failure };
+  const { response } = sent;
+  if (!response.ok) return { ok: false, failure: await failure(response) };
+  try { return { ok: true, value: parseRegistrationPreview(record(await response.json()).registration) }; }
+  catch (error) {
+    if (signal?.aborted) throw error;
+    return { ok: false, failure: { kind: 'unavailable', retryAfterSeconds: null } };
+  }
+}
+
 /** One multipart command; retry with the same request (and request_id) after a network failure. */
 export async function submitOwner(transport: OwnerTransport, request: OwnerSubmissionRequest, evidence: EvidenceFile): Promise<OwnerOutcome<SubmitValue>> {
   const form = new FormData();
@@ -169,6 +200,10 @@ export function ownerFailureMessage(failure: OwnerFailure): string {
     case 'sign_in': return 'Your sign-in has expired. Sign in again from Account, then retry.';
     case 'network': return 'Couldn’t reach pickly. Check your connection, then try again. Your details are still here.';
     case 'rate_limited': return `Too many requests right now. Try again in ${failure.retryAfterSeconds} seconds.`;
+    case 'code_locked': {
+      const minutes = Math.max(1, Math.ceil(failure.retryAfterSeconds / 60));
+      return `Too many codes that didn’t work. For your security, try again in ${minutes} ${minutes === 1 ? 'minute' : 'minutes'}.`;
+    }
     case 'not_configured': return 'Owner submissions aren’t set up in this build.';
     case 'address_search_unavailable': return 'Address search isn’t available right now. Move the map or use your location to place the pin.';
     case 'unavailable': return 'Submissions are unavailable right now. Nothing was submitted; try again shortly.';
@@ -181,6 +216,9 @@ export function ownerFailureMessage(failure: OwnerFailure): string {
         case 'already_pending': return 'You already have a submission for this place awaiting review.';
         case 'too_many_pending': return 'You have 5 submissions awaiting review. Wait for a decision before adding more.';
         case 'account_required': return 'Your account couldn’t be confirmed. Sign out and sign in again.';
+        case 'invalid_code': return 'Enter the 10-character code from your email, like ABCDE-FGHJK.';
+        // Wrong, already used and expired codes get the same words, so the reply never says which.
+        case 'code_not_valid': return 'That code doesn’t match a registration waiting to be claimed. Check it against your email; each code works once.';
         case 'request_reused':
         case 'invalid_submission':
         case 'invalid_evidence': return 'Something in this submission couldn’t be accepted. Check the details and try again.';
