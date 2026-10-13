@@ -302,7 +302,7 @@ select ops_test.expect_error($$select public.ops_alerts_confirm('[{"check":"hold
 
 -- Alert state: a quiet first run posts nothing; a problem posts until confirmed; then only changes, reminders and recovery.
 select ops_test.is(ops_test.run(), '', 'all ok: nothing to post');
-select ops_test.assert_that((select count(*) from private.ops_alert_state) = 16, 'all fourteen database checks and both Redis checks are tracked');
+select ops_test.assert_that((select count(*) from private.ops_alert_state) = 17, 'all fifteen database checks and both Redis checks are tracked');
 select ops_test.policy('approval');
 insert into ops_flow values ('late_hold', ops_test.rent('3', '1', '40', 660, 720));
 select ops_test.elapse_hold((select id from ops_flow where name = 'late_hold'), interval '11 minutes');

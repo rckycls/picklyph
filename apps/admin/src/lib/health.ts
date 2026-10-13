@@ -2,6 +2,7 @@
 // Pure, so unit tests run it directly. Wording for problems comes from the monitor's own OPS_CHECKS.
 import { OPS_CHECKS, OPS_CHECK_NAMES, OPS_EXTERNAL_CHECKS, isOpsCheckName, type OpsAdminView, type OpsCheckState, type OpsJobName,
   type OpsJobState, type OpsSignalKind, type OpsStatus } from '@picklyph/domain/src/ops.ts';
+import type { CrashGroup, CrashKind } from '@picklyph/domain/src/crash.ts';
 
 /** The monitor runs every five minutes; three missed runs mean it stopped. */
 export const MONITOR_STALE_MINUTES = 15;
@@ -70,4 +71,18 @@ export function problemCounts(view: OpsAdminView): { fail: number; warn: number 
 
 export function jobStateLabel(job: OpsJobState): string {
   return !job.present ? 'Missing' : !job.active ? 'Inactive' : 'Active';
+}
+
+// App crashes (T51d): the mobile app's anonymous crash reports, grouped by the database.
+export const CRASH_KIND_LABEL: Record<CrashKind, string> = { fatal: 'App crash', render: 'Screen failed', error: 'Error' };
+const VARIANT_ORDER = ['production', 'preview', 'development'] as const;
+
+/** "2 production · 1 development": which builds the group's reports came from, live builds first. */
+export function crashVariants(group: Pick<CrashGroup, 'production' | 'preview' | 'development'>): string {
+  return VARIANT_ORDER.filter((variant) => group[variant] > 0).map((variant) => `${group[variant]} ${variant}`).join(' · ');
+}
+
+/** Only fatal and render reports from preview and production builds raise app.crashes; the rest are listed, not alerted. */
+export function crashAlerts(group: Pick<CrashGroup, 'kind' | 'production' | 'preview'>): boolean {
+  return group.kind !== 'error' && group.production + group.preview > 0;
 }

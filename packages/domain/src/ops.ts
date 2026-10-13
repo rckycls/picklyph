@@ -4,7 +4,7 @@
  * docs/monitoring.md.
  */
 export const OPS_SIGNAL_SOURCES = ['venue-search', 'owner-submissions', 'owner-venues', 'owner-schedules', 'rental-bookings',
-  'owner-sessions', 'session-bookings', 'venue-reports', 'account-deletion', 'push-devices', 'push-dispatch', 'storage-sweep'] as const;
+  'owner-sessions', 'session-bookings', 'venue-reports', 'account-deletion', 'push-devices', 'push-dispatch', 'storage-sweep', 'crash-reports'] as const;
 export type OpsSignalSource = typeof OPS_SIGNAL_SOURCES[number];
 /** 5xx other than 503; 503 (outage policy or dependency down); rate limiter answered "degraded" (Redis unavailable). */
 export const OPS_SIGNAL_KINDS = ['server_error', 'unavailable', 'limiter_degraded'] as const;
@@ -35,6 +35,7 @@ export const OPS_CHECKS = {
   'redis.isolation': { label: 'Redis isolation', problem: (n: number) => `this database is also used by ${count(n, 'other environment', 'other environments')}` },
   'privacy.deletions': { label: 'Account deletions', problem: (n: number) => `${count(n, 'deletion started', 'deletions started')} over an hour ago, account still present` },
   'storage.backlog': { label: 'Storage cleanup', problem: (n: number) => `${count(n, 'file is', 'files are')} over a day past their removal date (storage-sweep)` },
+  'app.crashes': { label: 'App crashes', problem: (n: number) => `${count(n, 'crash or failed screen', 'crashes or failed screens')} in preview/production builds in the last hour (console: System health)` },
   'rollout.arrival_only': { label: 'Arrival-only pilot', problem: (n: number) => `${count(n, 'venue setting or booking offers', 'venue settings or bookings offer')} online payment` },
 } as const;
 export type OpsCheckName = keyof typeof OPS_CHECKS;

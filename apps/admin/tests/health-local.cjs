@@ -39,6 +39,7 @@ async function main() {
   let stage = 'startup';
   let cleanupFailed = false;
   let snapshot = null;
+  const crashIds = [randomUUID(), randomUUID()];
   const check = (result, message) => { assert.ok(!result.error, message); return result.data; };
   const literal = (rows) => `'${JSON.stringify(rows ?? []).replace(/'/g, "''")}'::jsonb`;
 
@@ -207,12 +208,24 @@ async function main() {
     assert.ok(home.includes('Monitor stopped; last ran 20 minutes ago'), 'Overview card says the monitor stopped.');
     console.log('PASS: a monitor silent for 20 minutes is called stopped on the page and the Overview card.');
 
+    stage = 'app crashes';
+    // T51d: one crash group from a preview and a development build (the crash-reports harness covers the function itself).
+    sql(`insert into private.app_crashes(id, kind, fingerprint, name, message, stack, route, app_version, variant, os, os_version, occurred_at) values
+      ('${crashIds[0]}', 'fatal', repeat('c', 64), 'TypeError', 'No booking for <email>', 'TypeError: boom at load (index.bundle:1:2345)', '/rental/booking/[id]', '0.1.0', 'preview', 'ios', '18.6', clock_timestamp()),
+      ('${crashIds[1]}', 'fatal', repeat('c', 64), 'TypeError', 'No booking for <email>', 'TypeError: boom at load (index.bundle:1:2345)', '/rental/booking/[id]', '0.1.0', 'development', 'ios', '18.6', clock_timestamp());`);
+    html = await page(jars.admin);
+    for (const shown of ['App crashes', '2 reports in the last 7 days', 'TypeError: No booking for &lt;email&gt;', '1 preview · 1 development', '<code>/rental/booking/[id]</code>',
+      'iOS 18.6', 'TypeError: boom at load (index.bundle:1:2345)', '1 crash or failed screen in preview/production builds in the last hour']) {
+      assert.ok(html.includes(shown), `The crash section shows ${shown}.`);
+    }
+    console.log('PASS: App crashes: a preview and a development report grouped (2 reports, "1 preview · 1 development"), scrubbed message, route, build, stack; app.crashes warns live.');
+
     stage = 'privacy and bundle';
     for (const hidden of [users.player.id, users.player.email, users.moderator.email, settings.SERVICE_ROLE_KEY]) assert.ok(!html.includes(hidden), 'No IDs, other emails or keys on the page.');
     const staticDir = path.join(root, 'apps/admin/.next/static');
     const bundle = fs.readdirSync(staticDir, { recursive: true }).filter((file) => String(file).endsWith('.js'))
       .map((file) => fs.readFileSync(path.join(staticDir, String(file)), 'utf8')).join('\n');
-    for (const name of ['ADMIN_SUPABASE_SECRET_KEY', 'ops_admin_read', 'readOpsAdminView']) assert.ok(!bundle.includes(name), `The client bundle never has ${name}.`);
+    for (const name of ['ADMIN_SUPABASE_SECRET_KEY', 'ops_admin_read', 'readOpsAdminView', 'crash_admin_read', 'readCrashAdminView']) assert.ok(!bundle.includes(name), `The client bundle never has ${name}.`);
     assert.ok(!serverLog.includes(users.player.email) && !serverLog.includes(settings.SERVICE_ROLE_KEY), 'Nothing sensitive in the server log.');
 
     stage = 'revocation';
@@ -230,6 +243,7 @@ async function main() {
       const list = ids.map((id) => `'${id}'::uuid`).join(',');
       try { sql(`delete from private.account_deletions where user_id in (${list}); delete from private.account_roles where user_id in (${list});`); } catch { cleanupFailed = true; }
     }
+    try { sql(`delete from private.app_crashes where id in ('${crashIds.join("','")}');`); } catch { cleanupFailed = true; }
     for (const id of ids) {
       try { if ((await service.auth.admin.deleteUser(id)).error) cleanupFailed = true; } catch { cleanupFailed = true; }
     }

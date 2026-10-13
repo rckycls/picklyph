@@ -53,3 +53,18 @@ test('without pg_cron the run checks say so; job states read missing, inactive o
   assert.equal(rows.find((row) => row.check === 'cron.jobs').live, 'fail');
   assert.deepEqual([job('ops-monitor', { present: false, active: false }), job('ops-monitor', { active: false }), job('ops-monitor')].map(jobStateLabel), ['Missing', 'Inactive', 'Active']);
 });
+
+test('app crashes (T51d): builds listed live first, and only crashes or failed screens from live builds alert', () => {
+  const { CRASH_KIND_LABEL, crashAlerts, crashVariants } = require('../src/lib/health.ts');
+  const { CRASH_KINDS, readCrashAdminView } = require('@picklyph/domain/src/crash.ts');
+  assert.deepEqual(Object.keys(CRASH_KIND_LABEL).sort(), [...CRASH_KINDS].sort());
+  const group = (patch) => readCrashAdminView({ at, days: 7, total: 9, groups: [{ fingerprint: 'b'.repeat(64), kind: 'fatal', name: 'TypeError', message: 'x',
+    reports: 4, development: 1, preview: 0, production: 3, first_seen: at, last_seen: at, app_version: '0.1.0', os: 'ios', os_version: '18.6',
+    route: null, stack: null, component_stack: null, ...patch }] }).groups[0];
+  assert.equal(crashVariants(group()), '3 production · 1 development');
+  assert.equal(crashVariants(group({ development: 0, preview: 2, production: 2 })), '2 production · 2 preview');
+  assert.equal(crashAlerts(group()), true);
+  assert.equal(crashAlerts(group({ kind: 'render' })), true);
+  assert.equal(crashAlerts(group({ kind: 'error' })), false, 'other errors are listed only');
+  assert.equal(crashAlerts(group({ development: 4, production: 0 })), false, 'development builds never alert');
+});

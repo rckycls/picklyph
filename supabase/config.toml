@@ -104,3 +104,8 @@ import_map = "./functions/deno.json"
 # T51b storage cleanup, called daily by pg_cron through pg_net; it requires the STORAGE_SWEEP_SECRET bearer, never a user token.
 verify_jwt = false
 import_map = "./functions/deno.json"
+
+[functions.crash-reports]
+# T51d anonymous mobile crash reports: no bearer is read; guests are limited by the trusted ingress source (crash-report).
+verify_jwt = false
+import_map = "./functions/deno.json"

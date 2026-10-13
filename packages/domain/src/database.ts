@@ -19,6 +19,7 @@ import type { RentalBooking, RentalBookingPage, RentalBookingResult, RentalQuote
 import type { CancellationReason } from './cancellation.ts';
 import type { OpsAlert, OpsCheck, OpsSignalKind, OpsSignalSource } from './ops.ts';
 import type { StorageSweepItem } from './storageSweep.ts';
+import type { CrashRecord } from './crash.ts';
 import type { PrelaunchRegisterResult, PrelaunchRegistration } from './prelaunch.ts';
 import type { AdminRegistrationPage, RegistrationEraseResult, RegistrationRotateResult, RegistrationStatus } from './prelaunchAdmin.ts';
 
@@ -195,6 +196,9 @@ export interface Database {
       ops_alerts_confirm: { Args: { alerts: Pick<OpsAlert, 'check' | 'status'>[] }; Returns: { confirmed: number } };
       // T51c console System health page (admin only); parsed strictly by readOpsAdminView.
       ops_admin_read: { Args: { actor_user_id: string }; Returns: unknown };
+      // T51d crash-reports function (service_role); the console's App crashes section parses readCrashAdminView.
+      crash_report_record: { Args: { report: CrashRecord }; Returns: unknown };
+      crash_admin_read: { Args: { actor_user_id: string }; Returns: unknown };
       // T51b: the storage-sweep worker parses both replies strictly (storageSweep.ts).
       storage_sweep_due: { Args: { batch_limit?: number }; Returns: unknown };
       storage_sweep_confirm: { Args: { items: StorageSweepItem[] }; Returns: unknown };

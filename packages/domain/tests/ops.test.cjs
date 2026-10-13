@@ -27,7 +27,8 @@ test('the contract matches the migrations: every SQL check is named here, and th
     .filter((entry) => entry.isDirectory() && !['_shared', 'tests', 'ops-monitor'].includes(entry.name)).map((entry) => entry.name).sort();
   assert.deepEqual(served, [...OPS_SIGNAL_SOURCES].sort(), 'every served function except the monitor reports signals');
   assert.deepEqual([...migration.matchAll(/kind (?:not )?in \(([^)]*)\)/g)].map((m) => m[1].replace(/\s/g, '')), Array(2).fill(OPS_SIGNAL_KINDS.map((k) => `'${k}'`).join(',')));
-  assert.deepEqual([...signals.matchAll(/kind (?:not )?in \(([^)]*)\)/g)].map((m) => m[1].replace(/\s/g, '')), [OPS_SIGNAL_KINDS.map((k) => `'${k}'`).join(',')]);
+  // signal_kind only: T51d's migration also checks crash kinds.
+  assert.deepEqual([...signals.matchAll(/signal_kind (?:not )?in \(([^)]*)\)/g)].map((m) => m[1].replace(/\s/g, '')), [OPS_SIGNAL_KINDS.map((k) => `'${k}'`).join(',')]);
   for (const name of OPS_CHECK_NAMES) assert.ok(isOpsCheckName(name));
   assert.ok(!isOpsCheckName('toString') && !isOpsCheckName('constructor'), 'own names only');
 });

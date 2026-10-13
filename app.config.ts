@@ -56,6 +56,8 @@ const config: ExpoConfig = {
     }],
   ],
   extra: {
+    // Crash reports (T51d) say which build they came from; only preview and production builds alert.
+    variant: appVariant,
     maps: { iosGoogleMapsConfigured: mapsConfigured },
     eas: { projectId: easProjectId },
   },

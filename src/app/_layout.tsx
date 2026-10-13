@@ -10,9 +10,15 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { colors } from '@/theme/colors';
 import { fonts } from '@/theme/typography';
 import { AuthProvider } from '@/features/auth/AuthProvider';
+import { CrashBoundary } from '@/features/crash/CrashBoundary';
+import { CrashRoute } from '@/features/crash/CrashRoute';
+import { startCrashReporting } from '@/features/crash/crashLive';
 import { NotificationLinks } from '@/features/notifications/NotificationLinks';
 import { PushRegistration } from '@/features/notifications/usePushRegistration';
 import { OwnerModeProvider } from '@/features/owner/OwnerMode';
+
+// T51d: anonymous crash reports, installed before the first render (docs/monitoring.md#mobile-crash-reports-t51d).
+startCrashReporting();
 
 // Owner screens sit directly in the root stack (no nested owner stack), so the first one
 // opened from a tab still gets the native back button. Each route checks its required access.
@@ -41,42 +47,45 @@ export default function RootLayout() {
   );
   return (
     <SafeAreaProvider>
-      <AuthProvider>
-        <PushRegistration />
-        <OwnerModeProvider>
-          <NotificationLinks />
-          <StatusBar style="dark" />
-          <Stack
-            screenOptions={{
-              headerShown: false,
-              contentStyle: { backgroundColor: colors.background },
-            }}
-          >
-            <Stack.Screen name="(tabs)" />
-            <Stack.Screen name="welcome" options={{ gestureEnabled: false, animation: 'none' }} />
-            <Stack.Screen name="rental/venue/[id]" options={ownerHeader('Reserve a court')} />
-            <Stack.Screen name="rental/booking/[id]" options={ownerHeader('Rental booking')} />
-            <Stack.Screen name="play/venue/[id]" options={ownerHeader('Open play')} />
-            <Stack.Screen name="play/session/[id]" options={ownerHeader('Join open play')} />
-            <Stack.Screen name="play/booking/[id]" options={ownerHeader('Open-play group')} />
-            <Stack.Screen name="preferences" options={ownerHeader('Preferences')} />
-            <Stack.Screen name="notifications" options={ownerHeader('Booking alerts')} />
-            <Stack.Screen name="delete-account" options={ownerHeader('Delete account')} />
-            <Stack.Screen name="report/[id]" options={ownerHeader('Report a listing')} />
-            <Stack.Screen name="owner/submit" options={ownerHeader('Add your venue')} />
-            <Stack.Screen name="owner/claim/[id]" options={ownerHeader('Claim a listing')} />
-            <Stack.Screen name="owner/code" options={ownerHeader('Claim with a code')} />
-            <Stack.Screen name="owner/venues/index" options={ownerHeader('Your venues')} />
-            <Stack.Screen name="owner/venues/[id]" options={ownerHeader('Edit venue')} />
-            <Stack.Screen name="owner/calendar/[id]" options={ownerHeader('Court calendar')} />
-            <Stack.Screen name="owner/hours/[id]" options={ownerHeader('Hours and closures')} />
-            <Stack.Screen name="owner/sessions/[id]" options={ownerHeader('Open-play sessions')} />
-            <Stack.Screen name="owner/requests/[id]" options={ownerHeader('Booking requests')} />
-            <Stack.Screen name="owner/desk/[id]" options={ownerHeader('Front desk')} />
-            <Stack.Screen name="owner/entry/[id]" options={ownerHeader('Outside booking')} />
-          </Stack>
-        </OwnerModeProvider>
-      </AuthProvider>
+      <CrashRoute />
+      <CrashBoundary>
+        <AuthProvider>
+          <PushRegistration />
+          <OwnerModeProvider>
+            <NotificationLinks />
+            <StatusBar style="dark" />
+            <Stack
+              screenOptions={{
+                headerShown: false,
+                contentStyle: { backgroundColor: colors.background },
+              }}
+            >
+              <Stack.Screen name="(tabs)" />
+              <Stack.Screen name="welcome" options={{ gestureEnabled: false, animation: 'none' }} />
+              <Stack.Screen name="rental/venue/[id]" options={ownerHeader('Reserve a court')} />
+              <Stack.Screen name="rental/booking/[id]" options={ownerHeader('Rental booking')} />
+              <Stack.Screen name="play/venue/[id]" options={ownerHeader('Open play')} />
+              <Stack.Screen name="play/session/[id]" options={ownerHeader('Join open play')} />
+              <Stack.Screen name="play/booking/[id]" options={ownerHeader('Open-play group')} />
+              <Stack.Screen name="preferences" options={ownerHeader('Preferences')} />
+              <Stack.Screen name="notifications" options={ownerHeader('Booking alerts')} />
+              <Stack.Screen name="delete-account" options={ownerHeader('Delete account')} />
+              <Stack.Screen name="report/[id]" options={ownerHeader('Report a listing')} />
+              <Stack.Screen name="owner/submit" options={ownerHeader('Add your venue')} />
+              <Stack.Screen name="owner/claim/[id]" options={ownerHeader('Claim a listing')} />
+              <Stack.Screen name="owner/code" options={ownerHeader('Claim with a code')} />
+              <Stack.Screen name="owner/venues/index" options={ownerHeader('Your venues')} />
+              <Stack.Screen name="owner/venues/[id]" options={ownerHeader('Edit venue')} />
+              <Stack.Screen name="owner/calendar/[id]" options={ownerHeader('Court calendar')} />
+              <Stack.Screen name="owner/hours/[id]" options={ownerHeader('Hours and closures')} />
+              <Stack.Screen name="owner/sessions/[id]" options={ownerHeader('Open-play sessions')} />
+              <Stack.Screen name="owner/requests/[id]" options={ownerHeader('Booking requests')} />
+              <Stack.Screen name="owner/desk/[id]" options={ownerHeader('Front desk')} />
+              <Stack.Screen name="owner/entry/[id]" options={ownerHeader('Outside booking')} />
+            </Stack>
+          </OwnerModeProvider>
+        </AuthProvider>
+      </CrashBoundary>
     </SafeAreaProvider>
   );
 }

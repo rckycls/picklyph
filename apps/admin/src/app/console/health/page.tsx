@@ -2,8 +2,9 @@ import Link from 'next/link';
 import { formatManilaDateTime } from '@picklyph/domain';
 import type { OpsCheckState, OpsStatus } from '@picklyph/domain/src/ops.ts';
 import { readDirectoryAccess } from '@/lib/directory-server';
-import { readHealthView } from '@/lib/health-server';
-import { JOB_LABEL, SIGNAL_LABEL, STATUS_LABEL, agoText, checkRows, jobStateLabel, monitorFreshness, problemCounts } from '@/lib/health';
+import { readCrashView, readHealthView } from '@/lib/health-server';
+import { CRASH_KIND_LABEL, JOB_LABEL, SIGNAL_LABEL, STATUS_LABEL, agoText, checkRows, crashAlerts, crashVariants, jobStateLabel, monitorFreshness,
+  problemCounts } from '@/lib/health';
 import { AccessProblem, Unavailable } from '@/components/console-state';
 import { PageHeader } from '@/components/page-header';
 
@@ -31,7 +32,8 @@ export default async function HealthPage() {
   // Layouts may persist in the router. Every data-bearing page verifies independently.
   const access = await readDirectoryAccess();
   if (access.status !== 'allowed') return <AccessProblem area="health" status={access.status} />;
-  const view = await readHealthView(access.actorId).catch(() => null);
+  // The crash section fails on its own (for example a database without the T51d migration); the rest of the page stays.
+  const [view, crashes] = await Promise.all([readHealthView(access.actorId).catch(() => null), readCrashView(access.actorId).catch(() => null)]);
   if (!view) return <Unavailable area="health" />;
   const freshness = monitorFreshness(view);
   const rows = checkRows(view);
@@ -93,6 +95,30 @@ export default async function HealthPage() {
             <td className="num">{signal.last_day}</td>
             <td className="nowrap">{stamp(signal.last_at)}</td>
           </tr>)}</tbody></table></div>}
+    </section>
+
+    <section className="panel" aria-labelledby="crashes-heading">
+      <div className="panel-head"><h2 id="crashes-heading">App crashes <span className="count">{crashes
+        ? `${crashes.total} ${crashes.total === 1 ? 'report' : 'reports'} in the last ${crashes.days} days` : 'Last 7 days'}</span></h2></div>
+      {!crashes ? <p className="panel-empty">Crash reports are unavailable on this database. If its crash-report migration is not applied yet, push it as in docs/monitoring.md.</p>
+        : crashes.groups.length === 0 ? <p className="panel-empty">The app reported no crashes, failed screens or errors in the last 7 days.</p>
+          : <div className="table-wrap"><table className="data-table">
+            <thead><tr><th scope="col">Crash</th><th scope="col" className="num">Reports</th><th scope="col">Latest build</th><th scope="col">Seen</th><th scope="col">Details</th></tr></thead>
+            <tbody>{crashes.groups.map((group) => <tr key={group.fingerprint}>
+              <td><span className={`badge ${crashAlerts(group) ? 'health-fail' : 'neutral'}`}>{CRASH_KIND_LABEL[group.kind]}</span>
+                <span className="cell-sub crash-text">{`${group.name}: ${group.message || '(no message)'}`}</span>
+                {group.route && <span className="cell-sub"><code>{group.route}</code></span>}</td>
+              <td className="num">{group.reports}<span className="cell-sub">{crashVariants(group)}</span></td>
+              <td className="nowrap">{group.app_version}<span className="cell-sub">{`${group.os === 'ios' ? 'iOS' : 'Android'} ${group.os_version}`}</span></td>
+              <td className="nowrap">{stamp(group.last_seen)}<span className="cell-sub">{`First ${stamp(group.first_seen)}`}</span></td>
+              <td>{group.stack || group.component_stack
+                ? <details><summary>Stack</summary>
+                  {group.stack && <pre className="crash-stack">{group.stack}</pre>}
+                  {group.component_stack && <pre className="crash-stack">{group.component_stack}</pre>}</details>
+                : DASH}</td>
+            </tr>)}</tbody></table></div>}
+      <p className="panel-note">{`Anonymous reports from the app, scrubbed of contact details and IDs, kept 30 days. Crashes and failed screens from preview and production builds raise the App crashes check; development builds and other errors are only listed here.${
+        crashes && crashes.groups.length === 50 ? ' Showing the 50 most recently seen.' : ''}`}</p>
     </section>
   </>;
 }

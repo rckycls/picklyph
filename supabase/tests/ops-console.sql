@@ -70,18 +70,18 @@ select oc_test.assert_that((select array_agg(k order by k) from jsonb_object_key
 set local role service_role;
 insert into oc_runs select 'first', (public.ops_monitor_run('[{"check":"redis.reachable","status":"ok","count":0},{"check":"redis.isolation","status":"fail","count":1}]')->>'at')::timestamptz;
 reset role;
-select oc_test.assert_that((select count(*) from private.ops_alert_state x where x.checked_at = oc_test.ran('first')) = 14,
-  'the first run stamps its twelve database checks and both Redis checks');
+select oc_test.assert_that((select count(*) from private.ops_alert_state x where x.checked_at = oc_test.ran('first')) = 15,
+  'the first run stamps its thirteen database checks and both Redis checks');
 set local role service_role;
 select public.ops_alerts_confirm('[{"check":"cron.jobs","status":"fail"}]');
 insert into oc_runs select 'second', (public.ops_monitor_run('[]')->>'at')::timestamptz;
 insert into oc_view values ('ran', public.ops_admin_read(oc_test.u('1')));
 reset role;
-select oc_test.assert_that((select count(*) from private.ops_alert_state x where x.checked_at = oc_test.ran('second')) = 12
+select oc_test.assert_that((select count(*) from private.ops_alert_state x where x.checked_at = oc_test.ran('second')) = 13
   and (select count(*) from private.ops_alert_state x where x.check_name like 'redis.%' and x.checked_at = oc_test.ran('first')) = 2,
   'a run without Redis checks leaves their time alone');
 select oc_test.assert_that((oc_test.view('ran')->>'monitor_ran_at')::timestamptz = oc_test.ran('second'), 'the monitor last ran at its latest stamp');
-select oc_test.assert_that(jsonb_array_length(oc_test.view('ran')->'state') = 14, 'every tracked check is listed');
+select oc_test.assert_that(jsonb_array_length(oc_test.view('ran')->'state') = 15, 'every tracked check is listed');
 select oc_test.assert_that(oc_test.state(oc_test.view('ran'), 'cron.jobs') = jsonb_build_object('check', 'cron.jobs',
     'status', 'fail', 'count', 5, 'since', oc_test.ran('first'), 'checked_at', oc_test.ran('second'),
     'notified_status', 'fail', 'notified_at', (select notified_at from private.ops_alert_state where check_name = 'cron.jobs')),

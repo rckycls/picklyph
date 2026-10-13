@@ -2,8 +2,9 @@
 
 The backend checks itself every five minutes and posts to the operators' Discord channel when
 something breaks. It posts again every six hours while the problem lasts, and once when it clears.
-Mobile crash reporting and paging are not part of this (T51). T51b added the storage sweep's job and
-backlog check; T51c added the console's [System health](#console-system-health-t51c) page.
+Paging is not part of this. T51b added the storage sweep's job and backlog check; T51c added the
+console's [System health](#console-system-health-t51c) page; T51d added
+[mobile crash reports](#mobile-crash-reports-t51d) and the `app.crashes` check.
 
 ```
 Edge functions ──5xx / 503 / limiter outage──▶ ops_signal_record ──▶ private.ops_signals
@@ -36,6 +37,7 @@ values, because alerts leave the system. Thresholds are in the migration
 | `redis.isolation` | fail at 1 | Another environment's marker is in this Redis database: two environments share it (H02 requires separate databases) | give each environment its own database |
 | `privacy.deletions` | fail at 1 | An account deletion started over an hour ago and its Auth user still exists (storage or Auth step failed) | `account-deletion` logs; the user retries, or an operator finishes it |
 | `storage.backlog` | 1 / 25 | Files the daily storage sweep should have removed over a day ago: proof photos 31+ days after their decision, unreferenced objects 48+ hours old (T51b) | the `storage-sweep` job, Vault `storage_sweep_*`, the function's 502 `storage_refused` replies in `net._http_response` ([privacy](privacy.md#storage-cleanup-t51b)) |
+| `app.crashes` | 1 / 10 | App crashes and failed screens reported by preview and production builds in the last hour (development builds never count; T51d, migration `20261014090000_crash_reports.sql`) | the console's System health page, **App crashes** ([below](#mobile-crash-reports-t51d)) |
 | `rollout.arrival_only` | fail at 1 | An active merchant, a stored online/both policy, or a live booking snapshot offering online payment during the pay-on-arrival pilot | **replace this check when online payments resume** |
 
 The Redis checks run in the function: it pings with the same settings as the rate guard
@@ -116,6 +118,56 @@ problems** card (live problems plus the monitor's Redis results) with the monito
 **Staging (2026-10-14):** the migration is applied. The monitor is not set up there yet, so the page says
 no monitor run is recorded and shows its own live checks.
 
+## Mobile crash reports (T51d)
+
+In-house and anonymous: no third-party service, account or native module.
+
+```
+app error ─▶ global handler / root boundary ─▶ scrubbed report ─▶ device queue (AsyncStorage)
+  ─▶ POST crash-reports (public key only) ─▶ crash_report_record ─▶ private.app_crashes
+  ─▶ app.crashes check (monitor, Discord) · crash_admin_read (console, System health)
+```
+
+**On the phone** (`src/features/crash/`, installed in `src/app/_layout.tsx`):
+
+- A global handler records every error React Native's own handler sees (`fatal` or `error`), then
+  hands it on unchanged. A fatal error is passed on only after its report is saved, or after 1.5
+  seconds, because React Native ends the app right after.
+- A root boundary records render errors (`render`) with React's component stack and shows
+  "Something went wrong" with **Try again**, which remounts the app below it.
+- A report holds the error name, message and stack, the component stack (render only), the screen's
+  path with IDs replaced (`/rental/booking/[id]`), the app version, the build variant (`APP_VARIANT`
+  through `extra.variant`), the OS and its version, and the time. Text is cut to fixed limits and
+  scrubbed of emails, phone-like numbers (10+ digits), UUIDs, JWTs, `Bearer` values, Supabase keys,
+  Expo push tokens, IP addresses and URL query strings (`scrubCrashText` in the domain `crash.ts`).
+  No account, device ID or token is sent; the request carries only the public key.
+- The queue keeps at most 10 reports for at most 7 days. It sends at launch (after 3 seconds), on every
+  return to the foreground and right after a non-fatal error. A 2xx answer, or a 400, 413 or 415 refusal,
+  removes the report; anything else (no answer, 429, 5xx, a function not deployed yet) keeps it for the
+  next try. The same error (kind, name, message) is recorded once a minute.
+
+**On the server:** `crash-reports` accepts POST JSON up to 16 KiB, reads no bearer, parses and scrubs
+again, limits by the trusted ingress source (`crash-report`, 20 a minute per source; all guests share
+one bucket until `DISCOVERY_IP_SOURCE=cloudflare`) and keeps accepting in a Redis outage (reports touch no
+bookings or payments; `edge.limiter` still alerts). It computes the grouping fingerprint (kind, name,
+message with numbers blanked, first five stack frames or three components) and stores through the
+service-only `crash_report_record`: one row per report ID (a resend is recognised), at most 2,000 stored a
+day. The daily privacy sweep removes reports after 30 days ([privacy](privacy.md#what-is-kept-and-for-how-long)).
+
+**Console:** System health's **App crashes** section (admins only; `crash_admin_read` rechecks the role
+and writes nothing) lists the last 7 days grouped by fingerprint, at most 50 groups, most recently seen
+first: kind, name and message, reports per build variant, the latest version, OS and screen, first and
+last seen, and the latest stack. Red badges mark groups that count toward `app.crashes`.
+
+**Limits:** crashes in native code that never reach JavaScript are not reported; release stacks are
+minified (no symbolication, so a new build starts new groups); unhandled promise rejections are not
+captured. The iPhone check needs a build with this JavaScript: a development build after a Metro reload
+reports as `development` (listed, never alerting); preview builds report as `preview`.
+
+**Rollout (T50 or a staging push):** push `20261014090000_crash_reports.sql` and deploy
+`crash-reports` (no new secret). Until the function is deployed, phones keep their reports and send them
+later.
+
 ## Setup per environment (operator)
 
 1. In Discord, create a channel webhook (channel settings → Integrations → Webhooks) and copy its
@@ -164,5 +216,13 @@ no monitor run is recorded and shows its own live checks.
   a fresh page, a recorded Edge signal and an unfinished deletion shown live, a monitor run and its
   posts, a 20-minute-silent monitor called stopped, a revoked admin refused. It restores alert state
   and signals exactly and removes its accounts.
+- `npm run test:crashes` (T51d): the PGlite suite `supabase/tests/crash-reports.sql` (grants, the strict
+  contract, one row per report, the daily cap, `app.crashes`, the admin read's groups and windows,
+  30-day retention; 25 mutations must each fail it), the function's handler tests and the mobile queue
+  and handler tests (including the shipped queue against the real handler). `npm run test:crashes:local`:
+  the same SQL on Docker, the served function (GET 405, 413, 400, 415), the shipped mobile queue sending
+  as the app does, a monitor run raising `app.crashes` (a development report not counted) and the admin
+  read (moderator, player and anon refused). `npm run test:health:local` also checks the page's App
+  crashes section.
 - Other local harnesses' served functions leave a few signal rows behind (harmless; pruned after two
   days by monitor runs).

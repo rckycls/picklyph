@@ -30,7 +30,7 @@
     "test:calendar:local": "node supabase/tests/calendar-local.cjs",
     "test:rentals": "node --test supabase/tests/rentals.test.cjs",
     "test:rentals:local": "node supabase/tests/rentals-local.cjs",
-    "functions:check": "npm exec --yes --package=deno@2.9.6 -- deno check --config supabase/functions/deno.json supabase/functions/venue-search/index.ts supabase/functions/owner-submissions/index.ts supabase/functions/owner-venues/index.ts supabase/functions/owner-schedules/index.ts supabase/functions/_shared/allocations.ts supabase/functions/rental-bookings/index.ts supabase/functions/owner-sessions/index.ts supabase/functions/session-bookings/index.ts supabase/functions/venue-reports/index.ts supabase/functions/account-deletion/index.ts supabase/functions/push-devices/index.ts supabase/functions/push-dispatch/index.ts supabase/functions/ops-monitor/index.ts supabase/functions/storage-sweep/index.ts",
+    "functions:check": "npm exec --yes --package=deno@2.9.6 -- deno check --config supabase/functions/deno.json supabase/functions/venue-search/index.ts supabase/functions/owner-submissions/index.ts supabase/functions/owner-venues/index.ts supabase/functions/owner-schedules/index.ts supabase/functions/_shared/allocations.ts supabase/functions/rental-bookings/index.ts supabase/functions/owner-sessions/index.ts supabase/functions/session-bookings/index.ts supabase/functions/venue-reports/index.ts supabase/functions/account-deletion/index.ts supabase/functions/push-devices/index.ts supabase/functions/push-dispatch/index.ts supabase/functions/ops-monitor/index.ts supabase/functions/storage-sweep/index.ts supabase/functions/crash-reports/index.ts",
     "functions:lint": "npm exec --yes --package=deno@2.9.6 -- deno lint --config supabase/functions/deno.json supabase/functions",
     "test:functions": "npm exec --yes --package=deno@2.9.6 -- deno test --allow-env --config supabase/functions/deno.json supabase/functions/tests",
     "test:directory:local": "docker exec -i supabase_db_picklyph psql -U postgres -d postgres -v ON_ERROR_STOP=1 -X -q < supabase/tests/directory.sql",
@@ -89,7 +89,9 @@
     "release:check": "node scripts/release-check.cjs",
     "test:release": "node --test scripts/__tests__/*.test.cjs",
     "test:storage-sweep": "node --test supabase/tests/storage-sweep.test.cjs supabase/tests/storage-sweep-handler.test.cjs",
-    "test:storage-sweep:local": "node supabase/tests/storage-sweep-local.cjs"
+    "test:storage-sweep:local": "node supabase/tests/storage-sweep-local.cjs",
+    "test:crashes": "node --test supabase/tests/crash-reports.test.cjs supabase/tests/crash-handler.test.cjs src/features/crash/__tests__/*.test.cjs",
+    "test:crashes:local": "node supabase/tests/crash-reports-local.cjs"
   },
   "dependencies": {
     "@expo-google-fonts/bricolage-grotesque": "0.4.1",

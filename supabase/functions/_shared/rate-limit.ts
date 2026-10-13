@@ -1,6 +1,6 @@
 /** Server-only. Principals MUST come from verified Auth or a trusted ingress. */
 export type RatePrincipal = { kind: 'user' | 'guest' | 'provider'; id: string };
-export type RateAction = 'discovery' | 'owner-lookup' | 'owner-submit' | 'owner-code' | 'owner-read' | 'owner-edit' | 'owner-ops' | 'hold-create' | 'checkout-create' | 'report-create' | 'account-delete' | 'push-register' | 'push-preferences' | 'cancel' | 'provider-webhook';
+export type RateAction = 'discovery' | 'owner-lookup' | 'owner-submit' | 'owner-code' | 'owner-read' | 'owner-edit' | 'owner-ops' | 'hold-create' | 'checkout-create' | 'report-create' | 'account-delete' | 'push-register' | 'push-preferences' | 'cancel' | 'crash-report' | 'provider-webhook';
 export type LimitReply = { success: boolean; limit: number; remaining: number; reset: number; reason?: string; pending?: Promise<unknown> };
 export type RateDecision = { allowed: boolean; status: 200 | 429 | 503; state: 'enforced' | 'degraded' | 'bypassed'; headers: Record<string, string> };
 export type RateBackend = (action: RateAction, principal: RatePrincipal, identifier: string) => Promise<LimitReply>;
@@ -28,6 +28,9 @@ export const RATE_POLICIES = {
   // Alert preferences (T45) are the caller's own switches and create nothing else, so they continue in an outage too.
   'push-preferences': { user: 30, guest: 0, outage: 'continue' },
   cancel: { user: 30, guest: 0, outage: 'continue' },
+  // Crash reports (T51d) are anonymous, so only guests send them, limited by the trusted ingress source. They touch no
+  // bookings or payments and the database caps them at 2,000 a day, so they keep arriving in an outage.
+  'crash-report': { user: 0, guest: 20, outage: 'continue' },
   'provider-webhook': { user: 0, guest: 0, outage: 'continue' },
 } as const;
 
@@ -40,7 +43,7 @@ export function createRateGuard(options: {
   return async (action: RateAction, principal: RatePrincipal): Promise<RateDecision> => {
     if (!principal.id || principal.id.length > 128 ||
       (action === 'provider-webhook' ? principal.kind !== 'provider' :
-        principal.kind === 'provider' || (action !== 'discovery' && principal.kind !== 'user'))) {
+        principal.kind === 'provider' || (action === 'crash-report' ? principal.kind !== 'guest' : action !== 'discovery' && principal.kind !== 'user'))) {
       throw new Error('A verified principal is required for this action.');
     }
     // Call ONLY after provider signature verification; never reject valid events

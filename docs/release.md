@@ -143,8 +143,8 @@ npm run release:check -- --variant production --linked
    `supabase db push --dry-run` and `supabase db push`. No seeds.
 4. Production Upstash database (H02). Set the function secrets above, then run the secrets check
    against staging's list.
-5. Deploy the thirteen functions in `supabase/config.toml` (`verify_jwt = false`, import map). Then set up
-   pg_net, Vault and the cron jobs (`booking-expiry-sweep`, `privacy-retention-sweep`, `push-dispatch`,
+5. Deploy the fourteen functions in `supabase/config.toml` (`verify_jwt = false`, import map; T51d's
+   `crash-reports` needs no new secret). Then set up pg_net, Vault and the cron jobs (`booking-expiry-sweep`, `privacy-retention-sweep`, `push-dispatch`,
    `ops-monitor`, `storage-sweep`) as in [notifications.md](notifications.md#rollout-and-operator-steps),
    [privacy.md](privacy.md#rollout-and-operator-notes), [privacy.md](privacy.md#storage-cleanup-t51b) and
    [monitoring.md](monitoring.md#setup-per-environment-operator); check that the first monitor post

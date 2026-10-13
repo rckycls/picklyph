@@ -55,3 +55,6 @@ export { CLAIM_CODE_ALPHABET, CLAIM_CODE_LENGTH, CLAIMED_REGISTRATION_RETENTION_
 export type { PrelaunchDuplicate, PrelaunchErrorReply, PrelaunchRegisterResult, PrelaunchRegistration, PrelaunchReply, PrelaunchRequest, RegistrationCourts, RegistrationRole } from './prelaunch';
 export { MAX_REGISTRATION_BATCH, MAX_REGISTRATION_BATCH_BYTES, REGISTRATION_STATUSES, codeDelivered, readRegistrationEmailFilter, readRegistrationErase, readRegistrationSend, readRegistrationStatus } from './prelaunchAdmin';
 export type { AdminRegistration, AdminRegistrationPage, RegistrationAction, RegistrationBatchResult, RegistrationEraseResult, RegistrationOutcome, RegistrationRotateResult, RegistrationSendItem, RegistrationStatus } from './prelaunchAdmin';
+export { CRASH_DAILY_CAP, CRASH_KINDS, CRASH_LIMITS, CRASH_OS, CRASH_QUEUE_DAYS, CRASH_QUEUE_LIMIT, CRASH_RETENTION_DAYS, CRASH_VARIANTS, CRASH_VIEW_DAYS, CrashInputError, MAX_CRASH_BYTES, MAX_CRASH_GROUPS,
+  crashFingerprint, normalizeCrashRoute, readCrashAdminView, readCrashReport, scrubCrashText } from './crash';
+export type { CrashAdminView, CrashGroup, CrashKind, CrashOs, CrashRecord, CrashReport, CrashVariant } from './crash';
