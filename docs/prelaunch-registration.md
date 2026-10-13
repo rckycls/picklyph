@@ -89,6 +89,11 @@ For the iPhone (Safari), run it on the network with `PICKLY_ENV=local`, `PRELAUN
 - `npm run test:domain`: contract readers and claim-code normalization.
 - `npm run test:web:local` (after `npm run web:build`, local Docker Supabase running with the migration applied): Docker SQL suite, bundle scan, then the real production server with loopback Upstash and email stand-ins and Cloudflare's test keys: pages and CSP, cross-site/oversized refusal, registration → private draft (anon read, bounds read and search see nothing; anon can't call the commands) → one email whose code matches the stored hash → retry returns the original → failed send then rotation → duplicate acknowledgement → 429 and Redis outage 503 with no write → no code in logs → always-fail Turnstile 403. It removes its own rows.
 
+## Rollout status
+
+- **Local Docker** and **hosted staging** (2026-10-13, at the user's request after a dry run listing only `20261013120000`; no seeds or roles) have the migration. On staging, anonymous calls to `prelaunch_register` and `prelaunch_email_sent` answer 401/42501 and `venue_registrations` is not exposed. Staging is for trials: point a local or preview run of the page at it, never live registrations.
+- **Production**: the migration goes with T50's production project. The page is not deployed anywhere yet (H13).
+
 ## Going live (H13) and next steps
 
 1. H13: domain and DNS; Resend with the domain verified (SPF/DKIM) and a server key; a Vercel project for `apps/web` (root `apps/web`, the npm workspace install) on the domain; a referrer-restricted browser Maps key; Turnstile keys for the domain.
