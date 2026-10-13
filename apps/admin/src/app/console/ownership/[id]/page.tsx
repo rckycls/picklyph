@@ -42,7 +42,7 @@ function Registration({ registration, admin }: { registration: RegistrationRevie
       <dt>Email</dt><dd>{contact.email}</dd>
       <dt>Mobile</dt><dd>{contact.phone ?? 'Not given'}</dd></>}</dl>
     {contact?.note && <><h3>Note on the registration</h3><p className="submitter-note">{contact.note}</p></>}
-    <p className="field-hint">{registration.erased ? 'The registration’s contact details were erased 30 days after the decision.'
+    <p className="field-hint">{registration.erased ? 'The registration’s contact details were erased (30 days after the decision, or earlier by an administrator).'
       : admin ? 'Private to administrators. The contact details are erased 30 days after the decision.'
       : 'The registrant’s contact details are visible to administrators only.'}</p></Panel>;
 }

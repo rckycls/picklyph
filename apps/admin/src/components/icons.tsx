@@ -4,6 +4,7 @@ const PATHS = {
   directory: <><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z" /><circle cx="12" cy="9.5" r="2.5" /></>,
   ownership: <><circle cx="9" cy="8" r="4" /><path d="M2 21a7 7 0 0 1 14 0" /><path d="m16 11 2 2 4-4" /></>,
   reports: <><path d="M5 21V4" /><path d="M5 4h12l-2.5 4 2.5 4H5" /></>,
+  registrations: <><rect x="5" y="4" width="14" height="17" rx="2" /><path d="M9 4V3h6v1" /><path d="M9 10h6M9 14h6M9 18h3" /></>,
   plus: <path d="M12 5v14M5 12h14" />,
   upload: <><path d="M12 15V4" /><path d="m7 9 5-5 5 5" /><path d="M5 15v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4" /></>,
   menu: <path d="M4 6h16M4 12h16M4 18h16" />,

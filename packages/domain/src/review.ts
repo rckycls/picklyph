@@ -96,7 +96,7 @@ export type RegistrationReview = {
   role: 'owner' | 'manager' | 'staff';
   /** The claiming account's email equalled the registration email when the code was redeemed. */
   email_matched: boolean;
-  /** True once the privacy sweep erased the contact details (30 days after the decision). */
+  /** True once the contact details were erased: by the privacy sweep 30 days after the decision, or earlier by an admin (T54b). */
   erased: boolean;
   /** Reads by admins only, until erased; always null for moderators. */
   contact: { owner_name: string; email: string; phone: string | null; note: string | null } | null;

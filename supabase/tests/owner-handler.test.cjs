@@ -48,7 +48,10 @@ function post(submission = claim, evidence = JPEG, extra = {}, headers = { autho
 test('mobile/admin source never references the server Maps key, evidence bucket or owner command RPCs (except the console evidence route)', () => {
   // T17: the console's server-only evidence route is the one reader outside the function, and only of the bucket.
   const evidenceReader = path.join(root, 'apps/admin/src/lib/ownership-handler.ts');
+  // T54b: the console sends new claim codes, so its settings reader (imported only by server-only modules) reads the code secret.
+  const codeSender = path.join(root, 'apps/admin/src/lib/registrations.ts');
   const forbidden = /GOOGLE_MAPS_SERVER_API_KEY|owner-evidence|owner_submit_(claim|venue)|owner_duplicate_candidates|owner_registration_check|owner_redeem_registration|PRELAUNCH_CODE_SECRET/;
+  const codeSenderImporters = [];
   function scan(directory) {
     for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
       if (['node_modules', '.next', '.expo', 'dist', '__tests__'].includes(entry.name)) continue;
@@ -56,12 +59,16 @@ test('mobile/admin source never references the server Maps key, evidence bucket 
       if (entry.isDirectory()) scan(file);
       else if (/\.[cm]?[jt]sx?$/.test(entry.name)) {
         const text = fs.readFileSync(file, 'utf8');
-        assert.ok(!forbidden.test(file === evidenceReader ? text.replaceAll('owner-evidence', '') : text), `Server-only owner detail in ${path.relative(root, file)}`);
+        const allowed = file === evidenceReader ? text.replaceAll('owner-evidence', '') : file === codeSender ? text.replaceAll('PRELAUNCH_CODE_SECRET', '') : text;
+        assert.ok(!forbidden.test(allowed), `Server-only owner detail in ${path.relative(root, file)}`);
+        if (/from '(\.\/|@\/lib\/)registrations'/.test(text)) codeSenderImporters.push(file);
       }
     }
   }
   scan(path.join(root, 'src')); scan(path.join(root, 'apps/admin/src'));
   assert.ok(fs.readFileSync(evidenceReader, 'utf8').startsWith("import 'server-only';"), 'The evidence reader stays server-only.');
+  assert.ok(codeSenderImporters.length > 0 && codeSenderImporters.every((file) => fs.readFileSync(file, 'utf8').startsWith("import 'server-only';")),
+    'Only server-only modules import the code sender.');
 });
 
 test('every owner command requires a verified bearer; identity never comes from the request', async () => {

@@ -21,6 +21,19 @@ export function normalizeClaimCode(input: unknown): string | null {
   return code;
 }
 
+/** A uniformly random claim code from the server's CSPRNG (rejection sampling keeps every symbol equally likely).
+ * Servers only: the registration page and the console (T54b) issue codes; the app never does. */
+export function generateClaimCode(random: (size: number) => Uint8Array = (size) => crypto.getRandomValues(new Uint8Array(size))): string {
+  const limit = 256 - (256 % CLAIM_CODE_ALPHABET.length);
+  let code = '';
+  while (code.length < CLAIM_CODE_LENGTH) {
+    for (const byte of random(16)) {
+      if (byte < limit && code.length < CLAIM_CODE_LENGTH) code += CLAIM_CODE_ALPHABET[byte % CLAIM_CODE_ALPHABET.length];
+    }
+  }
+  return code;
+}
+
 /** HMAC-SHA256 (hex) of the canonical code under PRELAUNCH_CODE_SECRET. Only this hash is ever stored or compared. */
 export async function hashClaimCode(secret: string, code: string): Promise<string> {
   const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);

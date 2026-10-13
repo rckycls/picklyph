@@ -10,6 +10,7 @@ import { SignoutButton } from './signout-button';
 const NAV: { href: string; label: string; icon: IconName; adminOnly?: boolean }[] = [
   { href: '/console', label: 'Overview', icon: 'overview' },
   { href: '/console/directory', label: 'Court directory', icon: 'directory', adminOnly: true },
+  { href: '/console/registrations', label: 'Pre-launch', icon: 'registrations', adminOnly: true },
   { href: '/console/ownership', label: 'Ownership review', icon: 'ownership' },
   { href: '/console/reports', label: 'Listing reports', icon: 'reports' },
 ];

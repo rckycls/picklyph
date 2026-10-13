@@ -20,6 +20,7 @@ import type { CancellationReason } from './cancellation.ts';
 import type { OpsAlert, OpsCheck, OpsSignalKind, OpsSignalSource } from './ops.ts';
 import type { StorageSweepItem } from './storageSweep.ts';
 import type { PrelaunchRegisterResult, PrelaunchRegistration } from './prelaunch.ts';
+import type { AdminRegistrationPage, RegistrationEraseResult, RegistrationRotateResult, RegistrationStatus } from './prelaunchAdmin.ts';
 
 // Schema-maintained PostgREST contract for the directory, authorization, owner-submission, ownership-review and owner-venue migrations.
 // Only the exposed public schema belongs in mobile code. PostGIS geometry is
@@ -201,6 +202,13 @@ export interface Database {
         Returns: PrelaunchRegisterResult;
       };
       prelaunch_email_sent: { Args: { registration_id: string; sent_version: number }; Returns: boolean };
+      // T54b console server only (service_role); each rechecks the admin role.
+      prelaunch_admin_read: {
+        Args: { actor_user_id: string; status_filter?: RegistrationStatus | null; email_filter?: string | null; after_created_at?: string | null; after_id?: string | null };
+        Returns: AdminRegistrationPage;
+      };
+      prelaunch_admin_rotate: { Args: { actor_user_id: string; registration_id: string; expected_version: number; code_hash: string }; Returns: RegistrationRotateResult };
+      prelaunch_admin_erase: { Args: { actor_user_id: string; registration_id: string }; Returns: RegistrationEraseResult };
       authorize_venue_management: {
         Args: { actor_user_id: string; target_venue_id: string };
         Returns: undefined;

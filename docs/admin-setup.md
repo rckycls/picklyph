@@ -28,6 +28,7 @@ independent of the root mobile env. Configure:
 | `ADMIN_SUPABASE_URL` | Chosen staging project URL, or `http://127.0.0.1:54321` for local Docker. HTTPS is required for remote projects. |
 | `ADMIN_SUPABASE_PUBLISHABLE_KEY` | Same project's publishable key. Local CLI legacy `anon` keys are also accepted. Infrastructure/secret/service-role keys are rejected. |
 | `ADMIN_SUPABASE_SECRET_KEY` | T11 only: same project's server-only secret (`sb_secret_`) key, or local legacy `service_role` key. Never expose via `NEXT_PUBLIC_` or Expo config. |
+| `PRELAUNCH_CODE_SECRET`, `PRELAUNCH_ORIGIN`, `PRELAUNCH_CONTACT_EMAIL`, `EMAIL_API_KEY`, `EMAIL_FROM` | T54b only, for **Send new code** on Pre-launch: the same values as that environment's registration page ([pre-launch registration](prelaunch-registration.md#configuration-appswebenvexample)); the code secret must also equal the project's `owner-submissions` function secret. Server-only. Without them the list and Erase still work and Send answers 503 before anything changes. Optional `EMAIL_API_URL` (defaults to Resend) and `PRELAUNCH_APP_URL` (the App Store link for the email, once the app is out; https only). |
 
 Open http://localhost:3000. Use the hostname in `ADMIN_ORIGIN` consistently;
 `127.0.0.1` and `localhost` are different origins. Local development uses HTTP
@@ -102,6 +103,7 @@ npm run admin:typecheck
 npm run admin:lint
 npm run admin:build
 npm run test:admin:local
+npm run test:registrations:local
 npm run typecheck
 npm run lint
 npm run check:dependencies
@@ -120,6 +122,10 @@ removes its fixtures and stops only its child server; it never touches hosted
 accounts. Production cookie headers are tested with a Node HTTP cookie jar;
 that jar sends Secure cookies over loopback for the test, whereas browsers need
 HTTPS in production.
+
+`npm run test:registrations:local` (T54b) uses the same production server pattern
+with a loopback stand-in for the email provider; see
+[pre-launch registration](prelaunch-registration.md#console-registrations-and-launch-codes-t54b).
 
 These checks prove server behavior, not a browser screenshot or physical-device
 layout review. Use dev mode for local browser layout, keyboard focus, narrow

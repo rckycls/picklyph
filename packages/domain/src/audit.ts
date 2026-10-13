@@ -18,13 +18,16 @@ export type DirectoryAuditAction =
   | 'session.cancel'
   | 'directory.delete'
   | 'prelaunch.register'
-  | 'prelaunch.retire';
+  | 'prelaunch.retire'
+  | 'prelaunch.code_send'
+  | 'prelaunch.erase';
 
 /** Safe audit projection; no request bodies, evidence, names or credentials. */
 export type DirectoryAuditEvent = {
   /** Decimal bigint string: never round through a JavaScript number. */
   id: string;
-  /** For `prelaunch.*` actions, the pre-launch registration (T53): no account exists yet. */
+  /** For `prelaunch.register` and `prelaunch.retire`, the pre-launch registration (T53): no account exists yet.
+   * `prelaunch.code_send` and `prelaunch.erase` name the administrator (T54b). */
   actor_user_id: string;
   target_venue_id: string;
   action: DirectoryAuditAction;
