@@ -113,8 +113,8 @@ Counts, job names, schedules and pg_cron messages only. **Check again** reloads 
 buttons that run the monitor, post or change anything. The Overview shows administrators a **Health
 problems** card (live problems plus the monitor's Redis results) with the monitor's freshness.
 
-**Staging:** the migration is not pushed yet (operator: the next `supabase db push`, after a dry run).
-Until then the page answers "System health unavailable".
+**Staging (2026-10-14):** the migration is applied. The monitor is not set up there yet, so the page says
+no monitor run is recorded and shows its own live checks.
 
 ## Setup per environment (operator)
 
