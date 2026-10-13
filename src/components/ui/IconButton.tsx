@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { colors } from '@/theme/colors';
 import { fonts } from '@/theme/typography';
@@ -29,26 +29,43 @@ export function IconPill({ icon, label, onPress, tone = 'soft', disabled = false
   );
 }
 
-/** A round icon-only button; `accessibilityLabel` names the action. */
-export function IconButton({ icon, accessibilityLabel, onPress, disabled = false }: {
-  icon: IconName; accessibilityLabel: string; onPress: () => void; disabled?: boolean;
+/** A round icon-only button; `accessibilityLabel` names the action. `danger` marks removals. */
+export function IconButton({ icon, accessibilityLabel, onPress, disabled = false, loading = false, tone = 'soft' }: {
+  icon: IconName; accessibilityLabel: string; onPress: () => void; disabled?: boolean; loading?: boolean; tone?: 'soft' | 'danger';
 }) {
   const [focused, setFocused] = useState(false);
+  const blocked = disabled || loading;
+  const color = tone === 'danger' ? colors.error : colors.selectedText;
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={accessibilityLabel} accessibilityState={{ disabled }} disabled={disabled}
+    <Pressable accessibilityRole="button" accessibilityLabel={accessibilityLabel} accessibilityState={{ disabled: blocked, busy: loading }} disabled={blocked}
       onPress={onPress} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)} hitSlop={4}
-      style={({ pressed }) => [styles.round, focused && styles.focused, pressed && styles.pressed, disabled && styles.faded]}>
-      <Icon name={icon} color={colors.selectedText} size={20} />
+      style={({ pressed }) => [styles.round, tone === 'danger' && styles.danger, focused && styles.focused, pressed && styles.pressed, disabled && styles.faded]}>
+      {loading ? <ActivityIndicator color={color} accessible={false} /> : <Icon name={icon} color={color} size={20} />}
     </Pressable>
   );
 }
 
+/** A right-aligned, icon-only refresh for list views. While a server wait runs it stays disabled. */
+export function RefreshButton({ accessibilityLabel, busy, waiting, onPress }: {
+  accessibilityLabel: string; busy: boolean; waiting: boolean; onPress: () => void;
+}) {
+  // A stable label while waiting, so VoiceOver doesn't re-announce a countdown.
+  return (
+    <View style={styles.end}>
+      <IconButton icon="refresh" accessibilityLabel={waiting ? `${accessibilityLabel}, available shortly` : accessibilityLabel}
+        loading={busy} disabled={waiting} onPress={onPress} />
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  end: { alignItems: 'flex-end' },
   pill: { minHeight: 40, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8,
     borderRadius: 20, borderWidth: 2, borderColor: 'transparent', flexShrink: 1 },
   label: { fontFamily: fonts.semibold, fontSize: 14, lineHeight: 20, flexShrink: 1 },
   round: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.selectedBackground,
     borderWidth: 2, borderColor: 'transparent' },
+  danger: { backgroundColor: colors.errorBackground },
   focused: { borderColor: colors.text },
   pressed: { transform: [{ scale: 0.96 }] },
   disabled: { opacity: 0.55 },

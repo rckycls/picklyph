@@ -1,5 +1,4 @@
 // Type-only imports keep this module loadable by the Node tests.
-import type { DeviceLocation } from './useDeviceLocation';
 import type { ResultsState } from './resultsState';
 import type { DiscoveryFilters } from './searchClient';
 
@@ -27,7 +26,12 @@ export function retryLabel(recovery: Recovery): string {
 }
 
 export function filtersActive(filters: DiscoveryFilters): boolean {
-  return filters.indoor !== null || filters.covered !== null || filters.surface !== null;
+  return activeFilterCount(filters) > 0;
+}
+
+/** How many filter groups are narrowing the search, for the Filters button's badge. */
+export function activeFilterCount(filters: DiscoveryFilters): number {
+  return [filters.indoor, filters.covered, filters.surface].filter((value) => value !== null).length;
 }
 
 /**
@@ -37,20 +41,4 @@ export function filtersActive(filters: DiscoveryFilters): boolean {
 export function wideningActions(state: Pick<ResultsState, 'status' | 'failure' | 'venues'>, options: { filtersActive: boolean; national: boolean }) {
   const applies = state.status === 'error' ? state.failure?.kind === 'rejected' : state.status === 'ready' && state.venues.length === 0;
   return { clearFilters: applies && options.filtersActive, zoomOut: applies && !options.national };
-}
-
-/** Location is optional: every state keeps the directory usable without it. */
-export function locationMessage(location: DeviceLocation, settingsError: boolean): string {
-  if (settingsError) return 'Couldn’t open Settings. You can keep browsing the Philippines.';
-  switch (location.status) {
-    case 'denied':
-      return location.canAskAgain
-        ? 'Location access is off. You can still explore the Philippines.'
-        : 'Location access is off for PicklyPH. Turn it on in Settings, or keep exploring the Philippines.';
-    case 'disabled': return 'Location services are off. You can still browse the map.';
-    case 'unavailable': return 'Couldn’t find your location. Try again or explore the Philippines.';
-    case 'requesting': return 'Finding your location…';
-    case 'granted': return 'Location enabled. Move the map to explore.';
-    case 'idle': return 'Explore approved venues. Location access is optional.';
-  }
 }

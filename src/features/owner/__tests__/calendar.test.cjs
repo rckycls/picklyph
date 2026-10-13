@@ -111,6 +111,37 @@ test('venue hours draft groups touching stretches, keeps rates exact and reports
   assert.equal(hours.closureDateOptions('2026-12-31')[1], '2027-01-01');
 });
 
+test('hours and closures tabs save separately and collapsed rows summarize each day and court', () => {
+  const saved = hours.scheduleDraftFrom({ weekly: [[], [{ start_minute: 480, end_minute: 1320, rates: [{ start_minute: 480, end_minute: 1320, hourly_centavos: 40000 }] }], [], [], [], [], []],
+    exceptions: [{ date: '2026-10-20', windows: [] }, { date: '2026-10-21', windows: [{ start_minute: 600, end_minute: 660, rates: [{ start_minute: 600, end_minute: 660, hourly_centavos: 1 }] }] }] });
+  // An hours edit plus a closure on the special date (which drops that special entry).
+  const both = hours.toggleClosure({ ...saved, weekly: saved.weekly.map((b, i) => (i === 2 ? [{ start: 600, end: 720, pesos: '300' }] : b)) }, '2026-10-21');
+  assert.equal(hours.scheduleSectionDirty(both, saved, 'hours'), true);
+  assert.equal(hours.scheduleSectionDirty(both, saved, 'closures'), true);
+  const hoursOnly = hours.scheduleSectionDraft(both, saved, 'hours');
+  assert.deepEqual(plain(hoursOnly.closures), ['2026-10-20']); assert.equal(hoursOnly.special.length, 1, 'special hours travel with closures');
+  assert.equal(hoursOnly.weekly[2].length, 1);
+  const closuresOnly = hours.scheduleSectionDraft(both, saved, 'closures');
+  assert.deepEqual(plain(closuresOnly.closures), ['2026-10-20', '2026-10-21']); assert.equal(closuresOnly.special.length, 0);
+  assert.equal(closuresOnly.weekly[2].length, 0, 'unsaved hours stay out of a closures save');
+  // Discarding (or saving) one tab keeps the other tab's edits.
+  const keptClosures = hours.resetScheduleSection(both, saved, 'hours');
+  assert.equal(hours.scheduleSectionDirty(keptClosures, saved, 'hours'), false);
+  assert.equal(hours.scheduleSectionDirty(keptClosures, saved, 'closures'), true);
+
+  assert.equal(hours.daySummary([], model.clockLabel), 'Closed');
+  assert.equal(hours.daySummary(saved.weekly[1], model.clockLabel), '8:00 AM – 10:00 PM · ₱400/hr');
+  // Touching stretches read as one period; mixed and missing rates are called out.
+  assert.equal(hours.daySummary([{ start: 1320, end: 1440, pesos: '250.50' }, { start: 1440, end: 1560, pesos: '300' }], model.clockLabel),
+    '10:00 PM – 2:00 AM (next day) · 2 rates');
+  assert.equal(hours.daySummary([{ start: 480, end: 720, pesos: '' }, { start: 780, end: 900, pesos: '300' }], model.clockLabel),
+    '8:00 AM – 12:00 PM, 1:00 PM – 3:00 PM · rate missing');
+  assert.equal(hours.windowsSummary([], model.clockLabel), 'Closed');
+  assert.equal(hours.windowsSummary([{ start_minute: 480, end_minute: 1320 }], model.clockLabel), '8:00 AM – 10:00 PM');
+  assert.equal(hours.courtSummary({ custom: false, weekly: [], closures: ['2026-10-01', '2026-10-12'] }, '2026-10-09'), 'Same as venue hours · 1 closure');
+  assert.equal(hours.courtSummary({ custom: true, weekly: [], closures: [] }, '2026-10-09'), 'Its own hours');
+});
+
 test('court hours draft: venue-following or own same-day periods, closures from today', () => {
   const draft = hours.courtDraftFrom({ weekly: null, closures: ['2026-10-01', '2026-10-12'] });
   assert.equal(draft.custom, false);

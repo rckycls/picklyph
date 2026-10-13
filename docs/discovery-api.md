@@ -115,9 +115,9 @@ A failed search clears that area's results; nothing from an earlier area is show
 | 503 without a wait | Unavailable message | **Try again** immediately |
 | Rejected search (400) / not configured | Message only, no retry | **Clear filters** / **Show all of the Philippines** when either would change the query |
 | Empty results | “No approved venues match…” | **Clear filters** when filters are on; **Show all of the Philippines** unless already national |
-| Location denied, disabled or unavailable | Header note explains the state | Browsing continues; **Open settings** replaces **Use my location** after a permanent denial |
+| Location denied, disabled or unavailable | Nothing extra (since 2026-10-13 Discover asks as it opens and has no location button or note) | The map stays on the whole Philippines. Allowing location later in Settings centers the map on return. Account → Location access shows the state and opens Settings |
 
-Copy never claims availability or bookability. While a countdown runs, the retry button keeps a stable VoiceOver label (“Try again, available shortly”), so screen readers don't re-announce each tick. Pure logic is covered by `npm run test:discovery`. Device review is pending: in airplane mode, search, then reconnect and foreground the app; repeat searches past the guest limit and watch the countdown and the single automatic retry; filter to an empty result and use Clear filters and Show all of the Philippines; deny location (Don't Allow), then use Open settings; check VoiceOver and large text on each state.
+Copy never claims availability or bookability. While a countdown runs, the retry button keeps a stable VoiceOver label (“Try again, available shortly”), so screen readers don't re-announce each tick. Pure logic is covered by `npm run test:discovery`. Device review is pending: in airplane mode, search, then reconnect and foreground the app; repeat searches past the guest limit and watch the countdown and the single automatic retry; filter to an empty result and use Clear filters and Show all of the Philippines; deny location (Don't Allow) and keep browsing the Philippines, then allow it in Settings and return; check VoiceOver and large text on each state.
 
 ## Verification
 

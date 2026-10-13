@@ -46,6 +46,47 @@ export function addBand(bands: BandDraft[]): BandDraft[] {
 export function copyDayToAll(draft: ScheduleDraft, day: number): ScheduleDraft {
   return { ...draft, weekly: draft.weekly.map(() => draft.weekly[day]!.map((band) => ({ ...band }))) };
 }
+/** The Hours and Closures tabs save separately, through the same venue schedule command. */
+export type ScheduleSection = 'hours' | 'closures';
+
+/** What one tab's Save sends: its edits, with the other tab as last saved. Special hours travel with closures. */
+export function scheduleSectionDraft(draft: ScheduleDraft, saved: ScheduleDraft, section: ScheduleSection): ScheduleDraft {
+  return section === 'hours' ? { ...saved, weekly: draft.weekly } : { ...draft, weekly: saved.weekly };
+}
+/** Takes one tab back to `saved` (after its save, or to discard it) and keeps the other tab's unsaved edits. */
+export function resetScheduleSection(draft: ScheduleDraft, saved: ScheduleDraft, section: ScheduleSection): ScheduleDraft {
+  return scheduleSectionDraft(draft, saved, section === 'hours' ? 'closures' : 'hours');
+}
+export function scheduleSectionDirty(draft: ScheduleDraft, saved: ScheduleDraft, section: ScheduleSection): boolean {
+  return JSON.stringify(scheduleSectionDraft(draft, saved, section)) !== JSON.stringify(saved);
+}
+
+/** Touching stretches (rate changes) read as one period: "8:00 AM – 10:00 PM, 11:00 PM – midnight". */
+function periodsText(spans: { start: number; end: number }[], clock: (minute: number) => string): string {
+  const periods: { start: number; end: number }[] = [];
+  for (const span of [...spans].sort((a, b) => a.start - b.start)) {
+    const last = periods[periods.length - 1];
+    if (last && span.start === last.end) last.end = span.end; else periods.push({ ...span });
+  }
+  return periods.map((p) => `${clock(p.start)} – ${clock(p.end)}`).join(', ');
+}
+/** A collapsed day row: "Closed", or its hours and rate ("8:00 AM – 10:00 PM · ₱400/hr"). */
+export function daySummary(bands: BandDraft[], clock: (minute: number) => string): string {
+  if (bands.length === 0) return 'Closed';
+  const rates = [...new Set(bands.map((band) => band.pesos.trim()))];
+  const rate = rates.includes('') ? 'rate missing' : rates.length === 1 ? `₱${rates[0]}/hr` : `${rates.length} rates`;
+  return `${periodsText(bands, clock)} · ${rate}`;
+}
+/** A collapsed court day row: "Closed" or its periods. */
+export function windowsSummary(windows: CourtWindow[], clock: (minute: number) => string): string {
+  return windows.length ? periodsText(windows.map((w) => ({ start: w.start_minute, end: w.end_minute })), clock) : 'Closed';
+}
+/** A collapsed court row: whose hours it follows and how many closures are coming up. */
+export function courtSummary(draft: CourtDraft, today: string): string {
+  const closures = draft.closures.filter((date) => date >= today).length;
+  return `${draft.custom ? 'Its own hours' : 'Same as venue hours'}${closures ? ` · ${closures} ${closures === 1 ? 'closure' : 'closures'}` : ''}`;
+}
+
 /** A closure replaces any special hours on that date. */
 export function toggleClosure(draft: ScheduleDraft, date: string): ScheduleDraft {
   if (draft.closures.includes(date)) return { ...draft, closures: draft.closures.filter((d) => d !== date) };

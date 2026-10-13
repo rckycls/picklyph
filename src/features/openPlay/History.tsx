@@ -5,6 +5,7 @@ import { Text, View } from 'react-native';
 import { PicklyMascot } from '@/components/mascot/PicklyMascot';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { RefreshButton } from '@/components/ui/IconButton';
 import { screenText } from '@/components/ui/Screen';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { mergeHistory } from '../rental/model';
@@ -23,7 +24,7 @@ export function GroupHistory({ actor }: { actor: string }) {
   const wait = useRetryWait(pages.failure); const rows = pages.rows;
   return <>
     <GroupRecovery recovery={recovery} />
-    <Button label={wait ? `Refresh in ${wait}s` : pages.busy ? 'Checking groups…' : 'Refresh groups'} variant="secondary" loading={pages.busy} disabled={wait > 0} onPress={pages.refresh} />
+    <RefreshButton accessibilityLabel="Refresh groups" busy={pages.busy} waiting={wait > 0} onPress={pages.refresh} />
     {pages.failure && <GroupError failure={pages.failure} />}
     {pages.failure && rows.length > 0 && <Text style={screenText.body}>The list below shows the last received records. Refresh to check current statuses.</Text>}
     {pages.loaded && rows.length === 0 && !pages.busy && !pages.failure && <Card><View style={{ alignItems: 'center' }}><PicklyMascot size={160} /></View>

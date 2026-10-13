@@ -35,15 +35,15 @@ export function useDeviceLocation(onResult: (result: LocationResult) => void) {
       const permission = await readForegroundPermission();
       if (!active || !mounted.current || busy.current) return;
       if (permission.status === 'granted') {
-        // Settings may grant permission, but position acquisition remains an explicit player action.
-        if (location.status !== 'granted') setLocation({ status: 'idle' });
+        // Discover centers on the player whenever it may, so a permission granted in Settings is used on return.
+        if (location.status !== 'granted') void request();
       } else {
         setLocation(permission);
         if (location.status === 'granted') onResult(permission);
       }
     });
     return () => { active = false; subscription.remove(); };
-  }, [location.status, onResult]);
+  }, [location.status, onResult, request]);
 
   return { location, request };
 }

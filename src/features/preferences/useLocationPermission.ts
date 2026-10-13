@@ -26,7 +26,7 @@ export function locationAccessLabel(permission: PermissionSnapshot | null): stri
   switch (permission.status) {
     case 'granted': return 'Allowed · used to show courts near you';
     case 'disabled': return 'Location Services are off · open Settings';
-    case 'denied': return permission.canAskAgain ? 'Not set · Discover asks when you tap Use my location' : 'Off · open Settings to allow';
+    case 'denied': return permission.canAskAgain ? 'Not set · Discover asks when it opens' : 'Off · open Settings to allow';
     case 'unavailable': return 'Unavailable on this device';
   }
 }

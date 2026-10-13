@@ -32,7 +32,10 @@ async function nativeClient(): Promise<LocationClient> {
   };
 }
 
-/** Called only after the player presses the location button. No background subscription or persistence. */
+/**
+ * Called when Discover opens (its prompt is the first ask) and from the add-venue pin step's
+ * location button. No background subscription or persistence.
+ */
 export async function locateUser(client?: LocationClient, timeoutMs = 15_000): Promise<LocationResult> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {

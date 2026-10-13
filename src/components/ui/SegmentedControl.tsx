@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors } from '@/theme/colors';
 import { fonts } from '@/theme/typography';
 
-/** Two or three mutually exclusive choices in a rounded track (radio group semantics). */
+/** Two to four mutually exclusive choices (or tabs) in a rounded track (radio group semantics). */
 export function SegmentedControl<T extends string>({ options, value, onChange, disabled = false, accessibilityLabel }: {
   options: readonly { value: T; label: string; accessibilityLabel?: string }[];
   value: T;

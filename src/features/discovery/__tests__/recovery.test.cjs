@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { initialResults, resultsReducer } = require('../resultsState.ts');
-const { filtersActive, locationMessage, recoveryFor, retryLabel, wideningActions } = require('../recovery.ts');
+const { activeFilterCount, filtersActive, recoveryFor, retryLabel, wideningActions } = require('../recovery.ts');
 const { failureMessage, resultsSummary } = require('../listing.ts');
 const { NO_FILTERS } = require('../searchClient.ts');
 
@@ -54,6 +54,10 @@ test('empty and rejected searches offer only actions that change the next query'
   }
   assert.equal(filtersActive(NO_FILTERS), false);
   assert.equal(filtersActive({ ...NO_FILTERS, covered: false }), true);
+  // The Filters dropdown badge counts groups, and "Outdoor" (indoor: false) counts as a filter.
+  assert.equal(activeFilterCount(NO_FILTERS), 0);
+  assert.equal(activeFilterCount({ ...NO_FILTERS, indoor: false }), 1);
+  assert.equal(activeFilterCount({ indoor: true, covered: true, surface: 'hard' }), 3);
 });
 
 test('loading, empty and failure copy stays truthful: no availability or booking claims, no retry promise for rejected input', () => {
@@ -67,15 +71,4 @@ test('loading, empty and failure copy stays truthful: no availability or booking
   assert.match(resultsSummary(resultsReducer(loaded([venue(1)]), { type: 'search', requestId: 2, filterKey: 'a' })), /Updating/);
   assert.doesNotMatch(failureMessage({ kind: 'rejected', retryAfterSeconds: null }), /try again/i);
   assert.match(failureMessage({ kind: 'network', retryAfterSeconds: null }), /connection/);
-});
-
-test('every location state keeps discovery usable and explains what to do', () => {
-  const messages = [{ status: 'idle' }, { status: 'requesting' }, { status: 'granted' }, { status: 'denied', canAskAgain: true },
-    { status: 'denied', canAskAgain: false }, { status: 'disabled' }, { status: 'unavailable' }].map((location) => locationMessage(location, false));
-  assert.equal(new Set(messages).size, messages.length);
-  for (const [index, text] of messages.entries()) {
-    if (index >= 3) assert.match(text, /explor|brows/i, `${text} keeps the directory usable`);
-  }
-  assert.match(locationMessage({ status: 'denied', canAskAgain: false }, false), /Settings/);
-  assert.match(locationMessage({ status: 'granted' }, true), /Couldn’t open Settings/);
 });

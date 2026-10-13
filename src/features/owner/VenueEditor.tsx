@@ -7,29 +7,38 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Field } from '@/components/ui/Field';
 import { screenText } from '@/components/ui/Screen';
+import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { colors } from '@/theme/colors';
 import { fonts } from '@/theme/typography';
 
 import { liveOwnedVenue, liveSaveVenue } from './liveOwner';
 import { OwnerScreen } from './OwnerScreen';
+import { SaveFooter } from './SaveFooter';
 import { venueFailureMessage, type VenueFailure } from './venueClient';
 import {
-  SURFACE_LABELS, addCourt, draftFrom, isDirty, removeNewCourt, saveCommand, updateCourt,
-  type CourtDraft, type VenueDraft,
+  SURFACE_LABELS, addCourt, draftFrom, removeNewCourt, resetSection, saveCommand, sectionDirty, sectionDraft, updateCourt,
+  type CourtDraft, type VenueDraft, type VenueSection,
 } from './venueDraft';
 import { VenuePhotos } from './VenuePhotos';
 import { VenuePolicyForm } from './VenuePolicyForm';
 
 type Loaded = { status: 'loading' } | { status: 'ready' } | { status: 'error'; failure: VenueFailure };
+type Tab = VenueSection | 'photos' | 'policies';
+type Message = { section: VenueSection; text: string; conflict: boolean };
 
-/** Details, courts and photos of one venue the signed-in owner manages. Pin and status are read-only. */
+/**
+ * Details, courts, photos and policies of one venue the signed-in owner manages, one tab each.
+ * Every tab saves on its own; hidden tabs stay mounted so their unsaved edits survive switching.
+ * Pin and status are read-only.
+ */
 export function VenueEditor({ venueId }: { venueId: string }) {
   const [loaded, setLoaded] = useState<Loaded>({ status: 'loading' });
   const [venue, setVenue] = useState<OwnerVenue | null>(null);
   const [draft, setDraft] = useState<VenueDraft | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<{ text: string; conflict: boolean } | null>(null);
+  const [tab, setTab] = useState<Tab>('details');
+  const [saving, setSaving] = useState<VenueSection | null>(null);
+  const [message, setMessage] = useState<Message | null>(null);
 
   const load = useCallback((signal?: AbortSignal) => {
     liveOwnedVenue(venueId, signal).then((outcome) => {
@@ -68,25 +77,41 @@ export function VenueEditor({ venueId }: { venueId: string }) {
     );
   }
 
-  const dirty = isDirty(draft, venue);
+  const detailsDirty = sectionDirty(draft, venue, 'details');
+  const courtsDirty = sectionDirty(draft, venue, 'courts');
+  const busy = saving !== null;
   // The owner's own new venue, editable while pickly reviews their proof.
   const underReview = venue.publication_status === 'draft';
   const edit = (patch: Partial<VenueDraft>) => { setDraft({ ...draft, ...patch }); setMessage(null); };
   const editCourt = (key: string, patch: Partial<Omit<CourtDraft, 'key' | 'id'>>) => { setDraft(updateCourt(draft, key, patch)); setMessage(null); };
-  const save = async () => {
-    const built = saveCommand(draft, venue);
-    if (!built.ok) { setMessage({ text: built.message, conflict: false }); return; }
-    setSaving(true); setMessage(null);
+  const reload = () => { setLoaded({ status: 'loading' }); load(); };
+  const save = async (section: VenueSection) => {
+    const built = saveCommand(sectionDraft(draft, venue, section), venue);
+    if (!built.ok) { setMessage({ section, text: built.message, conflict: false }); return; }
+    setSaving(section); setMessage(null);
     const outcome = await liveSaveVenue(built.command);
-    setSaving(false);
+    setSaving(null);
     if (outcome.ok) {
-      setVenue(outcome.value); setDraft(draftFrom(outcome.value));
-      setMessage({ text: underReview ? 'Saved. Players see it once pickly approves your venue.' : 'Saved. Players see the updated listing now.', conflict: false });
+      setVenue(outcome.value); setDraft((current) => (current ? resetSection(current, outcome.value, section) : current));
+      setMessage({ section, conflict: false,
+        text: underReview ? 'Saved. Players see it once pickly approves your venue.' : 'Saved. Players see the updated listing now.' });
       return;
     }
     const conflict = outcome.failure.kind === 'rejected' && outcome.failure.reason === 'version_conflict';
-    setMessage({ text: venueFailureMessage(outcome.failure), conflict });
+    setMessage({ section, text: venueFailureMessage(outcome.failure), conflict });
   };
+  const footer = (section: VenueSection, dirty: boolean, label: string) => (
+    <SaveFooter dirty={dirty} label={label} saving={saving === section} disabled={busy}
+      message={message?.section === section ? message : null} onReload={reload}
+      onSave={() => void save(section)} onDiscard={() => { setDraft(resetSection(draft, venue, section)); setMessage(null); }} />
+  );
+  // A dot marks a tab with unsaved edits, since its Save is out of sight.
+  const tabs = [
+    { value: 'details', label: detailsDirty ? 'Details •' : 'Details', accessibilityLabel: detailsDirty ? 'Details, unsaved changes' : 'Details' },
+    { value: 'courts', label: courtsDirty ? 'Courts •' : 'Courts', accessibilityLabel: courtsDirty ? 'Courts, unsaved changes' : 'Courts' },
+    { value: 'photos', label: 'Photos' },
+    { value: 'policies', label: 'Policies' },
+  ] as const;
 
   return (
     <OwnerScreen>
@@ -108,41 +133,35 @@ export function VenueEditor({ venueId }: { venueId: string }) {
         </Text>
       </Card>
 
-      <Card>
+      <SegmentedControl options={tabs} value={tab} onChange={setTab} accessibilityLabel="Venue sections" />
+
+      <Card style={tab !== 'details' && styles.hidden}>
         <Text accessibilityRole="header" style={screenText.title}>Venue details</Text>
-        <Field label="Venue name" value={draft.name} onChangeText={(name) => edit({ name })} maxLength={120} editable={!saving} />
-        <Field label="Street address" value={draft.address_line} onChangeText={(address_line) => edit({ address_line })} maxLength={240} editable={!saving} />
-        <Field label="City or municipality" value={draft.city} onChangeText={(city) => edit({ city })} maxLength={80} editable={!saving} />
-        <Field label="Province" value={draft.province} onChangeText={(province) => edit({ province })} maxLength={80} editable={!saving} />
+        <Field label="Venue name" value={draft.name} onChangeText={(name) => edit({ name })} maxLength={120} editable={!busy} />
+        <Field label="Street address" value={draft.address_line} onChangeText={(address_line) => edit({ address_line })} maxLength={240} editable={!busy} />
+        <Field label="City or municipality" value={draft.city} onChangeText={(city) => edit({ city })} maxLength={80} editable={!busy} />
+        <Field label="Province" value={draft.province} onChangeText={(province) => edit({ province })} maxLength={80} editable={!busy} />
+        {footer('details', detailsDirty, 'Save details')}
       </Card>
 
-      <Card>
+      <Card style={tab !== 'courts' && styles.hidden}>
         <Text accessibilityRole="header" style={screenText.title}>Courts</Text>
         <Text style={screenText.body}>Inactive courts stay on file but aren’t shown to players. Keep at least one court active.</Text>
         {draft.courts.map((court, index) => (
-          <CourtFields key={court.key} court={court} position={index + 1} disabled={saving}
+          <CourtFields key={court.key} court={court} position={index + 1} disabled={busy}
             onChange={(patch) => editCourt(court.key, patch)}
             onRemove={court.id === null ? () => { setDraft(removeNewCourt(draft, court.key)); setMessage(null); } : null} />
         ))}
-        <Button label="Add a court" variant="secondary" disabled={saving || draft.courts.length >= 40}
+        <Button label="Add a court" variant="secondary" disabled={busy || draft.courts.length >= 40}
           onPress={() => { setDraft(addCourt(draft, randomUUID())); setMessage(null); }} />
+        {footer('courts', courtsDirty, 'Save courts')}
       </Card>
 
-      <Card>
-        {message && (
-          <Text accessibilityRole={message.conflict ? 'alert' : undefined} accessibilityLiveRegion="polite"
-            style={[screenText.body, message.conflict && styles.error]}>{message.text}</Text>
-        )}
-        {message?.conflict && <Button label="Reload latest" variant="secondary" onPress={() => { setLoaded({ status: 'loading' }); load(); }} />}
-        <Button label={dirty ? 'Save changes' : 'No unsaved changes'} loading={saving} disabled={!dirty || saving} onPress={() => void save()} />
-        {dirty && <Button label="Discard changes" variant="secondary" disabled={saving} onPress={() => { setDraft(draftFrom(venue)); setMessage(null); }} />}
-      </Card>
-
-      <Card>
-        <VenuePhotos venueId={venue.id} photos={venue.photos} disabled={saving}
+      <Card style={tab !== 'photos' && styles.hidden}>
+        <VenuePhotos venueId={venue.id} photos={venue.photos} disabled={busy}
           onChange={(photos) => setVenue((current) => (current ? { ...current, photos } : current))} />
       </Card>
-      <Card><VenuePolicyForm venueId={venue.id} /></Card>
+      <Card style={tab !== 'policies' && styles.hidden}><VenuePolicyForm venueId={venue.id} /></Card>
     </OwnerScreen>
   );
 }
@@ -196,7 +215,7 @@ function Toggle({ label, value, onChange, disabled, accessibilityLabel }: {
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: 10, alignItems: 'center' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  error: { color: colors.error },
+  hidden: { display: 'none' },
   court: { gap: 10, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 14 },
   surfaces: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   surface: { minHeight: 44, paddingHorizontal: 14, borderRadius: 12, borderWidth: 2, borderColor: colors.border, justifyContent: 'center', backgroundColor: colors.surface },

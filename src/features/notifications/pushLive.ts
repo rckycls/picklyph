@@ -1,3 +1,4 @@
+import { requireOptionalNativeModule } from 'expo';
 import Constants from 'expo-constants';
 import type { NotificationResponse } from 'expo-notifications';
 import { Platform } from 'react-native';
@@ -18,8 +19,11 @@ let signedIn: string | null = null;
 /**
  * expo-notifications needs native code that older development builds lack, and its modules throw
  * when imported there. Load it lazily so those builds keep working and report push as unavailable.
+ * Check for the native module first: Metro hands an import's evaluation error to
+ * `ErrorUtils.reportFatalError` instead of rejecting, so the `catch` below never sees it.
  */
 function notifications(): Promise<Notifications | null> {
+  if (!loaded && !requireOptionalNativeModule('ExpoPushTokenManager')) loaded = Promise.resolve(null);
   loaded ??= import('expo-notifications').then((module) => {
     // Push is supplementary: while the app is open, show the banner and list entry quietly, and only
     // for the signed-in account (T45), so a phone that changed accounts never shows another one's.

@@ -9,7 +9,7 @@ import { clockText, manilaParts, monthDayText, shortDateText } from '@/component
 import { PicklyMascot } from '@/components/mascot/PicklyMascot';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { IconPill } from '@/components/ui/IconButton';
+import { IconButton } from '@/components/ui/IconButton';
 import { Notice } from '@/components/ui/Notice';
 import { screenText } from '@/components/ui/Screen';
 import { loadLiveVenueDetail } from '@/features/discovery/liveDirectory';
@@ -104,9 +104,9 @@ export function BookingsCalendar({ actor }: { actor: string }) {
     <Recovery recovery={rentalRecovery} />
     <GroupRecovery recovery={groupRecovery} />
     <View style={styles.toolbar}>
-      <IconPill icon="refresh" label={wait ? `Refresh in ${wait}s` : busy ? 'Checking…' : 'Refresh'} accessibilityLabel="Refresh bookings"
+      <Text style={styles.count}>{loaded && live > 0 ? `${live} upcoming` : ''}</Text>
+      <IconButton icon="refresh" accessibilityLabel={wait ? 'Refresh bookings, available shortly' : 'Refresh bookings'}
         loading={busy} disabled={wait > 0} onPress={() => { rentals.refresh(); groups.refresh(); }} />
-      {loaded && live > 0 && <Text style={styles.count}>{live} upcoming</Text>}
     </View>
     <DateStrip value={date} today={today} onChange={setDate} marks={playerMarks(entries)}
       markLabels={{ busy: 'has bookings', attention: 'has a booking awaiting approval' }} />
@@ -137,8 +137,8 @@ export function BookingsCalendar({ actor }: { actor: string }) {
 }
 
 const styles = StyleSheet.create({
-  toolbar: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 10 },
-  count: { fontFamily: fonts.semibold, color: colors.text, fontSize: 14, lineHeight: 20 },
+  toolbar: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  count: { flex: 1, fontFamily: fonts.semibold, color: colors.text, fontSize: 14, lineHeight: 20 },
   caption: { fontFamily: fonts.medium, color: colors.textSecondary, fontSize: 13, lineHeight: 19 },
   row: { flexDirection: 'row', gap: 10, alignItems: 'center' },
   center: { alignItems: 'center' },

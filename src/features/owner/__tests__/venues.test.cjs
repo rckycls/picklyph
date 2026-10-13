@@ -179,6 +179,24 @@ test('editor helpers keep saved courts, explain blocked venues and precheck phot
   assert.match(editor.saveCommand(inactive, venue).message, /at least one court active/);
   assert.match(editor.saveCommand(editor.updateCourt(draft, COURT, { name: 'Court 3' }), venue).message, /Two courts are named “Court 3”/);
   assert.match(editor.saveCommand({ ...draft, name: '   ' }, venue).message, /Enter the venue name/);
+  // Details and Courts tabs save separately: each Save sends only its own tab's edits.
+  const both = editor.updateCourt({ ...editor.draftFrom(venue), name: 'Beta Courts' }, COURT, { is_indoor: true });
+  assert.equal(editor.sectionDirty(both, venue, 'details'), true);
+  assert.equal(editor.sectionDirty(both, venue, 'courts'), true);
+  const details = editor.saveCommand(editor.sectionDraft(both, venue, 'details'), venue).command;
+  assert.equal(details.venue.name, 'Beta Courts');
+  assert.equal(details.courts.find((c) => c.id === COURT).is_indoor, false, 'unsaved court edits stay out of a details save');
+  const courts = editor.saveCommand(editor.sectionDraft(both, venue, 'courts'), venue).command;
+  assert.equal(courts.venue.name, 'Alpha Courts', 'unsaved details stay out of a courts save');
+  assert.equal(courts.courts.find((c) => c.id === COURT).is_indoor, true);
+  // After the details save, the courts tab keeps its unsaved edit (and discarding courts keeps details).
+  const renamed = { ...venue, name: 'Beta Courts', updated_at: '2026-10-07T01:02:04.000000+00:00' };
+  const afterDetails = editor.resetSection(both, renamed, 'details');
+  assert.equal(editor.sectionDirty(afterDetails, renamed, 'details'), false);
+  assert.equal(editor.sectionDirty(afterDetails, renamed, 'courts'), true);
+  const discarded = editor.resetSection(both, venue, 'courts');
+  assert.equal(discarded.name, 'Beta Courts');
+  assert.equal(editor.sectionDirty(discarded, venue, 'courts'), false);
   assert.deepEqual(plain(editor.photoProblem({ uri: 'file:///a.HEIC', mimeType: 'image/heic' })), { problem: 'Choose a JPEG or PNG photo.' });
   assert.match(editor.photoProblem({ uri: 'file:///a.jpg', fileSize: 6 * 1024 * 1024 }).problem, /5 MB/);
   assert.match(editor.photoProblem({ uri: 'file:///a.png', width: 200, height: 900 }).problem, /320 pixels/);

@@ -1,14 +1,13 @@
 import type { MapBounds, VenueSearchItem } from '@picklyph/domain';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Linking, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Button } from '@/components/ui/Button';
 import { PageHeader, pageLayout } from '@/components/ui/PageHeader';
 import CourtMap from '@/features/discovery/CourtMap';
 import { FilterBar, type DiscoveryView } from '@/features/discovery/FilterBar';
 import type { MapRegion } from '@/features/discovery/mapTypes';
-import { filtersActive, locationMessage, wideningActions } from '@/features/discovery/recovery';
+import { filtersActive, wideningActions } from '@/features/discovery/recovery';
 import { PHILIPPINES_REGION, regionToBounds, sameBounds, selectedVenueRegion } from '@/features/discovery/region';
 import { NO_FILTERS, type DiscoveryFilters } from '@/features/discovery/searchClient';
 import { useDeviceLocation } from '@/features/discovery/useDeviceLocation';
@@ -18,7 +17,6 @@ import { VenueSheet } from '@/features/discovery/VenueSheet';
 import { loadDiscoverView } from '@/features/preferences/discoverView';
 import type { LocationResult } from '@/lib/location';
 import { colors } from '@/theme/colors';
-import { fonts } from '@/theme/typography';
 import { FirstLaunchWelcome } from '@/features/welcome/FirstLaunchWelcome';
 
 const NATIONAL_BOUNDS = regionToBounds(PHILIPPINES_REGION) as MapBounds;
@@ -37,7 +35,6 @@ function DiscoverScreen() {
   const [missingId, setMissingId] = useState<string | null>(null);
   const [focusRegion, setFocusRegion] = useState<MapRegion>(PHILIPPINES_REGION);
   const [mapReady, setMapReady] = useState(false);
-  const [settingsError, setSettingsError] = useState(false);
   const query = useMemo(() => ({ bounds, ...filters }), [bounds, filters]);
   const { results, recovery, loadMore, retry, remove } = useVenueSearch(query);
   const regionTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -56,7 +53,10 @@ function DiscoverScreen() {
       : { ...PHILIPPINES_REGION });
   }, []);
   const { location, request } = useDeviceLocation(applyLocation);
-  const settingsNeeded = location.status === 'disabled' || (location.status === 'denied' && !location.canAskAgain);
+  // Discover is the landing page: it asks for location as it opens and centers the map on the
+  // player. The camera waits for the map, so asking before it is ready is fine. Declining keeps
+  // the whole Philippines in view.
+  useEffect(() => { void request(); }, [request]);
 
   const handleRegion = useCallback((region: MapRegion) => {
     clearTimeout(regionTimer.current);
@@ -93,7 +93,6 @@ function DiscoverScreen() {
     ? [...results.venues, selected]
     : results.venues;
 
-  const message = locationMessage(location, settingsError);
   // Without a ready map, its camera cannot report the national area, so search it directly.
   const showPhilippines = () => {
     setSelected(null);
@@ -112,23 +111,6 @@ function DiscoverScreen() {
       <View style={styles.headerSurface}>
         <View style={[pageLayout.content, styles.header]}>
           <PageHeader />
-          <View style={styles.actions}>
-            <Button
-              label={settingsNeeded ? 'Open settings' : 'Use my location'}
-              variant="accent"
-              style={styles.action}
-              disabled={!mapReady}
-              loading={location.status === 'requesting'}
-              accessibilityHint={mapReady ? 'Location is optional. You can explore without sharing it.' : 'Available when the Google map is ready.'}
-              onPress={() => {
-                setSettingsError(false);
-                if (settingsNeeded) void Linking.openSettings().catch(() => setSettingsError(true));
-                else void request();
-              }}
-            />
-            <Button label="View Philippines" variant="secondary" style={styles.action} disabled={!mapReady} onPress={showPhilippines} />
-          </View>
-          <Text accessibilityLiveRegion="polite" style={styles.note}>{message}</Text>
         </View>
       </View>
       <FilterBar view={view} onViewChange={changeView} filters={filters} onFiltersChange={changeFilters} />
@@ -163,10 +145,7 @@ function DiscoverScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   headerSurface: { backgroundColor: colors.surface },
-  header: { alignSelf: 'center', paddingBottom: 16, gap: 12 },
-  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  action: { flex: 1, flexBasis: 140, paddingHorizontal: 10 },
-  note: { fontFamily: fonts.medium, color: colors.textSecondary, fontSize: 13, lineHeight: 20 },
+  header: { alignSelf: 'center', paddingBottom: 12 },
   map: { flex: 1, minHeight: 0, overflow: 'hidden' },
   layer: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
 });

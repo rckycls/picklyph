@@ -42,7 +42,7 @@ export default function PreferencesScreen() {
       <Card>
         <Text accessibilityRole="header" style={styles.heading}>Location</Text>
         <Text style={screenText.body} accessibilityLiveRegion="polite">{locationAccessLabel(location)}</Text>
-        <Text style={styles.note}>pickly uses your location only when you tap Use my location on Discover. It isn’t stored.</Text>
+        <Text style={styles.note}>pickly uses your location to center the Discover map near you. It isn’t stored.</Text>
         <Button label="Open iPhone Settings" variant="secondary" onPress={() => void Linking.openSettings().catch(() => undefined)} />
       </Card>
     </OwnerScreen>

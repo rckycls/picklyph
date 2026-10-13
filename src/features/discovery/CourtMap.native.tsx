@@ -60,7 +60,8 @@ export default function CourtMap({ venues, selectedId, focusRegion, showUserLoca
         onMapReady={() => { setReady(true); setSlow(false); }}
         onRegionChangeComplete={(region) => { if (ready) onRegionChange(region); }}
         showsUserLocation={showUserLocation}
-        showsMyLocationButton={false}
+        // Google's own recenter control, the only way back to the player once they pan away.
+        showsMyLocationButton={showUserLocation}
         showsCompass
         showsPointsOfInterests={false}
         toolbarEnabled={false}

@@ -2,7 +2,8 @@ import Svg, { Circle, Path, Rect } from 'react-native-svg';
 
 export type IconName =
   | 'calendar' | 'desk' | 'inbox' | 'players' | 'clock' | 'edit' | 'pin' | 'court' | 'photo' | 'plus'
-  | 'chevronLeft' | 'chevronRight' | 'chevronDown' | 'chevronUp' | 'close' | 'refresh' | 'check' | 'cash' | 'lock' | 'today';
+  | 'chevronLeft' | 'chevronRight' | 'chevronDown' | 'chevronUp' | 'close' | 'refresh' | 'check' | 'cash' | 'lock' | 'today'
+  | 'filter' | 'trash' | 'copy';
 
 /** Rounded 24-unit line icons. Decorative: pair each with visible text or an accessible label on its control. */
 export function Icon({ name, color, size = 22, strokeWidth = 2 }: { name: IconName; color: string; size?: number; strokeWidth?: number }) {
@@ -63,6 +64,16 @@ export function Icon({ name, color, size = 22, strokeWidth = 2 }: { name: IconNa
       {name === 'today' && <>
         <Circle cx={12} cy={12} r={8.5} {...line} />
         <Circle cx={12} cy={12} r={3} fill={color} />
+      </>}
+      {name === 'filter' && <>
+        <Path d="M4 7h8.5M17.5 7H20M4 17h2.5M11.5 17H20" {...line} />
+        <Circle cx={15} cy={7} r={2.5} {...line} />
+        <Circle cx={9} cy={17} r={2.5} {...line} />
+      </>}
+      {name === 'trash' && <Path d="M4.5 7h15M9.5 7V5.2a1.2 1.2 0 0 1 1.2-1.2h2.6a1.2 1.2 0 0 1 1.2 1.2V7M6.5 7l.8 11.6a2 2 0 0 0 2 1.9h5.4a2 2 0 0 0 2-1.9L17.5 7M10 11v5.5M14 11v5.5" {...line} />}
+      {name === 'copy' && <>
+        <Rect x={8.5} y={8.5} width={11.5} height={11.5} rx={2.5} {...line} />
+        <Path d="M15.5 8.5V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7.5a2 2 0 0 0 2 2h2.5" {...line} />
       </>}
     </Svg>
   );

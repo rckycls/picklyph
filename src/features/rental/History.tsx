@@ -5,6 +5,7 @@ import { AppState, Text, View } from 'react-native';
 import { PicklyMascot } from '@/components/mascot/PicklyMascot';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { RefreshButton } from '@/components/ui/IconButton';
 import { screenText } from '@/components/ui/Screen';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { loadHistory, type RentalFailure } from './client';
@@ -42,7 +43,7 @@ export function RentalHistory({ actor }: { actor: string }) {
   }, [page, revision, generation, refresh]));
   return <>
     <Recovery recovery={recovery} />
-    <Button label={wait ? `Refresh in ${wait}s` : busy ? 'Checking bookings…' : 'Refresh bookings'} variant="secondary" loading={busy} disabled={wait > 0} onPress={refresh} />
+    <RefreshButton accessibilityLabel="Refresh bookings" busy={busy} waiting={wait > 0} onPress={refresh} />
     {failure && <RentalError failure={failure} />}
     {failure && rows.length > 0 && <Text style={screenText.body}>The list below shows the last received records. Refresh to check current statuses.</Text>}
     {loaded && rows.length === 0 && !busy && !failure && <Card><View style={{ alignItems: 'center' }}><PicklyMascot size={160} /></View><Text style={screenText.title}>Find your next game.</Text>

@@ -42,6 +42,25 @@ export function isDirty(draft: VenueDraft, venue: OwnerVenue): boolean {
   return JSON.stringify({ ...draft, courts: draft.courts.map(strip) }) !== JSON.stringify({ ...draftFrom(venue), courts: draftFrom(venue).courts.map(strip) });
 }
 
+/** The editor's Details and Courts tabs save separately, through the same venue command. */
+export type VenueSection = 'details' | 'courts';
+
+/** What one tab's Save sends: that tab's edits, with the other tab as last saved. */
+export function sectionDraft(draft: VenueDraft, venue: OwnerVenue, section: VenueSection): VenueDraft {
+  const saved = draftFrom(venue);
+  return section === 'details' ? { ...draft, courts: saved.courts } : { ...saved, courts: draft.courts };
+}
+
+/** Takes one tab back to `venue` (after its save, or to discard it) and keeps the other tab's unsaved edits. */
+export function resetSection(draft: VenueDraft, venue: OwnerVenue, section: VenueSection): VenueDraft {
+  const saved = draftFrom(venue);
+  return section === 'details' ? { ...saved, courts: draft.courts } : { ...draft, courts: saved.courts };
+}
+
+export function sectionDirty(draft: VenueDraft, venue: OwnerVenue, section: VenueSection): boolean {
+  return isDirty(sectionDraft(draft, venue, section), venue);
+}
+
 /** Normalizes through the shared contract the server also enforces. */
 export function saveCommand(draft: VenueDraft, venue: OwnerVenue): Built<OwnerVenueSave> {
   if (draft.courts.length > MAX_OWNER_COURTS) return { ok: false, message: `A venue can list at most ${MAX_OWNER_COURTS} courts.` };
